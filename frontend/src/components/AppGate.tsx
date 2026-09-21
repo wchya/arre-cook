@@ -4,6 +4,7 @@ import { authApi } from "@/api"
 import { APP_TOKEN_KEY } from "@/api/client"
 import { useAppInfoStore } from "@/store/useAppInfoStore"
 import AchievementUnlockOverlay from "@/components/AchievementUnlockOverlay"
+import AiAssistant from "@/components/AiAssistant"
 import toast from "react-hot-toast"
 
 export default function AppGate({ children }: { children: React.ReactNode }) {
@@ -33,6 +34,7 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
       <>
         {children}
         <AchievementUnlockOverlay />
+        <AiAssistant />
       </>
     )
   }
