@@ -1,0 +1,36 @@
+services:
+  ninimenu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: arre-cook/ninimenu:latest
+    container_name: arre-cook-ninimenu
+    restart: unless-stopped
+    ports:
+      # 对外开放 9925
+      - "9925:8080"
+    environment:
+      TZ: Asia/Shanghai
+      GIN_MODE: release
+      # 生产请自行修改以下值（也可用 .env 文件覆盖）
+      APP_PASSWORD: ${APP_PASSWORD:-nini123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-nini123}
+      JWT_SECRET: ${JWT_SECRET:-please-change-me}
+    volumes:
+      - ninimenu-data:/app/data
+      - ninimenu-uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/app-info >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  ninimenu-data:
+  ninimenu-uploads:

@@ -1,0 +1,14 @@
+# 环境变量与本地数据
+.env
+env.bak
+*.bak
+
+# 构建产物
+dist/
+dist-win/
+*.tar.gz
+frontend/node_modules/
+frontend/dist/
+backend/static/
+backend/data/
+backend/uploads_backup/
