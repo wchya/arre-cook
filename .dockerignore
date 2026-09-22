@@ -1,0 +1,14 @@
+.git
+frontend/node_modules
+frontend/dist
+backend/static
+backend/data
+backend/uploads_backup
+dist
+dist-win
+*.tar.gz
+.env
+env.bak
+README*.md
+CHANGELOG.md
+img
