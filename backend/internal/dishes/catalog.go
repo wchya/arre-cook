@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"ninimenu/internal/models"
+	"strings"
 )
 
 type DishPack struct {
@@ -37,18 +38,14 @@ type stepSpec struct {
 	Time int    `json:"time,omitempty"`
 }
 
+// 站内菜谱范围：只保留南方菜系，口味偏辣。
+// 按“辣度 / 下饭程度”排序：川菜、湘菜、贵州菜、云南菜、粤菜，共 100 道。
 var defaultCategories = []string{
-	"家常菜",
-	"快手菜",
-	"汤品",
-	"主食",
 	"川菜",
-	"粤菜",
 	"湘菜",
-	"东北菜",
-	"新疆菜",
-	"云南菜",
 	"贵州菜",
+	"云南菜",
+	"粤菜",
 }
 
 var defaultTastes = []string{
@@ -76,18 +73,19 @@ var defaultTastes = []string{
 }
 
 var defaultPacks = []DishPack{
-	basicHomePack,
-	quickMealPack,
-	soupPack,
-	staplePack,
 	sichuanPack,
-	cantonesePack,
 	hunanPack,
-	northeastPack,
-	xinjiangPack,
-	yunnanPack,
 	guizhouPack,
+	yunnanPack,
+	cantonesePack,
 }
+
+// seedImageDirs 是当前菜单种子图片目录；retiredSeedImageDirs 是已下线菜系的图片目录。
+// 历史数据库里由旧种子数据写入、如今已从菜单移除的菜品，靠这些前缀识别并清理；
+// 用户自己上传的图片落在 /uploads/YYYY/MM/DD/ 下，不会被误伤。
+var seedImageDirs = []string{"sichuan", "hunan", "guizhou", "yunnan", "cantonese"}
+
+var retiredSeedImageDirs = []string{"basic_home", "quick_meal", "soup", "staple", "northeast", "xinjiang"}
 
 func DefaultCategories() []string {
 	return copyStrings(defaultCategories)
@@ -103,6 +101,41 @@ func DefaultPacks() []DishPack {
 	return packs
 }
 
+// DefaultDishNameSet 返回当前菜单里全部种子菜名，用于识别已下线的种子菜品。
+func DefaultDishNameSet() map[string]bool {
+	names := make(map[string]bool, recipeCount(defaultPacks))
+	for _, pack := range defaultPacks {
+		for _, recipe := range pack.Recipes {
+			names[recipe.Name] = true
+		}
+	}
+	return names
+}
+
+func SeedImageDirs() []string {
+	return copyStrings(seedImageDirs)
+}
+
+// IsSeedImage 判断图片路径是否属于当前菜单的种子图片目录。
+func IsSeedImage(path string) bool {
+	return hasSeedDirPrefix(path, seedImageDirs)
+}
+
+// IsRetiredSeedImage 判断图片路径是否属于已下线菜系的种子图片目录。
+func IsRetiredSeedImage(path string) bool {
+	return hasSeedDirPrefix(path, retiredSeedImageDirs)
+}
+
+func hasSeedDirPrefix(path string, dirs []string) bool {
+	path = strings.TrimSpace(path)
+	for _, dir := range dirs {
+		if strings.HasPrefix(path, "/uploads/"+dir+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 func DefaultDishes() []models.Dish {
 	result := make([]models.Dish, 0, recipeCount(defaultPacks))
 	sortOrder := 10
@@ -114,7 +147,7 @@ func DefaultDishes() []models.Dish {
 				category = pack.Category
 			}
 			if category == "" {
-				category = "家常菜"
+				category = defaultCategories[0]
 			}
 
 			mealType := recipe.MealType

@@ -5,8 +5,8 @@ import { dishesApi, uploadApi, settingsApi, getUploadErrorMessage } from "@/api"
 import { asArray } from "@/lib/utils"
 import toast from "react-hot-toast"
 
-const DEFAULT_CATEGORIES = ["家常菜", "川菜", "粤菜", "快手菜", "汤品", "主食", "小食"]
-const DEFAULT_TASTES = ["酸", "甜", "辣", "鲜", "清淡", "咸鲜", "麻辣", "蒜香", "葱香", "酱香", "糖醋", "咖喱"]
+const DEFAULT_CATEGORIES = ["川菜", "湘菜", "贵州菜", "云南菜", "粤菜"]
+const DEFAULT_TASTES = ["辣", "麻辣", "香辣", "酸辣", "鲜辣", "酸", "甜", "鲜", "清淡", "咸鲜", "蒜香", "葱香", "酱香", "豉香"]
 const mealTypes = [
   { key: "lunch", label: "🍳 午餐" },
   { key: "dinner", label: "🍲 晚餐" },
@@ -68,7 +68,7 @@ export default function AdminDishEdit() {
   const tastes = parseList(settings?.tastes, DEFAULT_TASTES)
 
   const [name, setName] = useState("")
-  const [category, setCategory] = useState("家常菜")
+  const [category, setCategory] = useState("川菜")
   const [mealType, setMealType] = useState("all")
   const [difficulty, setDifficulty] = useState("easy")
   const [tasteList, setTasteList] = useState<string[]>([])
@@ -94,7 +94,7 @@ export default function AdminDishEdit() {
   useEffect(() => {
     if (!dish) return
     setName(dish.name || "")
-    setCategory(dish.category || "家常菜")
+    setCategory(dish.category || "川菜")
     setMealType(dish.meal_type || "all")
     setDifficulty(dish.difficulty || "easy")
     setTasteList((dish.taste || "").split(",").map((t) => t.trim()).filter(Boolean))

@@ -33,20 +33,20 @@ func DefaultAchievements() []models.Achievement {
 		auto("full_day_3", "规律开饭", "3天同时记录午餐和晚餐", "📋"),
 		auto("full_day_10", "饭点稳定器", "10天同时记录午餐和晚餐", "⏱️"),
 
-		auto("home_chef", "居家大厨", "记录20道家常菜", "🏠"),
-		auto("home_food_5", "家常味道", "记录5道家常菜", "🍚"),
+		auto("home_chef", "居家大厨", "记录20道川菜或湘菜", "🏠"),
 		auto("sichuan_rookie", "川味初探", "记录5道川菜", "🌶️"),
 		auto("sichuan_master", "川菜大师", "记录10道川菜", "🔥"),
+		auto("hunan_rookie", "湘味初探", "记录5道湘菜", "🌶️"),
+		auto("hunan_master", "湘菜大师", "记录10道湘菜", "🫕"),
+		auto("guizhou_rookie", "黔味初探", "记录5道贵州菜", "🍲"),
+		auto("guizhou_master", "酸汤大师", "记录10道贵州菜", "🥘"),
+		auto("yunnan_rookie", "滇味初探", "记录5道云南菜", "🍄"),
 		auto("cantonese_rookie", "粤味初探", "记录5道粤菜", "🐟"),
 		auto("cantonese_master", "粤菜大师", "记录10道粤菜", "🥘"),
-		auto("soup_lover", "汤品爱好者", "记录5道汤品", "🍲"),
-		auto("soup_master", "暖汤收藏家", "记录15道汤品", "🥣"),
 		auto("quick_cook", "快手达人", "连续3次记录快手菜", "⚡"),
 		auto("quick_master", "十五分钟战神", "记录20道快手菜", "⏲️"),
-		auto("staple_runner", "主食担当", "记录10道主食", "🍜"),
-		auto("snack_collector", "小食收藏家", "记录5道小食", "🥟"),
-		auto("foodie_explorer", "美食探险家", "尝试5种不同分类", "🗺️"),
-		auto("category_collector", "分类收集癖", "尝试7种不同分类", "🧩"),
+		auto("south_explorer", "南方菜系探索者", "尝试3种不同菜系", "🗺️"),
+		auto("foodie_explorer", "美食探险家", "尝试5种不同菜系", "🧭"),
 
 		auto("easy_10", "轻松下厨", "记录10道简单菜", "🙂"),
 		auto("medium_10", "稳扎稳打", "记录10道中等难度菜", "🧑‍🍳"),
@@ -110,6 +110,9 @@ func DefaultAchievements() []models.Achievement {
 		auto("blind_box_10", "惊喜收藏家", "打开10次惊喜盲盒", "🎪"),
 		auto("week_plan_first", "本周安排上", "生成一周菜单", "📅"),
 		auto("week_plan_5", "计划型吃货", "生成5次一周菜单", "🗓️"),
+		auto("agent_recommend_first", "AI 点菜初体验", "第一次让 AI 推荐官帮你点菜", "🤖"),
+		auto("agent_recommend_10", "AI 饭搭子", "AI 推荐官帮你点了10次菜", "🧠"),
+		auto("agent_accept_5", "从善如流", "采纳5次 AI 推荐", "🤝"),
 
 		auto("dish_library_10", "菜单起步", "菜品库达到10道菜", "📒"),
 		auto("dish_library_30", "菜单扩容", "菜品库达到30道菜", "📚"),
@@ -118,7 +121,7 @@ func DefaultAchievements() []models.Achievement {
 		auto("video_recipe_1", "视频课开张", "录入第一条视频教程", "▶️"),
 		auto("ingredient_ready_10", "备料清楚", "10道菜录入配料", "🥬"),
 		auto("rich_recipe_10", "步骤控", "10道菜录入制作步骤", "📝"),
-		auto("category_builder_5", "菜单架构师", "菜品库覆盖5种分类", "🗂️"),
+		auto("category_builder_5", "菜单架构师", "菜品库覆盖5种菜系", "🗂️"),
 
 		auto("top_dish_5", "有个老朋友", "同一道菜记录5次", "🤝"),
 		auto("top_dish_10", "本命菜出现", "同一道菜记录10次", "👑"),
@@ -134,5 +137,12 @@ func auto(code, name, description, icon string) models.Achievement {
 		Description: description,
 		Icon:        icon,
 		Condition:   "auto",
+	}
+}
+
+// RetiredCodes 随“只保留南方菜系”裁剪一起下线的旧成就编码。
+func RetiredCodes() []string {
+	return []string{
+		"home_food_5", "soup_lover", "soup_master", "staple_runner", "snack_collector", "category_collector",
 	}
 }

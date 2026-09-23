@@ -2,12 +2,14 @@ package database
 
 import (
 	"encoding/json"
+	"log"
 	"ninimenu/internal/achievements"
 	"ninimenu/internal/config"
 	"ninimenu/internal/dishes"
 	"ninimenu/internal/models"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -45,12 +47,51 @@ func Init() error {
 		&models.ShoppingCheck{},
 		&models.HomeInventory{},
 		&models.ShoppingItemCategory{},
+		&models.BehaviorEvent{},
 	); err != nil {
 		return err
 	}
 
 	seedData()
+	retireRemovedSeedDishes()
 	return nil
+}
+
+// retireRemovedSeedDishes 把历史数据库里由旧种子写入、如今已从菜单移除的菜品下线：
+// 软删除并取消收藏，同时清掉本周菜单缓存让其按新菜单重新生成。用餐记录保留（记录自带菜名）。
+// 判定依据：图片来自已下线菜系的种子目录；或图片来自现有菜系目录但菜名不在当前菜单里
+// （用户克隆出来的“(副本)”菜品除外）。用户自己上传图片的菜品不受影响。
+func retireRemovedSeedDishes() {
+	keep := dishes.DefaultDishNameSet()
+
+	var all []models.Dish
+	DB.Select("id", "name", "image_url", "images").Find(&all)
+
+	var retired []uint
+	for _, d := range all {
+		if keep[d.Name] {
+			continue
+		}
+		image := d.ImageURL
+		var images []string
+		if json.Unmarshal([]byte(d.Images), &images) == nil && len(images) > 0 && image == "" {
+			image = images[0]
+		}
+		switch {
+		case dishes.IsRetiredSeedImage(image):
+			retired = append(retired, d.ID)
+		case dishes.IsSeedImage(image) && !strings.Contains(d.Name, "副本"):
+			retired = append(retired, d.ID)
+		}
+	}
+	if len(retired) == 0 {
+		return
+	}
+	DB.Where("dish_id IN ?", retired).Delete(&models.Favorite{})
+	DB.Model(&models.Dish{}).Where("id IN ?", retired).Update("favorite", false)
+	DB.Where("id IN ?", retired).Delete(&models.Dish{})
+	DB.Where("`key` = ?", "week_plan_cache").Delete(&models.Setting{})
+	log.Printf("已下线 %d 道不在当前菜单中的旧种子菜品", len(retired))
 }
 
 func configureSQLite(db *gorm.DB) error {
@@ -110,10 +151,23 @@ func seedData() {
 		}
 		DB.Create(&a)
 	}
+	// 已随菜系裁剪下线的旧成就（家常菜/汤品/主食/小食等）连同解锁记录一并移除
+	if retired := achievements.RetiredCodes(); len(retired) > 0 {
+		var ids []uint
+		DB.Model(&models.Achievement{}).Where("code IN ? AND `condition` = ?", retired, "auto").Pluck("id", &ids)
+		if len(ids) > 0 {
+			DB.Where("achievement_id IN ?", ids).Delete(&models.UserAchievement{})
+			DB.Where("id IN ?", ids).Delete(&models.Achievement{})
+		}
+	}
 
 	for _, dish := range dishes.DefaultDishes() {
 		var existing models.Dish
-		if err := DB.Where("name = ?", dish.Name).First(&existing).Error; err == nil {
+		if err := DB.Unscoped().Where("name = ?", dish.Name).First(&existing).Error; err == nil {
+			// 曾被下线的种子菜品重新回到菜单：恢复而不是重复创建
+			if existing.DeletedAt.Valid {
+				DB.Unscoped().Model(&existing).Update("deleted_at", nil)
+			}
 			continue
 		}
 		DB.Create(&dish)

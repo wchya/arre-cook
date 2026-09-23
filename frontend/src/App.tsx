@@ -15,6 +15,7 @@ import Favorites from "@/pages/Favorites"
 import PhotoWall from "@/pages/PhotoWall"
 import More from "@/pages/More"
 import Tomorrow from "@/pages/Tomorrow"
+import Assistant from "@/pages/Assistant"
 import Achievements from "@/pages/Achievements"
 import CookMode from "@/pages/CookMode"
 import AdminLogin from "@/pages/admin/Login"
@@ -57,6 +58,7 @@ export default function App() {
           <Route element={<AppGate><SubPageLayout /></AppGate>}>
             <Route path="/dishes/:id" element={<DishDetail />} />
             <Route path="/tomorrow" element={<Tomorrow />} />
+            <Route path="/assistant" element={<Assistant />} />
             <Route path="/achievements" element={<Achievements />} />
           </Route>
           <Route path="/dishes/:id/cook" element={<AppGate><CookMode /></AppGate>} />

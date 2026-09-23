@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { dishesApi, favoritesApi, recordsApi } from "@/api"
+import { dishesApi, favoritesApi, recordsApi, behaviorApi } from "@/api"
 import { useAuthStore } from "@/store/useAuthStore"
 import { asArray } from "@/lib/utils"
 import { getDishImageUrl, getDishEmoji } from "@/components/DishImage"
@@ -126,6 +126,13 @@ export default function DishDetail() {
   const { data: favDishes } = useQuery({ queryKey: ["favorites"], queryFn: () => favoritesApi.list(), staleTime: 0 })
   const isFav = favDishes?.some((d: Dish) => d.id === dishId) || false
 
+  // 浏览埋点：进入详情页记一条 view 事件，供推荐分析使用
+  const viewedDishName = dish?.name
+  useEffect(() => {
+    if (!dishId || !viewedDishName) return
+    void behaviorApi.log({ event_type: "view", dish_id: dishId, dish_name: viewedDishName, meta: { from: "detail" } })
+  }, [dishId, viewedDishName])
+
   const { data: dishRecordsData } = useQuery({
     queryKey: ["dish-records", dishId],
     queryFn: () => dishesApi.records(dishId),
@@ -158,11 +165,12 @@ export default function DishDetail() {
       meal_type: mealType,
       meal_date: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}-${String(new Date().getDate()).padStart(2,"0")}`,
     }),
-    onSuccess: () => {
+    onSuccess: (_res, mealType) => {
       toast.success("❤ 已记录！")
       qc.invalidateQueries({ queryKey: ["records"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       qc.invalidateQueries({ queryKey: ["dish-records", dishId] })
+      void behaviorApi.log({ event_type: "accept", dish_id: dishId, dish_name: dish?.name || "", meta: { from: "detail", meal_type: mealType } })
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message

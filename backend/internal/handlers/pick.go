@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"io"
 	"math/rand"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
@@ -25,34 +27,39 @@ type TomorrowPickRequest struct {
 	ExcludeIDs []uint `json:"exclude_ids"`
 }
 
+// recommendForApp 站内推荐统一走推荐引擎（口味画像 + 约束打分），并带一点随机抖动保证“换一个”有变化。
+func recommendForApp(req services.RecommendRequest) []models.Dish {
+	req.Source = "app"
+	req.Jitter = true
+	result, err := services.RecommendDishes(req)
+	if err != nil || result == nil {
+		return nil
+	}
+	dishes := make([]models.Dish, 0, len(result.Items))
+	for _, it := range result.Items {
+		dishes = append(dishes, it.Dish)
+	}
+	return dishes
+}
+
 func PickLunch(c *gin.Context) {
-	count := getPickCount(c)
-	dishes, err := services.PickDishes("lunch", count, true)
-	if err != nil || len(dishes) == 0 {
+	dishes := recommendForApp(services.RecommendRequest{MealType: "lunch", Count: getPickCount(c)})
+	if len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
 	services.RecordAchievementEvent("recommend_lunch", "")
-	quote := services.GetRandomQuote("lunch")
-	utils.Success(c, gin.H{
-		"dishes": dishes,
-		"quote":  quote,
-	})
+	utils.Success(c, gin.H{"dishes": dishes, "quote": services.GetRandomQuote("lunch")})
 }
 
 func PickDinner(c *gin.Context) {
-	count := getPickCount(c)
-	dishes, err := services.PickDishes("dinner", count, true)
-	if err != nil || len(dishes) == 0 {
+	dishes := recommendForApp(services.RecommendRequest{MealType: "dinner", Count: getPickCount(c)})
+	if len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
 	services.RecordAchievementEvent("recommend_dinner", "")
-	quote := services.GetRandomQuote("dinner")
-	utils.Success(c, gin.H{
-		"dishes": dishes,
-		"quote":  quote,
-	})
+	utils.Success(c, gin.H{"dishes": dishes, "quote": services.GetRandomQuote("dinner")})
 }
 
 func PickMood(c *gin.Context) {
@@ -62,58 +69,55 @@ func PickMood(c *gin.Context) {
 		return
 	}
 
-	count := 3
-
+	rec := services.RecommendRequest{Mood: req.Mood, Count: 4}
 	switch req.Mood {
 	case "tired", "lazy":
-		var dishes []models.Dish
-		database.DB.Where("enabled = ? AND difficulty = ?", true, "easy").Find(&dishes)
-		if len(dishes) > 0 {
-			shuffled := shuffleDishes(dishes)
-			if len(shuffled) > count {
-				shuffled = shuffled[:count]
-			}
-			services.RecordAchievementEvent("recommend_mood", "")
-			quote := services.GetRandomQuote("quick")
-			utils.Success(c, gin.H{"dishes": shuffled, "quote": quote})
-			return
-		}
+		rec.MaxCookTime = 30
 	case "spicy":
-		var dishes []models.Dish
-		database.DB.Where("enabled = ? AND taste = ?", true, "辣").Find(&dishes)
-		if len(dishes) > 0 {
-			shuffled := shuffleDishes(dishes)
-			if len(shuffled) > count {
-				shuffled = shuffled[:count]
-			}
-			services.RecordAchievementEvent("recommend_mood", "")
-			quote := services.GetRandomQuote("lunch")
-			utils.Success(c, gin.H{"dishes": shuffled, "quote": quote})
-			return
-		}
-	case "healthy":
-		var dishes []models.Dish
-		database.DB.Where("enabled = ? AND taste IN ?", true, []string{"清淡", "鲜"}).Find(&dishes)
-		if len(dishes) > 0 {
-			shuffled := shuffleDishes(dishes)
-			if len(shuffled) > count {
-				shuffled = shuffled[:count]
-			}
-			services.RecordAchievementEvent("recommend_mood", "")
-			quote := services.GetRandomQuote("dinner")
-			utils.Success(c, gin.H{"dishes": shuffled, "quote": quote})
-			return
-		}
+		rec.Tastes = []string{"辣"}
 	}
-
-	dishes, err := services.PickDishes("", count, true)
-	if err != nil || len(dishes) == 0 {
+	dishes := recommendForApp(rec)
+	if len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
 	services.RecordAchievementEvent("recommend_mood", "")
-	quote := services.GetRandomQuote("")
-	utils.Success(c, gin.H{"dishes": dishes, "quote": quote})
+
+	scene := ""
+	switch req.Mood {
+	case "tired", "lazy":
+		scene = "quick"
+	case "spicy":
+		scene = "lunch"
+	case "healthy":
+		scene = "dinner"
+	}
+	utils.Success(c, gin.H{"dishes": dishes, "quote": services.GetRandomQuote(scene)})
+}
+
+// PickSmart 首页“智能推荐”：直接暴露推荐引擎的完整入参与带理由的结果。
+func PickSmart(c *gin.Context) {
+	var req services.RecommendRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		utils.BadRequest(c, "请求数据无效")
+		return
+	}
+	req.Source = "app"
+	req.Jitter = true
+	result, err := services.RecommendDishes(req)
+	if err != nil || result == nil || len(result.Items) == 0 {
+		utils.NotFound(c, "没有可推荐的菜品")
+		return
+	}
+	if req.Mode != "home_auto" {
+		services.RecordAchievementEvent("recommend_mood", req.Mood)
+	}
+	utils.Success(c, gin.H{
+		"items":           result.Items,
+		"profile_summary": result.ProfileSummary,
+		"applied":         result.Applied,
+		"quote":           services.GetRandomQuote(""),
+	})
 }
 
 func PickTomorrow(c *gin.Context) {
@@ -159,6 +163,7 @@ func PickBlindBox(c *gin.Context) {
 	}
 
 	services.RecordAchievementEvent("blind_box", "")
+	logBehavior("recommend", dish.ID, dish.Name, "app", "", map[string]any{"mode": "blind_box"})
 	utils.Success(c, gin.H{
 		"hint":  hint,
 		"dish":  dish,
@@ -175,14 +180,4 @@ func getPickCount(c *gin.Context) int {
 		count = 10
 	}
 	return count
-}
-
-func shuffleDishes(dishes []models.Dish) []models.Dish {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	shuffled := make([]models.Dish, len(dishes))
-	copy(shuffled, dishes)
-	r.Shuffle(len(shuffled), func(i, j int) {
-		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
-	})
-	return shuffled
 }

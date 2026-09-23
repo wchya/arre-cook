@@ -57,6 +57,7 @@ chmod +x ninimenu
 | `PORT` | `8080` | 服务端口 |
 | `APP_PASSWORD` | `nini123` | 应用端密码 |
 | `ADMIN_PASSWORD` | `nini123` | 管理端密码 |
+| `AGENT_TOKEN` | 同 `ADMIN_PASSWORD` | 智能体开放接口 `/api/agent/*` 的访问令牌（请求头 `X-Agent-Token`） |
 | `JWT_SECRET` | `ninimenu-secret-key` | JWT 签名密钥 |
 | `JWT_EXPIRE` | `24h` | Token 过期时间 |
 | `DB_PATH` | `data/ninimenu.db` | 数据库路径 |
@@ -189,7 +190,10 @@ NiniMenu/
 | GET/POST/PUT/DELETE | `/api/records` | 用餐记录 CRUD |
 | POST | `/api/records/batch` | 批量创建记录 |
 | GET/POST | `/api/favorites/:dishId` | 收藏/取消收藏 |
-| POST | `/api/pick/lunch\|dinner\|mood\|tomorrow\|blind-box` | 各类推荐 |
+| POST | `/api/pick/lunch\|dinner\|mood\|tomorrow\|blind-box` | 各类推荐（午/晚餐与心情推荐已接入推荐引擎） |
+| POST | `/api/pick/smart` | 智能推荐：口味画像 + 约束打分，返回带理由的结果 |
+| GET | `/api/profile` | 口味画像 |
+| POST | `/api/behavior` | 前端行为埋点（view / accept / reject …） |
 | GET/POST | `/api/day-rating` | 每日评价 |
 | GET | `/api/photo-wall` | 照片墙 |
 | GET/POST | `/api/shopping-list` | 购物清单 |
@@ -209,3 +213,26 @@ NiniMenu/
 | CRUD | `/api/achievements` | 成就管理 |
 | PUT | `/api/settings` | 系统设置 |
 | GET | `/api/admin/dashboard` | 仪表盘 |
+
+### 智能体开放接口（需 `X-Agent-Token`）
+
+食谱站把菜单、用餐记录、收藏、评价、行为事件、口味画像与推荐引擎全部开放给外部智能体，前缀 `/api/agent/*`。完整说明见 [docs/agent-api.md](docs/agent-api.md)，或直接请求 `GET /api/agent/capabilities` 获取自描述清单。
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/agent/capabilities` | 能力清单与枚举值 |
+| GET | `/api/agent/dishes`、`/api/agent/dishes/:id` | 菜品查询（含食材筛选、近期去重）与详情统计 |
+| GET | `/api/agent/profile` | 口味画像 |
+| POST | `/api/agent/recommend` | 推荐引擎 |
+| GET/POST/DELETE | `/api/agent/records` | 用餐记录读写 |
+| GET/POST/DELETE | `/api/agent/favorites` | 收藏读写 |
+| GET/POST | `/api/agent/behavior` | 行为事件流读写 |
+| GET | `/api/agent/day-ratings`、`/stats`、`/week-plan`、`/shopping-list`、`/settings`、`/export` | 评价、统计、周计划、买菜清单、设置、一次性导出 |
+
+## 菜单范围
+
+种子菜谱只保留南方菜系、以辣味为主，共 100 道：川菜 30、湘菜 30、贵州菜 18、云南菜 12、粤菜 10（`backend/internal/dishes/pack_*.go`，由 `catalog_test.go` 约束数量与菜系）。启动时会把历史数据库中已不在菜单里的旧种子菜品软删除（用户自建菜品不受影响）。
+
+## 智能体接入
+
+配套的「食谱推荐官」智能体在 `ai-agent-scaffold-lite` 工程中（`docs/dev-ops/recipe-agent.md`）。管理后台 → 设置 → 「AI 推荐官」填入智能体嵌入页地址后，站内 `/assistant` 页面会内嵌对话组件；该页同时展示口味画像并可按条件调用推荐引擎。

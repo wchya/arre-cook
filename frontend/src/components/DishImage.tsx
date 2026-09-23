@@ -2,8 +2,7 @@ import type { Dish } from "@/types"
 import { asArray } from "@/lib/utils"
 
 const categoryEmojis: Record<string, string> = {
-  川菜: "🌶", 粤菜: "🐟", 家常菜: "🍳", 快手菜: "⚡",
-  汤品: "🍲", 主食: "🍚", 小食: "🥟",
+  川菜: "🌶", 湘菜: "🔥", 贵州菜: "🍲", 云南菜: "🍄", 粤菜: "🐟",
 }
 
 export function getDishEmoji(d: Dish): string {

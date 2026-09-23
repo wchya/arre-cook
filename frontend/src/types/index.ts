@@ -285,3 +285,96 @@ export interface DishRecordsResponse {
   records: DishRecordWithDay[]
   stats: DishRecordsStats
 }
+
+// ---- 智能推荐 / 口味画像 / 行为事件 ----
+
+export interface RecommendItem {
+  dish: Dish
+  score: number
+  reasons: string[]
+}
+
+export interface SmartPickRequest {
+  meal_type?: string
+  mood?: string
+  count?: number
+  keyword?: string
+  tastes?: string[]
+  categories?: string[]
+  max_cook_time?: number
+  difficulty?: string
+  include_ingredients?: string[]
+  exclude_ingredients?: string[]
+  exclude_dish_ids?: number[]
+  exclude_recent_days?: number
+  mode?: string
+}
+
+export interface SmartPickResult {
+  items: RecommendItem[]
+  profile_summary: string
+  applied: Record<string, unknown>
+  quote: string
+}
+
+export interface WeightItem {
+  name: string
+  weight: number
+  count: number
+}
+
+export interface DishBrief {
+  id: number
+  name: string
+  category: string
+  taste: string
+  cook_time: number
+  difficulty: string
+}
+
+export interface DishFrequency {
+  dish_id: number
+  dish_name: string
+  count: number
+  last_date: string
+}
+
+export interface TasteProfile {
+  generated_at: string
+  window_days: number
+  repeat_days: number
+  total_records: number
+  window_records: number
+  distinct_dishes: number
+  meal_type_counts: Record<string, number>
+  taste_weights: WeightItem[]
+  category_weights: WeightItem[]
+  difficulty_counts: Record<string, number>
+  avg_cook_time: number
+  spicy_ratio: number
+  top_ingredients: WeightItem[]
+  top_dishes: DishFrequency[]
+  recent_dish_ids: number[]
+  favorite_dishes: DishBrief[]
+  liked_dishes: DishBrief[]
+  disliked_dishes: DishBrief[]
+  mood_counts: Record<string, number>
+  home_mood_counts: Record<string, number>
+  behavior_counts: Record<string, number>
+  most_viewed_dishes: DishFrequency[]
+  summary: string
+}
+
+export interface BehaviorEventInput {
+  event_type: "view" | "recommend" | "accept" | "reject" | "search" | "chat" | "feedback" | "custom"
+  dish_id?: number
+  dish_name?: string
+  source?: string
+  actor?: string
+  meta?: Record<string, unknown>
+}
+
+export interface AppInfo {
+  app_name: string
+  agent_embed_url: string
+}

@@ -8,9 +8,7 @@ import toast from "react-hot-toast"
 import { Search } from "lucide-react"
 
 const categoryEmojis: Record<string, string> = {
-  川菜: "🌶", 粤菜: "🐟", 家常菜: "🍳", 快手菜: "⚡",
-  汤品: "🍲", 主食: "🍚", 小食: "🥟", 湘菜: "🔥",
-  东北菜: "🥬", 新疆菜: "🐑", 云南菜: "🍄", 贵州菜: "🌶",
+  川菜: "🌶", 湘菜: "🔥", 贵州菜: "🍲", 云南菜: "🍄", 粤菜: "🐟",
 }
 function getEmoji(d: Dish) { return categoryEmojis[d.category] || "🍽" }
 function diffLabel(d: string) { return d === "easy" ? "简单" : d === "medium" ? "中等" : "困难" }
@@ -40,7 +38,7 @@ export default function AdminDishes() {
 
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: () => settingsApi.get() })
   const categories = asArray<string>(settings?.categories).filter((x) => typeof x === "string")
-  if (categories.length === 0) categories.push("家常菜", "川菜", "粤菜", "快手菜", "汤品", "主食")
+  if (categories.length === 0) categories.push("川菜", "湘菜", "贵州菜", "云南菜", "粤菜")
 
   const params: Record<string, string> = { pageSize: String(pageSize), page: String(page) }
   if (search) params.search = search

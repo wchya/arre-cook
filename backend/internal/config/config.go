@@ -12,6 +12,7 @@ type Config struct {
 	Port           string
 	AppPassword    string
 	AdminPassword  string
+	AgentToken     string
 	JWTSecret      string
 	JWTExpire      string
 	RepeatDays     int
@@ -29,9 +30,11 @@ func Load() {
 	loadDotEnv()
 
 	C = Config{
-		Port:           getEnv("PORT", "8080"),
-		AppPassword:    getEnv("APP_PASSWORD", getEnv("ADMIN_PASSWORD", "nini123")),
-		AdminPassword:  getEnv("ADMIN_PASSWORD", "nini123"),
+		Port:          getEnv("PORT", "8080"),
+		AppPassword:   getEnv("APP_PASSWORD", getEnv("ADMIN_PASSWORD", "nini123")),
+		AdminPassword: getEnv("ADMIN_PASSWORD", "nini123"),
+		// 智能体访问令牌：/api/agent/* 全量能力接口的凭证，未设置时沿用管理端密码
+		AgentToken:     getEnv("AGENT_TOKEN", getEnv("ADMIN_PASSWORD", "nini123")),
 		JWTSecret:      getEnv("JWT_SECRET", "ninimenu-secret-key"),
 		JWTExpire:      getEnv("JWT_EXPIRE", "24h"),
 		RepeatDays:     3,

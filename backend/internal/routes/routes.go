@@ -52,6 +52,9 @@ func Setup(r *gin.Engine) {
 			app.POST("/pick/mood", handlers.PickMood)
 			app.POST("/pick/tomorrow", handlers.PickTomorrow)
 			app.POST("/pick/blind-box", handlers.PickBlindBox)
+			app.POST("/pick/smart", handlers.PickSmart)
+			app.GET("/profile", handlers.GetAgentProfile)
+			app.POST("/behavior", handlers.CreateAppBehavior)
 			app.GET("/quotes", handlers.GetQuotes)
 			app.GET("/achievements", handlers.GetAchievements)
 			app.POST("/achievements/:id/unlock", handlers.UnlockAchievement)
@@ -69,6 +72,32 @@ func Setup(r *gin.Engine) {
 			app.POST("/shopping-list/toggle", handlers.ToggleShoppingCheckHandler)
 			app.POST("/shopping-list/inventory", handlers.ToggleHomeInventoryHandler)
 			app.GET("/holidays/upcoming", handlers.GetUpcomingHolidays)
+		}
+
+		// 智能体开放接口：全量能力（菜单、记录、收藏、评价、行为事件、画像、推荐引擎）
+		agent := api.Group("/agent")
+		agent.Use(middleware.AgentAuthMiddleware())
+		{
+			agent.GET("/capabilities", handlers.GetAgentCapabilities)
+			agent.GET("/dishes", handlers.GetAgentDishes)
+			agent.GET("/dishes/:id", handlers.GetAgentDish)
+			agent.GET("/profile", handlers.GetAgentProfile)
+			agent.POST("/recommend", handlers.AgentRecommend)
+			agent.GET("/records", handlers.GetAgentRecords)
+			agent.POST("/records", handlers.CreateAgentRecords)
+			agent.DELETE("/records/:id", handlers.DeleteAgentRecord)
+			agent.GET("/favorites", handlers.GetAgentFavorites)
+			agent.POST("/favorites/:dishId", handlers.AddFavorite)
+			agent.DELETE("/favorites/:dishId", handlers.RemoveFavorite)
+			agent.GET("/behavior", handlers.GetAgentBehavior)
+			agent.POST("/behavior", handlers.CreateAgentBehavior)
+			agent.GET("/day-ratings", handlers.GetAgentDayRatings)
+			agent.GET("/stats", handlers.GetAgentStats)
+			agent.GET("/week-plan", handlers.GetWeekPlan)
+			agent.POST("/week-plan/regenerate", handlers.RegenerateWeekPlanHandler)
+			agent.GET("/shopping-list", handlers.GetShoppingList)
+			agent.GET("/settings", handlers.GetAgentSettings)
+			agent.GET("/export", handlers.GetAgentExport)
 		}
 	}
 

@@ -1,6 +1,6 @@
 import { api, getUploadErrorMessage } from "./client"
 import defaultClient from "./client"
-import type { Dish, DishInput, PaginatedData, PickResult, BlindBoxResult, MealRecord, StatsData, DashboardData, Achievement, WeekPlan, ShoppingCategory, ShoppingCategoryOverride, Holiday, Quote, DayRating, PhotoWall, DishRecordsResponse, DishCategoryCounts, FavoriteOverview } from "@/types"
+import type { Dish, DishInput, PaginatedData, PickResult, BlindBoxResult, MealRecord, StatsData, DashboardData, Achievement, WeekPlan, ShoppingCategory, ShoppingCategoryOverride, Holiday, Quote, DayRating, PhotoWall, DishRecordsResponse, DishCategoryCounts, FavoriteOverview, SmartPickRequest, SmartPickResult, TasteProfile, BehaviorEventInput } from "@/types"
 
 export const dishesApi = {
   list: (params?: Record<string, string>) =>
@@ -25,6 +25,17 @@ export const pickApi = {
   tomorrow: (data: { meal_type: string; profile: string; count: number; exclude_ids?: number[] }) =>
     api<PickResult>("POST", "/pick/tomorrow", data),
   blindBox: () => api<BlindBoxResult>("POST", "/pick/blind-box"),
+  // 智能推荐：口味画像 + 约束打分，返回带理由的结果
+  smart: (data: SmartPickRequest) => api<SmartPickResult>("POST", "/pick/smart", data),
+}
+
+export const profileApi = {
+  get: (days?: number) => api<TasteProfile>("GET", "/profile", days ? { days: String(days) } : undefined),
+}
+
+// 行为埋点：浏览 / 采纳 / 拒绝推荐等，失败静默（不影响主流程）
+export const behaviorApi = {
+  log: (data: BehaviorEventInput) => api<null>("POST", "/behavior", data).catch(() => null),
 }
 
 export const recordsApi = {

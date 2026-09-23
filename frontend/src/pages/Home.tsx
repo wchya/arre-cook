@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { pickApi, dishesApi, recordsApi, dayRatingApi } from "@/api"
-import type { Dish } from "@/types"
+import { pickApi, dishesApi, recordsApi, dayRatingApi, behaviorApi } from "@/api"
+import type { Dish, RecommendItem } from "@/types"
 import DishImage from "@/components/DishImage"
 import DishCard from "@/components/DishCard"
 import SectionHeader from "@/components/SectionHeader"
@@ -14,7 +14,7 @@ import { useAppInfoStore } from "@/store/useAppInfoStore"
 import { launchConfetti } from "@/lib/confetti"
 import { gsap, motionDuration, scrollToElement, useGSAP } from "@/lib/gsap"
 import toast from "react-hot-toast"
-import { Home as HomeIcon, Settings } from "lucide-react"
+import { Home as HomeIcon, Settings, Sparkles } from "lucide-react"
 
 const moods = [
   { key: "happy", emoji: "😊", label: "开心" },
@@ -61,13 +61,24 @@ export default function Home() {
     queryKey: ["day-rating", todayKey],
     queryFn: () => dayRatingApi.get(todayKey),
   })
+  // 首屏推荐：按口味画像挑 3 道，供“今日推荐 / 换一个”使用
+  const { data: initialPick } = useQuery({
+    queryKey: ["pick", "smart", "initial"],
+    queryFn: () => pickApi.smart({ count: 3, mode: "home_auto" }),
+    staleTime: Infinity,
+    retry: 0,
+  })
 
   const [pickedRec, setPickedRec] = useState<Dish | null>(null)
+  const [recItems, setRecItems] = useState<RecommendItem[]>([])
+  const [recIdx, setRecIdx] = useState(0)
   const [recQuote, setRecQuote] = useState<string>("")
   const [recMeal, setRecMeal] = useState<"lunch" | "dinner" | null>(null)
+  const [profileSummary, setProfileSummary] = useState("")
   const [selectedMood, setSelectedMood] = useState<string | null>(todayRating?.home_mood || null)
   const [blindRevealed, setBlindRevealed] = useState(false)
   const [spinning, setSpinning] = useState(false)
+  const [changing, setChanging] = useState(false)
   const wheelDegRef = useRef(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wheelRef = useRef<HTMLDivElement>(null)
@@ -75,10 +86,17 @@ export default function Home() {
   const confettiRef = useRef<HTMLDivElement>(null)
   const recCardRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    if (!initialPick?.items?.length) return
+    setRecItems((prev) => (prev.length > 0 ? prev : initialPick.items))
+    setProfileSummary((prev) => prev || initialPick.profile_summary || "")
+  }, [initialPick])
+
   const dishes = dishesData?.items || []
   const wheelDishes = useMemo(() => wheelData?.items || [], [wheelData])
   const todayRecords = recordsData?.items || []
-  const currentRec = pickedRec || dishes[0] || null
+  const currentItem: RecommendItem | null = pickedRec ? null : (recItems[recIdx] ?? null)
+  const currentRec: Dish | null = pickedRec || currentItem?.dish || dishes[0] || null
 
   const { data: moodPick } = useQuery({
     queryKey: ["pick", "mood", selectedMood],
@@ -96,20 +114,22 @@ export default function Home() {
     mutationFn: () => pickApi.blindBox(),
   })
 
-  // 午/晚餐推荐：触发后把结果写入当前推荐卡并滚动过去
+  // 午/晚餐推荐：走智能推荐引擎，带推荐理由，结果写入当前推荐卡并滚动过去
   const pickMealMut = useMutation({
-    mutationFn: (meal: "lunch" | "dinner") => (meal === "lunch" ? pickApi.lunch() : pickApi.dinner()),
+    mutationFn: (meal: "lunch" | "dinner") => pickApi.smart({ meal_type: meal, count: 3, mood: selectedMood || undefined, mode: "home_meal" }),
     onSuccess: (data, meal) => {
-      const dish = data?.dishes?.[0]
-      if (!dish) {
+      if (!data?.items?.length) {
         toast.error("暂无可推荐的菜品")
         return
       }
-      setPickedRec(dish)
+      setPickedRec(null)
+      setRecItems(data.items)
+      setRecIdx(0)
       setRecQuote(data.quote || "")
       setRecMeal(meal)
+      setProfileSummary(data.profile_summary || "")
       qc.invalidateQueries({ queryKey: ["achievements"] })
-      toast.success(`${meal === "lunch" ? "🍳 午餐" : "🍲 晚餐"}推荐：${dish.name}`)
+      toast.success(`${meal === "lunch" ? "🍳 午餐" : "🍲 晚餐"}推荐：${data.items[0].dish.name}`)
       requestAnimationFrame(() => scrollToElement(recCardRef.current, { block: "center" }))
     },
     onError: () => toast.error("推荐失败，稍后再试"),
@@ -118,11 +138,18 @@ export default function Home() {
   const recordMut = useMutation({
     mutationFn: (data: { dish_id: number; dish_name: string; meal_type: string; meal_date: string }) =>
       recordsApi.create(data),
-    onSuccess: () => {
+    onSuccess: (_res, variables) => {
       toast.success("❤ 已记录！")
       launchConfetti(confettiRef.current)
       qc.invalidateQueries({ queryKey: ["records"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
+      // 采纳推荐 → 行为事件，供推荐分析使用
+      void behaviorApi.log({
+        event_type: "accept",
+        dish_id: variables.dish_id,
+        dish_name: variables.dish_name,
+        meta: { from: pickedRec ? "home_pick" : "home_recommend", meal_type: variables.meal_type },
+      })
     },
     onError: (err: unknown) => {
       const msg = (err instanceof Error ? err.message : "") || "记录失败"
@@ -264,13 +291,47 @@ export default function Home() {
     })
   }
 
-  function changeRecommend() {
-    if (dishes.length === 0) return
-    const idx = currentRec ? dishes.findIndex((d) => d.id === currentRec.id) : -1
-    const next = dishes[(idx + 1) % dishes.length]
-    setPickedRec(next)
-    setRecQuote("")
-    setRecMeal(null)
+  // 换一个：先在本批推荐里翻页，翻完了按已看过的菜排除后再要一批；被跳过的菜记一条 reject 事件
+  async function changeRecommend() {
+    if (changing) return
+    if (currentItem) {
+      void behaviorApi.log({
+        event_type: "reject",
+        dish_id: currentItem.dish.id,
+        dish_name: currentItem.dish.name,
+        meta: { from: "home_recommend", meal_type: recMeal || "" },
+      })
+    }
+    setPickedRec(null)
+    if (recItems.length > 0 && recIdx < recItems.length - 1) {
+      setRecIdx(recIdx + 1)
+      return
+    }
+    setChanging(true)
+    try {
+      const seen = recItems.map((it) => it.dish.id)
+      const data = await pickApi.smart({
+        meal_type: recMeal || undefined,
+        mood: selectedMood || undefined,
+        count: 3,
+        exclude_dish_ids: seen,
+        mode: "home_change",
+      })
+      if (!data?.items?.length) {
+        toast.error("没有更多推荐了")
+        return
+      }
+      setRecItems(data.items)
+      setRecIdx(0)
+      setProfileSummary(data.profile_summary || profileSummary)
+    } catch {
+      // 回退：在已加载的菜单里顺序换
+      if (dishes.length === 0) return
+      const idx = currentRec ? dishes.findIndex((d) => d.id === currentRec.id) : -1
+      setPickedRec(dishes[(idx + 1) % dishes.length])
+    } finally {
+      setChanging(false)
+    }
   }
 
   const moodDishes = moodPick?.dishes
@@ -324,13 +385,17 @@ export default function Home() {
             <SectionHeader
               title="✨ 今日推荐"
               action={
-                <button onClick={changeRecommend} className="text-sm font-semibold text-text2 hover:text-primary hover:bg-primary-light px-3 py-1.5 rounded-full transition-all">🔄 换一个</button>
+                <button onClick={() => void changeRecommend()} disabled={changing} className="text-sm font-semibold text-text2 hover:text-primary hover:bg-primary-light px-3 py-1.5 rounded-full transition-all disabled:opacity-50">
+                  {changing ? "挑选中..." : "🔄 换一个"}
+                </button>
               }
             />
             <div ref={recCardRef} onClick={() => navigate(`/dishes/${currentRec.id}`)} className={`bg-card rounded-2xl overflow-hidden ${cardShadow} mb-2 cursor-pointer border border-border transition-all active:scale-98 animate-fadeUp`}>
               <div className="relative h-[200px] bg-gradient-to-br from-primary-light to-pink-light">
                 <DishImage dish={currentRec} className="w-full h-full" emojiSize="text-[64px]" />
-                <span className="absolute top-3 left-3 bg-white/92 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-primary z-[1]">🔥 推荐</span>
+                <span className="absolute top-3 left-3 bg-white/92 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-primary z-[1]">
+                  {currentItem ? "🧠 按你的口味" : "🔥 推荐"}
+                </span>
                 <div className="absolute top-3 right-3 flex gap-1.5">
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "lunch" ? "bg-primary text-white" : "bg-white/90 text-primary"}`}>🍳 午餐</span>
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "dinner" ? "bg-mint text-white" : "bg-white/90 text-mint"}`}>🍲 晚餐</span>
@@ -342,20 +407,44 @@ export default function Home() {
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-primary-light text-primary">{currentRec.category}</span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-mint-light text-mint">{currentRec.cook_time}分钟</span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-primary-light text-primary">{diffLabel(currentRec.difficulty)}</span>
+                  {currentRec.taste && <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-pink-light text-pink">{currentRec.taste}</span>}
                 </div>
+                {currentItem && currentItem.reasons.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap mb-3">
+                    {currentItem.reasons.map((reason) => (
+                      <span key={reason} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-light text-[#A67912] border border-yellow/30">💡 {reason}</span>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-2.5">
                   <button onClick={(e) => { e.stopPropagation(); handlePickMeal("lunch") }} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-5 rounded-full text-sm font-semibold bg-primary text-white transition-all active:scale-96 hover:bg-primary-dark">🍳 中午吃这个</button>
                   <button onClick={(e) => { e.stopPropagation(); handlePickMeal("dinner") }} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-5 rounded-full text-sm font-semibold bg-mint text-white transition-all active:scale-96">🍲 晚上吃这个</button>
                 </div>
               </div>
             </div>
-            {/* 今日推荐语 */}
-            {recQuote && (
-              <div className="text-center text-[13px] text-text2 italic mb-6 px-4 leading-relaxed">"{recQuote}"</div>
+            {recItems.length > 1 && currentItem && (
+              <div className="text-center text-[11px] text-text3 mb-2">第 {recIdx + 1} / {recItems.length} 道 · 换一个会从下一道开始</div>
             )}
-            {!recQuote && <div className="mb-6" />}
+            {/* 今日推荐语 */}
+            {recQuote ? (
+              <div className="text-center text-[13px] text-text2 italic mb-6 px-4 leading-relaxed">"{recQuote}"</div>
+            ) : (
+              <div className="mb-6" />
+            )}
           </>
         )}
+
+        {/* AI 推荐官入口 */}
+        <button onClick={() => navigate("/assistant")} className={`w-full bg-card rounded-2xl p-4 ${cardShadow} border border-primary/15 flex items-center gap-3.5 transition-all active:scale-98 mb-6`}>
+          <div className="w-12 h-12 rounded-[10px] bg-gradient-to-br from-purple-light to-primary-light flex items-center justify-center text-primary flex-shrink-0">
+            <Sparkles size={24} strokeWidth={2.4} />
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-[15px] font-bold mb-0.5">🤖 AI 推荐官</div>
+            <div className="text-xs text-text2 truncate">{profileSummary || "根据你的口味画像推荐，还能聊着点菜"}</div>
+          </div>
+          <span className="text-text3 text-sm">›</span>
+        </button>
 
         {/* 更多玩法（下移） */}
         <div className="text-[13px] font-semibold text-text3 mb-3 flex items-center gap-2">

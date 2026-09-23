@@ -36,10 +36,13 @@ export default function AdminSettings() {
   const [lunchPerDay, setLunchPerDay] = useState<string | null>(null)
   const [dinnerPerDay, setDinnerPerDay] = useState<string | null>(null)
   const [appName, setAppName] = useState<string | null>(null)
+  const [agentEmbedUrl, setAgentEmbedUrl] = useState<string | null>(null)
   const [shoppingItemName, setShoppingItemName] = useState("")
   const [shoppingCategory, setShoppingCategory] = useState("蔬菜")
   const storedAppName = useAppInfoStore((s) => s.appName)
   const updateAppName = useAppInfoStore((s) => s.setAppName)
+  const storedAgentEmbedUrl = useAppInfoStore((s) => s.agentEmbedUrl)
+  const updateAgentEmbedUrl = useAppInfoStore((s) => s.setAgentEmbedUrl)
 
   const updateMut = useMutation({
     mutationFn: (s: Record<string, string>) => settingsApi.update(s),
@@ -47,6 +50,9 @@ export default function AdminSettings() {
       qc.invalidateQueries({ queryKey: ["settings"] })
       if (variables.app_name !== undefined) {
         updateAppName(variables.app_name || "NiniMenu")
+      }
+      if (variables.agent_embed_url !== undefined) {
+        updateAgentEmbedUrl(variables.agent_embed_url)
       }
       toast.success("已保存")
     },
@@ -152,6 +158,30 @@ export default function AdminSettings() {
             onChange={() => updateMut.mutate({ blind_box_enabled: settings?.blind_box_enabled === "1" ? "0" : "1" })}
           />
         </SettingRow>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="text-[13px] font-semibold text-text2 mb-1">AI 推荐官</div>
+        <div className="text-[11px] text-text3 mb-2">智能体嵌入页地址（如 https://agent.example.com/embed?agentId=100003&amp;mode=light&amp;accent=amber）。填写后「AI 推荐官」页面会内嵌对话助手。</div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={agentEmbedUrl !== null ? agentEmbedUrl : asString(settings?.agent_embed_url, storedAgentEmbedUrl)}
+            onChange={(e) => setAgentEmbedUrl(e.target.value)}
+            placeholder="留空则不显示对话助手"
+            className="flex-1 min-w-0 py-2.5 px-3 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none transition-all focus:border-primary"
+          />
+          <button
+            onClick={() => updateMut.mutate({ agent_embed_url: (agentEmbedUrl !== null ? agentEmbedUrl : asString(settings?.agent_embed_url, storedAgentEmbedUrl)).trim() })}
+            disabled={updateMut.isPending}
+            className="px-4 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
+          >
+            保存
+          </button>
+        </div>
+        <div className="text-[11px] text-text3 mt-2 leading-relaxed">
+          智能体访问本站全量接口（/api/agent/*）需携带 X-Agent-Token，值由环境变量 AGENT_TOKEN 控制（默认与管理密码相同）。
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">

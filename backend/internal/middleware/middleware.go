@@ -78,11 +78,31 @@ func AppAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// AgentAuthMiddleware 保护 /api/agent/* 全量能力接口。
+// 接受三种凭证：X-Agent-Token 头（= AGENT_TOKEN）、Bearer AGENT_TOKEN、或管理端 JWT。
+func AgentAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		expected := []byte(config.C.AgentToken)
+		if token := c.GetHeader("X-Agent-Token"); token != "" && subtle.ConstantTimeCompare([]byte(token), expected) == 1 {
+			c.Next()
+			return
+		}
+		if rawToken := bearerToken(c); rawToken != "" {
+			if subtle.ConstantTimeCompare([]byte(rawToken), expected) == 1 || parseAdminToken(rawToken) {
+				c.Next()
+				return
+			}
+		}
+		utils.Unauthorized(c, "需要智能体访问令牌（X-Agent-Token）")
+		c.Abort()
+	}
+}
+
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Token")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Token, X-Agent-Token")
 		c.Header("Access-Control-Max-Age", "86400")
 
 		if c.Request.Method == http.MethodOptions {

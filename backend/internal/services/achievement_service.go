@@ -68,6 +68,7 @@ type achievementSnapshot struct {
 	consecutiveQuick    int
 	consecutiveSpicy    int
 	longestDateStreak   int
+	agentAcceptCount    int
 }
 
 type achievementRecordInfo struct {
@@ -391,6 +392,13 @@ func buildAchievementSnapshot() achievementSnapshot {
 		s.eventCounts[event.EventType] = event.Count
 	}
 
+	// 采纳 AI 推荐：行为事件里由智能体来源写入的 accept
+	var acceptCount int64
+	database.DB.Model(&models.BehaviorEvent{}).
+		Where("event_type = ? AND source LIKE ?", "accept", "agent%").
+		Count(&acceptCount)
+	s.agentAcceptCount = int(acceptCount)
+
 	return s
 }
 
@@ -473,20 +481,20 @@ func evaluateAchievementCodes(s achievementSnapshot) map[string]bool {
 	unlock("full_day_3", s.fullDayCount >= 3)
 	unlock("full_day_10", s.fullDayCount >= 10)
 
-	unlock("home_food_5", s.categoryCounts["家常菜"] >= 5)
-	unlock("home_chef", s.categoryCounts["家常菜"] >= 20)
+	unlock("home_chef", s.categoryCounts["川菜"]+s.categoryCounts["湘菜"] >= 20)
 	unlock("sichuan_rookie", s.categoryCounts["川菜"] >= 5)
 	unlock("sichuan_master", s.categoryCounts["川菜"] >= 10)
+	unlock("hunan_rookie", s.categoryCounts["湘菜"] >= 5)
+	unlock("hunan_master", s.categoryCounts["湘菜"] >= 10)
+	unlock("guizhou_rookie", s.categoryCounts["贵州菜"] >= 5)
+	unlock("guizhou_master", s.categoryCounts["贵州菜"] >= 10)
+	unlock("yunnan_rookie", s.categoryCounts["云南菜"] >= 5)
 	unlock("cantonese_rookie", s.categoryCounts["粤菜"] >= 5)
 	unlock("cantonese_master", s.categoryCounts["粤菜"] >= 10)
-	unlock("soup_lover", s.categoryCounts["汤品"] >= 5)
-	unlock("soup_master", s.categoryCounts["汤品"] >= 15)
 	unlock("quick_cook", s.consecutiveQuick >= 3)
 	unlock("quick_master", s.quickCount >= 20)
-	unlock("staple_runner", s.categoryCounts["主食"] >= 10)
-	unlock("snack_collector", s.categoryCounts["小食"] >= 5)
+	unlock("south_explorer", len(s.recordCategories) >= 3)
 	unlock("foodie_explorer", len(s.recordCategories) >= 5)
-	unlock("category_collector", len(s.recordCategories) >= 7)
 
 	unlock("easy_10", s.difficultyCounts["easy"] >= 10)
 	unlock("medium_10", s.difficultyCounts["medium"] >= 10)
@@ -551,6 +559,9 @@ func evaluateAchievementCodes(s achievementSnapshot) map[string]bool {
 	unlock("blind_box_10", s.eventCounts["blind_box"] >= 10)
 	unlock("week_plan_first", s.eventCounts["week_plan"] >= 1)
 	unlock("week_plan_5", s.eventCounts["week_plan"] >= 5)
+	unlock("agent_recommend_first", s.eventCounts["agent_recommend"] >= 1)
+	unlock("agent_recommend_10", s.eventCounts["agent_recommend"] >= 10)
+	unlock("agent_accept_5", s.agentAcceptCount >= 5)
 
 	unlock("dish_library_10", s.dishLibraryCount >= 10)
 	unlock("dish_library_30", s.dishLibraryCount >= 30)

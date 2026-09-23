@@ -12,8 +12,8 @@ import { useAuthStore } from "@/store/useAuthStore"
 import toast from "react-hot-toast"
 import { Settings, UtensilsCrossed, Minus, Plus, ChefHat, X, Trash2 } from "lucide-react"
 
-const DEFAULT_CATEGORIES = ["川菜", "粤菜", "家常菜", "快手菜", "汤品", "主食"]
-const DEFAULT_TASTES = ["酸", "甜", "辣", "鲜", "清淡", "咸鲜", "麻辣", "蒜香", "酱香", "糖醋", "酸辣", "香辣"]
+const DEFAULT_CATEGORIES = ["川菜", "湘菜", "贵州菜", "云南菜", "粤菜"]
+const DEFAULT_TASTES = ["辣", "麻辣", "香辣", "酸辣", "鲜辣", "酸", "甜", "鲜", "清淡", "咸鲜", "蒜香", "酱香"]
 
 function parseList(raw: unknown, fallback: string[]): string[] {
   const arr = asArray<string>(raw).filter((x) => typeof x === "string")
