@@ -30,13 +30,13 @@ export default function DishCard({ dish, onClick, showFav, favActive, onToggleFa
         {showFav && (
           <span
             onClick={(e) => { e.stopPropagation(); onToggleFav?.() }}
-            className={`absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-sm shadow-sm transition-all active:scale-90 ${favActive ? "text-primary animate-heartbeat" : "text-text3"}`}
+            className={`absolute top-2 right-2 w-7 h-7 rounded-full bg-card/90 backdrop-blur-sm flex items-center justify-center text-sm shadow-sm transition-all active:scale-90 ${favActive ? "text-primary animate-heartbeat" : "text-text3"}`}
           >
             {favActive ? "❤" : "♡"}
           </span>
         )}
         {showDifficulty && (
-          <span className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 backdrop-blur-sm ${diffColor(dish.difficulty)}`}>
+          <span className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-card/90 backdrop-blur-sm ${diffColor(dish.difficulty)}`}>
             {diffLabel(dish.difficulty)}
           </span>
         )}

@@ -91,7 +91,7 @@ export default function AdminRecords() {
               )}
               <button
                 onClick={() => { if (confirm("确定删除此记录？")) deleteMut.mutate(r.id) }}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-bg transition-all active:bg-red-50 active:text-red-500 flex-shrink-0"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-bg transition-all active:bg-red-light active:text-red-500 flex-shrink-0"
               >
                 🗑
               </button>

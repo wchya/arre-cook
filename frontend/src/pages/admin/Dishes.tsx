@@ -225,7 +225,7 @@ export default function AdminDishes() {
             <button onClick={() => batchToggleMut.mutate({ ids: [...selected], enabled: true })} className="px-2.5 py-1 rounded-full text-[11px] bg-mint text-white font-semibold">批量启用</button>
             <button onClick={() => batchToggleMut.mutate({ ids: [...selected], enabled: false })} className="px-2.5 py-1 rounded-full text-[11px] bg-text3 text-white font-semibold">批量禁用</button>
             <button onClick={() => setShowBatchCat(true)} className="px-2.5 py-1 rounded-full text-[11px] bg-primary text-white font-semibold">改分类</button>
-            <button onClick={() => { if (confirm(`确定删除选中的 ${selected.size} 道菜品？`)) batchDeleteMut.mutate([...selected]) }} className="px-2.5 py-1 rounded-full text-[11px] bg-red-500 text-white font-semibold">批量删除</button>
+            <button onClick={() => { if (confirm(`确定删除选中的 ${selected.size} 道菜品？`)) batchDeleteMut.mutate([...selected]) }} className="px-2.5 py-1 rounded-full text-[11px] bg-red-light0 text-white font-semibold">批量删除</button>
           </div>
         )}
 
@@ -264,7 +264,7 @@ export default function AdminDishes() {
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); cloneMut.mutate(d.id) }} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-bg transition-all active:bg-primary-light flex-shrink-0">📋</button>
                     <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/dishes/${d.id}`) }} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-bg transition-all active:bg-primary-light flex-shrink-0">✎</button>
-                    <button onClick={(e) => { e.stopPropagation(); if (confirm(`确定删除「${d.name}」吗？`)) deleteMut.mutate(d.id) }} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-bg transition-all active:bg-red-50 active:text-red-500 flex-shrink-0">🗑</button>
+                    <button onClick={(e) => { e.stopPropagation(); if (confirm(`确定删除「${d.name}」吗？`)) deleteMut.mutate(d.id) }} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-bg transition-all active:bg-red-light active:text-red-500 flex-shrink-0">🗑</button>
                   </div>
                 )}
               </div>

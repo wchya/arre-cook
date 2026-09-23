@@ -12,6 +12,7 @@
   --color-pink-light: #FFF0EE;
   --color-yellow: #F5D76E;
   --color-yellow-light: #FFF9E6;
+  --color-yellow-dark: #A67912;
   --color-purple: #8B5CF6;
   --color-purple-light: #F0E6FF;
   --color-red: #DC2626;
@@ -22,6 +23,44 @@
   --color-text4: #D1D5DB;
   --color-border: #F0F0EC;
   --color-border2: #E5E5E0;
+}
+
+/* 深色模式：跟随系统（夜间自动深色）。组件统一用上面的色板变量，这里只换值。
+   不设置 color-scheme，避免与内嵌 agent iframe 的配色方案不一致时 iframe 变成不透明底。 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #131316;
+    --color-card: #1D1D22;
+    --color-primary: #F0825A;
+    --color-primary-light: #3A2419;
+    --color-primary-dark: #D8683F;
+    --color-mint: #72CDBE;
+    --color-mint-light: #15302C;
+    --color-pink: #F4A8A0;
+    --color-pink-light: #3A2226;
+    --color-yellow: #F5D76E;
+    --color-yellow-light: #352E18;
+    --color-yellow-dark: #F2CD5C;
+    --color-purple: #A78BFA;
+    --color-purple-light: #2A2140;
+    --color-red: #EF4444;
+    --color-red-light: #3B1C1C;
+    --color-text: #ECECF1;
+    --color-text2: #A1A1AA;
+    --color-text3: #71717A;
+    --color-text4: #3F3F46;
+    --color-border: #26262C;
+    --color-border2: #34343C;
+  }
+
+  .achievement-unlock-card {
+    border-color: rgba(255,255,255,.08);
+    background: var(--color-card);
+  }
+
+  .achievement-icon-wrap {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 12px 28px rgba(0,0,0,.35);
+  }
 }
 
 html {

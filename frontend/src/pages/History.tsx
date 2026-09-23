@@ -417,7 +417,7 @@ export default function History() {
                 {calMonth + 1}月{selectedDay}日
                 {selectedDateKey === todayStr() && <span className="text-[10px] font-medium bg-primary text-white px-1.5 py-px rounded-full">今天</span>}
                 {dayRating?.home_mood && (
-                  <span className="text-[10px] font-medium bg-white/80 text-primary px-1.5 py-px rounded-full">
+                  <span className="text-[10px] font-medium bg-card/80 text-primary px-1.5 py-px rounded-full">
                     {homeMoodEmojiMap[dayRating.home_mood] || "😃"} {homeMoodLabelMap[dayRating.home_mood] || "心情"}
                   </span>
                 )}

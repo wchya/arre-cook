@@ -393,12 +393,12 @@ export default function Home() {
             <div ref={recCardRef} onClick={() => navigate(`/dishes/${currentRec.id}`)} className={`bg-card rounded-2xl overflow-hidden ${cardShadow} mb-2 cursor-pointer border border-border transition-all active:scale-98 animate-fadeUp`}>
               <div className="relative h-[200px] bg-gradient-to-br from-primary-light to-pink-light">
                 <DishImage dish={currentRec} className="w-full h-full" emojiSize="text-[64px]" />
-                <span className="absolute top-3 left-3 bg-white/92 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-primary z-[1]">
+                <span className="absolute top-3 left-3 bg-card/92 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-primary z-[1]">
                   {currentItem ? "🧠 按你的口味" : "🔥 推荐"}
                 </span>
                 <div className="absolute top-3 right-3 flex gap-1.5">
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "lunch" ? "bg-primary text-white" : "bg-white/90 text-primary"}`}>🍳 午餐</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "dinner" ? "bg-mint text-white" : "bg-white/90 text-mint"}`}>🍲 晚餐</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "lunch" ? "bg-primary text-white" : "bg-card/90 text-primary"}`}>🍳 午餐</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "dinner" ? "bg-mint text-white" : "bg-card/90 text-mint"}`}>🍲 晚餐</span>
                 </div>
               </div>
               <div className="p-4">
@@ -412,7 +412,7 @@ export default function Home() {
                 {currentItem && currentItem.reasons.length > 0 && (
                   <div className="flex gap-1.5 flex-wrap mb-3">
                     {currentItem.reasons.map((reason) => (
-                      <span key={reason} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-light text-[#A67912] border border-yellow/30">💡 {reason}</span>
+                      <span key={reason} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-light text-yellow-dark border border-yellow/30">💡 {reason}</span>
                     ))}
                   </div>
                 )}

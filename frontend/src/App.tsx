@@ -81,8 +81,8 @@ export default function App() {
           duration: 2000,
           style: {
             borderRadius: "9999px",
-            background: "#FFFFFF",
-            color: "#1A1A2E",
+            background: "var(--color-card)",
+            color: "var(--color-text)",
             fontSize: "14px",
             padding: "10px 24px",
             boxShadow: "0 8px 32px rgba(0,0,0,.1)",

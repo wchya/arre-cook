@@ -132,7 +132,7 @@ function ProfileCard({ profile, loading }: { profile?: TasteProfile; loading: bo
             <span key={i.name} className="rounded-full bg-mint-light px-2.5 py-1 text-[11px] font-semibold text-mint">🥬 {i.name}</span>
           ))}
           {topHomeMood && (
-            <span className="rounded-full bg-yellow-light px-2.5 py-1 text-[11px] font-semibold text-[#A67912]">😃 常见心情 {homeMoodLabel[topHomeMood[0]] || topHomeMood[0]}</span>
+            <span className="rounded-full bg-yellow-light px-2.5 py-1 text-[11px] font-semibold text-yellow-dark">😃 常见心情 {homeMoodLabel[topHomeMood[0]] || topHomeMood[0]}</span>
           )}
           {profile.disliked_dishes.length > 0 && (
             <span className="rounded-full bg-red-light px-2.5 py-1 text-[11px] font-semibold text-red">🙅 避开 {profile.disliked_dishes.length} 道踩雷菜</span>
@@ -162,7 +162,7 @@ function RecommendRow({ item, onEat, onReject, disabled }: {
             <button onClick={() => navigate(`/dishes/${dish.id}`)} className="min-w-0 text-left">
               <div className="truncate text-[16px] font-extrabold leading-tight">{dish.name}</div>
             </button>
-            <span className="shrink-0 rounded-full bg-yellow-light px-2 py-0.5 text-[10px] font-extrabold text-[#A67912]">匹配 {Math.round(item.score)}</span>
+            <span className="shrink-0 rounded-full bg-yellow-light px-2 py-0.5 text-[10px] font-extrabold text-yellow-dark">匹配 {Math.round(item.score)}</span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-text2">
             <span className="rounded-full bg-bg px-2 py-0.5">{dish.category}</span>

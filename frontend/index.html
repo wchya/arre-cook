@@ -6,7 +6,8 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/180.png" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#FFF8F0" />
+    <meta name="theme-color" content="#FFF8F0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#131316" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="NiniMenu" />
@@ -17,6 +18,7 @@
     <title>NiniMenu</title>
     <style>
       body { margin: 0; background: #FFF8F0; }
+      @media (prefers-color-scheme: dark) { body { background: #131316; } }
       #root { min-height: 100dvh; }
     </style>
   </head>

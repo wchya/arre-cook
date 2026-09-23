@@ -162,7 +162,7 @@ export default function AdminSettings() {
 
       <div className="rounded-2xl border border-border bg-card p-4">
         <div className="text-[13px] font-semibold text-text2 mb-1">AI 推荐官</div>
-        <div className="text-[11px] text-text3 mb-2">智能体嵌入页地址（如 https://agent.example.com/embed?agentId=100003&amp;mode=light&amp;accent=amber）。填写后「AI 推荐官」页面会内嵌对话助手。</div>
+        <div className="text-[11px] text-text3 mb-2">智能体嵌入页地址（如 https://agent.example.com/embed?agentId=100003&amp;mode=auto&amp;accent=amber）。填写后「AI 推荐官」页面会内嵌对话助手。</div>
         <div className="flex gap-2">
           <input
             type="text"

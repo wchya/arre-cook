@@ -204,7 +204,7 @@ export default function MainLayout() {
       </div>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-[100] border-t border-white/70 bg-white/92 backdrop-blur-2xl shadow-[0_-10px_30px_rgba(26,26,46,.07)]"
+        className="fixed bottom-0 left-0 right-0 z-[100] border-t border-border/70 bg-card/92 backdrop-blur-2xl shadow-[0_-10px_30px_rgba(26,26,46,.07)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="mx-auto grid h-[58px] max-w-[640px] grid-cols-6 items-center px-2">

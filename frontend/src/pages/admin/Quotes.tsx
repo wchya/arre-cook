@@ -155,7 +155,7 @@ export default function AdminQuotes() {
             </div>
             <div className="flex gap-1.5 flex-shrink-0">
               <button onClick={() => startEdit(q)} className="w-8 h-8 rounded-[10px] flex items-center justify-center text-sm bg-bg transition-all active:bg-primary-light">✎</button>
-              <button onClick={() => { if (confirm("确定删除这条语录？")) deleteMut.mutate(q.id) }} className="w-8 h-8 rounded-[10px] flex items-center justify-center text-sm bg-bg transition-all active:bg-red-50 active:text-red-500">🗑</button>
+              <button onClick={() => { if (confirm("确定删除这条语录？")) deleteMut.mutate(q.id) }} className="w-8 h-8 rounded-[10px] flex items-center justify-center text-sm bg-bg transition-all active:bg-red-light active:text-red-500">🗑</button>
             </div>
           </div>
         ))}

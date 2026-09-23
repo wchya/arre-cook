@@ -12,7 +12,7 @@ import { Sparkles, X } from "lucide-react"
 
 // agent 去壳嵌入页；agentId=100003 为当前装配的单一智能体。
 const EMBED_SRC =
-  "https://agent.arrebyte.top/embed?agentId=100003&title=食谱小助手&mode=light&accent=amber"
+  "https://agent.arrebyte.top/embed?agentId=100003&title=食谱小助手&mode=auto&accent=amber"
 
 // 记忆用户是否已打开过助手：打开过就不再显示引导气泡/光环。
 const SEEN_KEY = "nini-ai-assistant-seen"
@@ -20,6 +20,8 @@ const SEEN_KEY = "nini-ai-assistant-seen"
 export default function AiAssistant() {
   const [open, setOpen] = useState(false)   // 是否渲染面板（含收起动画期间）
   const [shown, setShown] = useState(false) // 面板可见态，驱动进/出过渡
+  // 首次打开后常驻 iframe（收起只隐藏）：避免每次打开都重载嵌入页造成闪烁，也保留对话上下文。
+  const [mounted, setMounted] = useState(false)
   const [seen, setSeen] = useState(true)    // 是否已打开过（默认 true，避免 SSR/首帧闪现）
   const [showHint, setShowHint] = useState(false) // 首次引导气泡
   const closeTimer = useRef<number | null>(null)
@@ -72,6 +74,7 @@ export default function AiAssistant() {
       closeTimer.current = null
     }
     setOpen(true)
+    setMounted(true)
     // 下一帧再切到可见态，让过渡从初始态起跳。
     requestAnimationFrame(() => setShown(true))
   }
@@ -92,7 +95,7 @@ export default function AiAssistant() {
             <button
               type="button"
               onClick={openPanel}
-              className="animate-pop-soft fixed right-4 z-[111] max-w-[220px] rounded-2xl rounded-br-md bg-white px-3.5 py-2.5 text-left text-sm leading-snug text-text shadow-[0_12px_34px_rgba(0,0,0,.16)] ring-1 ring-black/5"
+              className="animate-pop-soft fixed right-4 z-[111] max-w-[220px] rounded-2xl rounded-br-md bg-card px-3.5 py-2.5 text-left text-sm leading-snug text-text shadow-[0_12px_34px_rgba(0,0,0,.16)] ring-1 ring-black/5"
               style={{ bottom: "calc(140px + env(safe-area-inset-bottom))" }}
             >
               <span className="font-medium text-primary">今天吃什么？</span>
@@ -104,7 +107,7 @@ export default function AiAssistant() {
                   e.stopPropagation()
                   setShowHint(false)
                 }}
-                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-text2/90 text-white shadow-sm"
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-text2/90 text-bg shadow-sm"
               >
                 <X size={12} strokeWidth={2.6} />
               </span>
@@ -131,43 +134,44 @@ export default function AiAssistant() {
         </>
       )}
 
-      {/* 对话面板 */}
+      {/* 遮罩：点击关闭（桌面端透明、仅承载点击），随面板淡入淡出 */}
       {open && (
-        <>
-          {/* 遮罩：点击关闭（桌面端透明、仅承载点击），随面板淡入淡出 */}
-          <div
-            className={`fixed inset-0 z-[110] bg-black/30 backdrop-blur-[2px] transition-opacity duration-200 sm:bg-transparent sm:backdrop-blur-none ${
-              shown ? "opacity-100" : "opacity-0"
-            }`}
+        <div
+          className={`fixed inset-0 z-[110] bg-black/30 backdrop-blur-[2px] transition-opacity duration-200 sm:bg-transparent sm:backdrop-blur-none ${
+            shown ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={closePanel}
+        />
+      )}
+
+      {/* 对话面板：首次打开后常驻，收起时隐藏而非卸载 */}
+      {mounted && (
+        <div
+          role="dialog"
+          aria-label="食谱小助手"
+          aria-hidden={!open}
+          className={`fixed z-[111] overflow-hidden rounded-[18px] bg-card shadow-[0_20px_60px_rgba(0,0,0,.30)] transition-all duration-200 ease-out inset-x-3 bottom-3 top-16 sm:inset-auto sm:right-5 sm:bottom-5 sm:top-auto sm:h-[560px] sm:w-[384px] sm:origin-bottom-right ${
+            shown
+              ? "opacity-100 translate-y-0 scale-100"
+              : "opacity-0 translate-y-3 scale-95 sm:translate-y-2"
+          } ${open ? "" : "invisible pointer-events-none"}`}
+        >
+          <button
+            type="button"
+            aria-label="关闭食谱小助手"
             onClick={closePanel}
-          />
-          <div
-            role="dialog"
-            aria-label="食谱小助手"
-            className={`fixed z-[111] overflow-hidden rounded-[18px] bg-white shadow-[0_20px_60px_rgba(0,0,0,.30)] transition-all duration-200 ease-out inset-x-3 bottom-3 top-16 sm:inset-auto sm:right-5 sm:bottom-5 sm:top-auto sm:h-[560px] sm:w-[384px] sm:origin-bottom-right ${
-              shown
-                ? "opacity-100 translate-y-0 scale-100"
-                : "opacity-0 translate-y-3 scale-95 sm:translate-y-2"
-            }`}
+            className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/10 text-text2 backdrop-blur transition-all active:scale-90 hover:bg-black/20"
           >
-            <button
-              type="button"
-              aria-label="关闭食谱小助手"
-              onClick={closePanel}
-              className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/10 text-text2 backdrop-blur transition-all active:scale-90 hover:bg-black/20"
-            >
-              <X size={18} strokeWidth={2.4} />
-            </button>
-            <iframe
-              src={EMBED_SRC}
-              title="食谱小助手"
-              className="h-full w-full border-0 bg-transparent"
-              allow="clipboard-write"
-              referrerPolicy="strict-origin-when-cross-origin"
-              loading="lazy"
-            />
-          </div>
-        </>
+            <X size={18} strokeWidth={2.4} />
+          </button>
+          <iframe
+            src={EMBED_SRC}
+            title="食谱小助手"
+            className="h-full w-full border-0 bg-transparent"
+            allow="clipboard-write"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
       )}
     </>
   )

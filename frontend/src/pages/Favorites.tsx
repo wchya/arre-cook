@@ -22,7 +22,7 @@ function diffLabel(d: string) {
 }
 
 function diffClass(d: string) {
-  return d === "easy" ? "bg-mint-light text-mint" : d === "medium" ? "bg-yellow-light text-[#A67912]" : "bg-primary-light text-primary"
+  return d === "easy" ? "bg-mint-light text-mint" : d === "medium" ? "bg-yellow-light text-yellow-dark" : "bg-primary-light text-primary"
 }
 
 function formatCountLabel(count: number) {
@@ -95,7 +95,7 @@ export default function Favorites() {
   }, [activeCategory, items, search, sortBy])
 
   return (
-    <div className="animate-fadeUp min-h-full bg-[#F7F7F3]">
+    <div className="animate-fadeUp min-h-full bg-bg">
       <PageHeader title="收藏" subtitle="按自己的口味重新整理菜单" icon={Heart} />
 
       <div className="mx-auto max-w-[640px] px-4 py-4">
@@ -122,7 +122,7 @@ export default function Favorites() {
                   </div>
                   <button
                     onClick={() => navigate("/dishes")}
-                    className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-text px-3.5 text-[12px] font-bold text-white transition-all active:scale-95"
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-text px-3.5 text-[12px] font-bold text-bg transition-all active:scale-95"
                   >
                     加菜
                     <ArrowRight size={14} strokeWidth={2.6} />
@@ -193,7 +193,7 @@ export default function Favorites() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="搜索收藏菜、口味、标签"
-                    className="h-10 w-full rounded-[12px] border border-border bg-bg pl-9 pr-9 text-[13px] font-medium outline-none transition-all focus:border-primary/40 focus:bg-white focus:shadow-[0_0_0_3px_rgba(232,115,74,.10)]"
+                    className="h-10 w-full rounded-[12px] border border-border bg-bg pl-9 pr-9 text-[13px] font-medium outline-none transition-all focus:border-primary/40 focus:bg-card focus:shadow-[0_0_0_3px_rgba(232,115,74,.10)]"
                   />
                   {search && (
                     <button
@@ -271,7 +271,7 @@ export default function Favorites() {
 
 function MetricCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border border-[#EEE8DD] bg-white px-3 py-2.5">
+    <div className="rounded-[14px] border border-border2 bg-card px-3 py-2.5">
       <div className="mb-1.5 flex items-center justify-between text-text3">
         <span className="text-[11px] font-bold">{label}</span>
         {icon}
@@ -299,7 +299,7 @@ function HeroDishButton({
       onClick={onClick}
       className="flex w-full items-center gap-3 rounded-[14px] border border-primary/12 bg-primary-light/70 p-2.5 text-left transition-all active:scale-98"
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-primary">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-card text-primary">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -496,7 +496,7 @@ function FavoritesSkeleton() {
         <div className="skeleton mb-4 h-8 w-40 rounded" />
         <div className="grid grid-cols-3 gap-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-[14px] border border-border bg-white px-3 py-3">
+            <div key={i} className="rounded-[14px] border border-border bg-card px-3 py-3">
               <div className="skeleton mb-2 h-3 w-10 rounded" />
               <div className="skeleton h-5 w-12 rounded" />
             </div>
