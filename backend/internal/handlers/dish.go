@@ -7,23 +7,50 @@ import (
 	"ninimenu/internal/models"
 	"ninimenu/internal/services"
 	"ninimenu/internal/utils"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func GetDishes(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+// 菜品可见性：公共菜谱（owner_id=0，管理员维护）+ 本人私房菜（owner_id=uid）。
+// 编辑权限：私房菜仅本人；公共菜谱仅管理员。
 
-	query := database.DB.Model(&models.Dish{})
+func dishScope(c *gin.Context) *gorm.DB {
+	q := database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c)))
+	switch c.Query("scope") {
+	case "mine":
+		q = q.Where("owner_id = ?", uid(c))
+	case "public":
+		q = q.Where("owner_id = 0")
+	}
+	return q
+}
+
+func canEditDish(c *gin.Context, d *models.Dish) bool {
+	if d.OwnerID == 0 {
+		return isAdmin(c)
+	}
+	return d.OwnerID == uid(c)
+}
+
+func findEditableDish(c *gin.Context) (*models.Dish, bool) {
+	var dish models.Dish
+	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).First(&dish, c.Param("id")).Error; err != nil {
+		utils.NotFound(c, "菜品不存在")
+		return nil, false
+	}
+	if !canEditDish(c, &dish) {
+		utils.Forbidden(c, "公共菜谱只有管理员可以修改，可以先“复制到我的菜谱”再改")
+		return nil, false
+	}
+	return &dish, true
+}
+
+func GetDishes(c *gin.Context) {
+	page, pageSize := pageParams(c, 20)
+	query := dishScope(c)
 
 	if category := c.Query("category"); category != "" {
 		query = query.Where("category = ?", category)
@@ -31,17 +58,21 @@ func GetDishes(c *gin.Context) {
 	if mealType := c.Query("meal_type"); mealType != "" {
 		query = query.Where("meal_type IN ?", []string{mealType, "all"})
 	}
-	if search := c.Query("search"); search != "" {
-		query = query.Where("name LIKE ?", "%"+search+"%")
+	if search := strings.TrimSpace(c.Query("search")); search != "" {
+		like := "%" + search + "%"
+		query = query.Where("name LIKE ? OR ingredients LIKE ? OR tags LIKE ?", like, like, like)
 	}
 	if enabled := c.Query("enabled"); enabled != "" {
-		query = query.Where("enabled = ?", enabled == "1" || enabled == "true")
+		query = query.Where("enabled = ?", queryBool(enabled))
 	}
 	if taste := c.Query("taste"); taste != "" {
 		query = query.Where("taste LIKE ?", "%"+taste+"%")
 	}
 	if difficulty := c.Query("difficulty"); difficulty != "" {
 		query = query.Where("difficulty = ?", difficulty)
+	}
+	if queryBool(c.Query("favorite")) {
+		query = query.Where("id IN (?)", database.DB.Model(&models.Favorite{}).Select("dish_id").Where("user_id = ?", uid(c)))
 	}
 
 	sort := c.DefaultQuery("sort", "created_at")
@@ -55,7 +86,7 @@ func GetDishes(c *gin.Context) {
 		if order != "asc" && order != "desc" {
 			order = "desc"
 		}
-		query = query.Order(sort + " " + order)
+		query = query.Order(sort + " " + order).Order("id ASC")
 	}
 
 	var total int64
@@ -69,20 +100,19 @@ func GetDishes(c *gin.Context) {
 			dishes = dishes[:pageSize]
 		}
 	} else {
-		offset := (page - 1) * pageSize
-		query.Offset(offset).Limit(pageSize).Find(&dishes)
+		query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&dishes)
 	}
-
+	services.MarkFavorites(uid(c), dishes)
 	utils.SuccessPaginated(c, dishes, total, page, pageSize)
 }
 
 func GetDish(c *gin.Context) {
-	id := c.Param("id")
-	var dish models.Dish
-	if err := database.DB.First(&dish, id).Error; err != nil {
+	dish, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	if err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
+	services.MarkFavorite(uid(c), &dish)
 	utils.Success(c, dish)
 }
 
@@ -102,144 +132,137 @@ type CreateDishRequest struct {
 	Remark      string `json:"remark"`
 	Tags        string `json:"tags"`
 	SortOrder   int    `json:"sort_order"`
+	// Public 管理员创建公共菜谱；普通用户忽略此字段，一律创建私房菜。
+	Public bool `json:"public"`
+}
+
+func jsonOr(raw, def string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || !json.Valid([]byte(raw)) {
+		return def
+	}
+	return raw
+}
+
+func (r *CreateDishRequest) apply(d *models.Dish) {
+	d.Name = strings.TrimSpace(r.Name)
+	d.ImageURL = r.ImageURL
+	d.Images = jsonOr(r.Images, "[]")
+	d.VideoURL = r.VideoURL
+	d.Category = strings.TrimSpace(r.Category)
+	d.MealType = r.MealType
+	d.Taste = strings.TrimSpace(r.Taste)
+	d.Ingredients = jsonOr(r.Ingredients, "[]")
+	d.Seasonings = jsonOr(r.Seasonings, "[]")
+	d.Steps = jsonOr(r.Steps, "[]")
+	d.CookTime = r.CookTime
+	d.Difficulty = r.Difficulty
+	d.Remark = r.Remark
+	d.Tags = jsonOr(r.Tags, "[]")
+	d.SortOrder = r.SortOrder
+	if d.MealType == "" {
+		d.MealType = "all"
+	}
+	if d.Difficulty == "" {
+		d.Difficulty = "easy"
+	}
+	if d.CookTime < 0 {
+		d.CookTime = 0
+	}
 }
 
 func CreateDish(c *gin.Context) {
 	var req CreateDishRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Name) == "" {
 		utils.BadRequest(c, "菜名不能为空")
 		return
 	}
-
-	dish := models.Dish{
-		Name:        req.Name,
-		ImageURL:    req.ImageURL,
-		Images:      req.Images,
-		VideoURL:    req.VideoURL,
-		Category:    req.Category,
-		MealType:    req.MealType,
-		Taste:       req.Taste,
-		Ingredients: req.Ingredients,
-		Seasonings:  req.Seasonings,
-		Steps:       req.Steps,
-		CookTime:    req.CookTime,
-		Difficulty:  req.Difficulty,
-		Remark:      req.Remark,
-		Tags:        req.Tags,
-		SortOrder:   req.SortOrder,
-		Enabled:     true,
+	dish := models.Dish{Enabled: true, OwnerID: uid(c)}
+	if req.Public && isAdmin(c) {
+		dish.OwnerID = 0
 	}
-
-	if dish.MealType == "" {
-		dish.MealType = "all"
+	req.apply(&dish)
+	if dish.OwnerID != 0 {
+		var n int64
+		database.DB.Model(&models.Dish{}).Where("owner_id = ?", dish.OwnerID).Count(&n)
+		if n >= 500 {
+			utils.BadRequest(c, "私房菜已达 500 道上限")
+			return
+		}
 	}
-	if dish.Difficulty == "" {
-		dish.Difficulty = "easy"
-	}
-	if dish.Images == "" {
-		dish.Images = "[]"
-	}
-	if dish.Ingredients == "" {
-		dish.Ingredients = "[]"
-	}
-	if dish.Seasonings == "" {
-		dish.Seasonings = "[]"
-	}
-	if dish.Steps == "" {
-		dish.Steps = "[]"
-	}
-	if dish.Tags == "" {
-		dish.Tags = "[]"
-	}
-
 	if err := database.DB.Create(&dish).Error; err != nil {
 		utils.InternalError(c, "创建菜品失败")
 		return
 	}
-
-	services.QueueAutoAchievementSync()
+	services.QueueAutoAchievementSync(uid(c))
 	utils.Success(c, dish)
 }
 
 func UpdateDish(c *gin.Context) {
-	id := c.Param("id")
-	var dish models.Dish
-	if err := database.DB.First(&dish, id).Error; err != nil {
-		utils.NotFound(c, "菜品不存在")
+	dish, ok := findEditableDish(c)
+	if !ok {
 		return
 	}
-
 	var req CreateDishRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Name) == "" {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-
-	dish.Name = req.Name
-	dish.ImageURL = req.ImageURL
-	dish.Images = req.Images
-	dish.VideoURL = req.VideoURL
-	dish.Category = req.Category
-	dish.MealType = req.MealType
-	dish.Taste = req.Taste
-	dish.Ingredients = req.Ingredients
-	dish.Seasonings = req.Seasonings
-	dish.Steps = req.Steps
-	dish.CookTime = req.CookTime
-	dish.Difficulty = req.Difficulty
-	dish.Remark = req.Remark
-	dish.Tags = req.Tags
-	dish.SortOrder = req.SortOrder
-
-	if err := database.DB.Save(&dish).Error; err != nil {
+	req.apply(dish)
+	if err := database.DB.Save(dish).Error; err != nil {
 		utils.InternalError(c, "更新菜品失败")
 		return
 	}
-
-	services.QueueAutoAchievementSync()
+	services.QueueAutoAchievementSync(uid(c))
+	services.MarkFavorite(uid(c), dish)
 	utils.Success(c, dish)
 }
 
 func DeleteDish(c *gin.Context) {
-	id := c.Param("id")
-	if err := database.DB.Delete(&models.Dish{}, id).Error; err != nil {
-		utils.NotFound(c, "菜品不存在")
+	dish, ok := findEditableDish(c)
+	if !ok {
 		return
 	}
-	services.QueueAutoAchievementSync()
+	database.DB.Delete(dish)
+	services.InvalidateWeekPlan(uid(c))
+	services.QueueAutoAchievementSync(uid(c))
 	utils.SuccessMsg(c, "删除成功")
 }
 
 func ToggleDish(c *gin.Context) {
-	id := c.Param("id")
-	var dish models.Dish
-	if err := database.DB.First(&dish, id).Error; err != nil {
-		utils.NotFound(c, "菜品不存在")
+	dish, ok := findEditableDish(c)
+	if !ok {
 		return
 	}
 	dish.Enabled = !dish.Enabled
-	database.DB.Save(&dish)
-	services.QueueAutoAchievementSync()
+	database.DB.Model(dish).Update("enabled", dish.Enabled)
+	services.QueueAutoAchievementSync(uid(c))
 	utils.Success(c, dish)
 }
 
+// CloneDish 复制一道菜：普通用户得到一份可自由修改的私房菜；管理员可带 ?public=1 复制为公共菜谱。
 func CloneDish(c *gin.Context) {
-	id := c.Param("id")
-	var dish models.Dish
-	if err := database.DB.First(&dish, id).Error; err != nil {
+	src, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	if err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
-
-	newDish := dish
+	newDish := src
 	newDish.ID = 0
-	newDish.Name = dish.Name + " (副本)"
+	newDish.CreatedAt, newDish.UpdatedAt = time.Time{}, time.Time{}
+	newDish.OwnerID = uid(c)
+	newDish.Enabled = true
+	if isAdmin(c) && queryBool(c.Query("public")) {
+		newDish.OwnerID = 0
+		newDish.Name = src.Name + " (副本)"
+	} else if src.OwnerID == uid(c) {
+		newDish.Name = src.Name + " (副本)"
+	}
 	if err := database.DB.Create(&newDish).Error; err != nil {
-		utils.InternalError(c, "克隆菜品失败")
+		utils.InternalError(c, "复制菜品失败")
 		return
 	}
-
-	services.QueueAutoAchievementSync()
+	services.QueueAutoAchievementSync(uid(c))
 	utils.Success(c, newDish)
 }
 
@@ -250,20 +273,31 @@ type CategoryCount struct {
 
 func GetDishCategoryCounts(c *gin.Context) {
 	var counts []CategoryCount
-	database.DB.Model(&models.Dish{}).
+	database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c))).
 		Select("category, count(*) as count").
-		Where("enabled = ? AND deleted_at IS NULL", true).
+		Where("enabled = ?", true).
 		Group("category").
 		Order("count DESC").
 		Find(&counts)
 
-	var total int64
-	database.DB.Model(&models.Dish{}).Where("enabled = ? AND deleted_at IS NULL", true).Count(&total)
+	var total, mine int64
+	database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c))).Where("enabled = ?", true).Count(&total)
+	database.DB.Model(&models.Dish{}).Where("owner_id = ?", uid(c)).Count(&mine)
 
-	utils.Success(c, gin.H{
-		"total":      total,
-		"categories": counts,
-	})
+	utils.Success(c, gin.H{"total": total, "mine": mine, "categories": counts})
+}
+
+// editableIDs 批量操作只作用于调用者有权编辑的菜品。
+func editableIDs(c *gin.Context, ids []uint) []uint {
+	q := database.DB.Model(&models.Dish{}).Where("id IN ?", ids)
+	if isAdmin(c) {
+		q = q.Where("owner_id IN ?", []uint{0, uid(c)})
+	} else {
+		q = q.Where("owner_id = ?", uid(c))
+	}
+	var out []uint
+	q.Pluck("id", &out)
+	return out
 }
 
 type BatchToggleRequest struct {
@@ -277,8 +311,9 @@ func BatchToggleDishes(c *gin.Context) {
 		utils.BadRequest(c, "请选择菜品")
 		return
 	}
-	database.DB.Model(&models.Dish{}).Where("id IN ?", req.IDs).Update("enabled", req.Enabled)
-	services.QueueAutoAchievementSync()
+	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
+		database.DB.Model(&models.Dish{}).Where("id IN ?", ids).Update("enabled", req.Enabled)
+	}
 	utils.SuccessMsg(c, "批量操作成功")
 }
 
@@ -292,8 +327,9 @@ func BatchDeleteDishes(c *gin.Context) {
 		utils.BadRequest(c, "请选择菜品")
 		return
 	}
-	database.DB.Where("id IN ?", req.IDs).Delete(&models.Dish{})
-	services.QueueAutoAchievementSync()
+	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
+		database.DB.Where("id IN ?", ids).Delete(&models.Dish{})
+	}
 	utils.SuccessMsg(c, "批量删除成功")
 }
 
@@ -308,7 +344,9 @@ func BatchUpdateCategory(c *gin.Context) {
 		utils.BadRequest(c, "请选择菜品并指定分类")
 		return
 	}
-	database.DB.Model(&models.Dish{}).Where("id IN ?", req.IDs).Update("category", req.Category)
+	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
+		database.DB.Model(&models.Dish{}).Where("id IN ?", ids).Update("category", req.Category)
+	}
 	utils.SuccessMsg(c, "批量修改分类成功")
 }
 
@@ -343,22 +381,19 @@ type DishRecordsResponse struct {
 	Stats   DishRecordsStats    `json:"stats"`
 }
 
+// GetDishRecords 当前用户吃这道菜的历史。
 func GetDishRecords(c *gin.Context) {
-	id := c.Param("id")
-	var dish models.Dish
-	if err := database.DB.First(&dish, id).Error; err != nil {
+	dish, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	if err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
+	own := database.OwnedBy(uid(c))
 
 	var records []models.MealRecord
-	database.DB.Where("dish_id = ?", id).Order("meal_date DESC, created_at DESC").Find(&records)
-
+	database.DB.Scopes(own).Where("dish_id = ?", dish.ID).Order("meal_date DESC, created_at DESC").Find(&records)
 	if len(records) == 0 {
-		utils.Success(c, DishRecordsResponse{
-			Records: []DishRecordWithDay{},
-			Stats:   DishRecordsStats{},
-		})
+		utils.Success(c, DishRecordsResponse{Records: []DishRecordWithDay{}, Stats: DishRecordsStats{}})
 		return
 	}
 
@@ -366,39 +401,27 @@ func GetDishRecords(c *gin.Context) {
 	for _, r := range records {
 		dates = append(dates, r.MealDate)
 	}
-
 	dayRatingMap := make(map[string]models.DayRating)
-	if len(dates) > 0 {
-		var dayRatings []models.DayRating
-		database.DB.Where("meal_date IN ?", dates).Find(&dayRatings)
-		for _, dr := range dayRatings {
-			dayRatingMap[dr.MealDate] = dr
-		}
+	var dayRatings []models.DayRating
+	database.DB.Scopes(own).Where("meal_date IN ?", dates).Find(&dayRatings)
+	for _, dr := range dayRatings {
+		dayRatingMap[dr.MealDate] = dr
 	}
 
 	result := make([]DishRecordWithDay, 0, len(records))
-	yumCount := 0
-	okCount := 0
-	noCount := 0
-	totalRating := 0
-	ratingCount := 0
-	lunchCount := 0
-
+	yumCount, okCount, noCount, totalRating, ratingCount, lunchCount := 0, 0, 0, 0, 0, 0
 	for _, r := range records {
 		var photos []string
 		var homeMood, dayMood, dayRemark string
 		if dr, ok := dayRatingMap[r.MealDate]; ok {
-			homeMood = dr.HomeMood
-			dayMood = dr.Mood
-			dayRemark = dr.Remark
+			homeMood, dayMood, dayRemark = dr.HomeMood, dr.Mood, dr.Remark
 			if dr.Photos != "" {
-				json.Unmarshal([]byte(dr.Photos), &photos)
+				_ = json.Unmarshal([]byte(dr.Photos), &photos)
 			}
 		}
 		if photos == nil {
 			photos = []string{}
 		}
-
 		switch r.Mood {
 		case "yum", "great":
 			yumCount++
@@ -414,72 +437,34 @@ func GetDishRecords(c *gin.Context) {
 		if r.MealType == "lunch" {
 			lunchCount++
 		}
-
 		result = append(result, DishRecordWithDay{
-			ID:        r.ID,
-			MealType:  r.MealType,
-			MealDate:  r.MealDate,
-			Rating:    r.Rating,
-			Remark:    r.Remark,
-			Mood:      r.Mood,
-			Photo:     r.Photo,
-			HomeMood:  homeMood,
-			DayMood:   dayMood,
-			DayRemark: dayRemark,
-			Photos:    photos,
+			ID: r.ID, MealType: r.MealType, MealDate: r.MealDate, Rating: r.Rating, Remark: r.Remark,
+			Mood: r.Mood, Photo: r.Photo, HomeMood: homeMood, DayMood: dayMood, DayRemark: dayRemark, Photos: photos,
 		})
 	}
 
 	total := len(records)
-	yumPct := 0
-	okPct := 0
-	noPct := 0
-	moodTotal := yumCount + okCount + noCount
-	if moodTotal > 0 {
-		yumPct = yumCount * 100 / moodTotal
-		okPct = okCount * 100 / moodTotal
-		noPct = noCount * 100 / moodTotal
+	stats := DishRecordsStats{TotalCount: total, LunchCount: lunchCount, DinnerCount: total - lunchCount, LastDate: records[0].MealDate}
+	if moodTotal := yumCount + okCount + noCount; moodTotal > 0 {
+		stats.YumPercent = yumCount * 100 / moodTotal
+		stats.OkPercent = okCount * 100 / moodTotal
+		stats.NoPercent = noCount * 100 / moodTotal
 	}
-
-	avgRating := 0.0
 	if ratingCount > 0 {
-		avgRating = float64(totalRating) / float64(ratingCount)
+		stats.AvgRating = float64(totalRating) / float64(ratingCount)
 	}
-
-	lastDate := records[0].MealDate
-
-	var avgInterval int
 	if total >= 2 {
-		sorted := make([]string, len(records))
-		for i, r := range records {
-			sorted[i] = r.MealDate
-		}
 		totalDays := 0
-		for i := 0; i < len(sorted)-1; i++ {
-			d1, e1 := time.Parse("2006-01-02", sorted[i])
-			d2, e2 := time.Parse("2006-01-02", sorted[i+1])
+		for i := 0; i < total-1; i++ {
+			d1, e1 := time.Parse("2006-01-02", records[i].MealDate)
+			d2, e2 := time.Parse("2006-01-02", records[i+1].MealDate)
 			if e1 == nil && e2 == nil {
-				diff := int(d1.Sub(d2).Hours() / 24)
-				if diff > 0 {
+				if diff := int(d1.Sub(d2).Hours() / 24); diff > 0 {
 					totalDays += diff
 				}
 			}
 		}
-		avgInterval = totalDays / (len(sorted) - 1)
+		stats.AvgInterval = totalDays / (total - 1)
 	}
-
-	utils.Success(c, DishRecordsResponse{
-		Records: result,
-		Stats: DishRecordsStats{
-			TotalCount:  total,
-			LunchCount:  lunchCount,
-			DinnerCount: total - lunchCount,
-			YumPercent:  yumPct,
-			OkPercent:   okPct,
-			NoPercent:   noPct,
-			AvgRating:   avgRating,
-			LastDate:    lastDate,
-			AvgInterval: avgInterval,
-		},
-	})
+	utils.Success(c, DishRecordsResponse{Records: result, Stats: stats})
 }

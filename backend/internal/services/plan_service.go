@@ -26,9 +26,8 @@ type WeekPlan struct {
 }
 
 var (
-	cachedPlan    *WeekPlan
-	cachedWeekKey string
-	planMu        sync.RWMutex
+	planCache = map[uint]*WeekPlan{}
+	planMu    sync.RWMutex
 )
 
 func getCurrentWeekKey() string {
@@ -51,60 +50,97 @@ func getSettingInt(key string, defaultVal int) int {
 	return defaultVal
 }
 
-func GetCachedWeekPlan() *WeekPlan {
+// getUserSettingInt 用户设置优先，未设置时回落到 fallback（通常是站点设置）。
+func getUserSettingInt(uid uint, key string, fallback int) int {
+	if n, err := strconv.Atoi(database.GetUserSetting(uid, key, "")); err == nil && n > 0 {
+		return n
+	}
+	return fallback
+}
+
+// GetCachedWeekPlan 用户本周菜单：内存 → 用户设置缓存 → 重新生成。
+func GetCachedWeekPlan(uid uint) *WeekPlan {
 	weekKey := getCurrentWeekKey()
 
 	planMu.RLock()
-	if cachedPlan != nil && cachedWeekKey == weekKey {
-		p := cachedPlan
+	if p := planCache[uid]; p != nil && len(p.Days) > 0 && p.Days[0].Date >= weekKey {
 		planMu.RUnlock()
-		return p
+		return withFavorites(uid, p)
 	}
 	planMu.RUnlock()
 
-	var setting models.Setting
-	if err := database.DB.Where("`key` = ?", "week_plan_cache").First(&setting).Error; err == nil && setting.Value != "" {
+	if raw := database.GetUserSetting(uid, "week_plan_cache", ""); raw != "" {
 		var plan WeekPlan
-		if json.Unmarshal([]byte(setting.Value), &plan) == nil && len(plan.Days) > 0 {
-			if plan.Days[0].Date >= weekKey {
-				planMu.Lock()
-				cachedPlan = &plan
-				cachedWeekKey = weekKey
-				planMu.Unlock()
-				return &plan
-			}
+		if json.Unmarshal([]byte(raw), &plan) == nil && len(plan.Days) > 0 && plan.Days[0].Date >= weekKey {
+			planMu.Lock()
+			planCache[uid] = &plan
+			planMu.Unlock()
+			return withFavorites(uid, &plan)
 		}
 	}
 
-	plan, _ := GenerateWeekPlan()
-	saveWeekPlanCache(plan)
-	return plan
+	return RegenerateWeekPlan(uid)
 }
 
-func RegenerateWeekPlan() *WeekPlan {
-	plan, _ := GenerateWeekPlan()
-	saveWeekPlanCache(plan)
-	return plan
+func RegenerateWeekPlan(uid uint) *WeekPlan {
+	plan, _ := GenerateWeekPlan(uid)
+	saveWeekPlanCache(uid, plan)
+	return withFavorites(uid, plan)
 }
 
-func saveWeekPlanCache(plan *WeekPlan) {
-	data, _ := json.Marshal(plan)
-	database.DB.Model(&models.Setting{}).Where("`key` = ?", "week_plan_cache").Assign(models.Setting{Key: "week_plan_cache", Value: string(data)}).FirstOrCreate(&models.Setting{})
+// InvalidateWeekPlan 菜品变更后让用户的周菜单下次重新生成。
+func InvalidateWeekPlan(uid uint) {
 	planMu.Lock()
-	cachedPlan = plan
-	cachedWeekKey = getCurrentWeekKey()
+	delete(planCache, uid)
+	planMu.Unlock()
+	database.DB.Where("user_id = ? AND `key` = ?", uid, "week_plan_cache").Delete(&models.UserSetting{})
+}
+
+func saveWeekPlanCache(uid uint, plan *WeekPlan) {
+	data, _ := json.Marshal(plan)
+	_ = database.SetUserSetting(uid, "week_plan_cache", string(data))
+	planMu.Lock()
+	planCache[uid] = plan
 	planMu.Unlock()
 }
 
-func GenerateWeekPlan() (*WeekPlan, error) {
+// withFavorites 返回带当前收藏状态的副本（缓存里的收藏状态可能已过期）。
+func withFavorites(uid uint, plan *WeekPlan) *WeekPlan {
+	if plan == nil {
+		return &WeekPlan{Days: []WeekDayPlan{}}
+	}
+	favs := FavoriteIDSet(uid)
+	out := &WeekPlan{Days: make([]WeekDayPlan, len(plan.Days))}
+	for i, day := range plan.Days {
+		d := WeekDayPlan{Date: day.Date, DayName: day.DayName}
+		d.Lunch = append([]models.Dish{}, day.Lunch...)
+		d.Dinner = append([]models.Dish{}, day.Dinner...)
+		for j := range d.Lunch {
+			d.Lunch[j].Favorite = favs[d.Lunch[j].ID]
+		}
+		for j := range d.Dinner {
+			d.Dinner[j].Favorite = favs[d.Dinner[j].ID]
+		}
+		out.Days[i] = d
+	}
+	return out
+}
+
+func GenerateWeekPlan(uid uint) (*WeekPlan, error) {
+	prefs := GetPreferences(uid)
+	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
 	var dishes []models.Dish
-	database.DB.Where("enabled = ?", true).Find(&dishes)
+	for _, d := range VisibleEnabledDishes(uid) {
+		if !containsAny(dishSearchText(d), blocked) {
+			dishes = append(dishes, d)
+		}
+	}
 	if len(dishes) == 0 {
-		return &WeekPlan{}, nil
+		return &WeekPlan{Days: []WeekDayPlan{}}, nil
 	}
 
-	lunchCount := getSettingInt("lunch_dishes_per_day", 1)
-	dinnerCount := getSettingInt("dinner_dishes_per_day", 1)
+	lunchCount := getUserSettingInt(uid, "lunch_dishes_per_day", getSettingInt("lunch_dishes_per_day", 1))
+	dinnerCount := getUserSettingInt(uid, "dinner_dishes_per_day", getSettingInt("dinner_dishes_per_day", 1))
 
 	var lunchPool, dinnerPool []models.Dish
 	for _, d := range dishes {
@@ -416,13 +452,13 @@ func shoppingItemPriority(item ShoppingItem) int {
 	}
 }
 
-func BuildShoppingList(dates []string) []ShoppingCategory {
+func BuildShoppingList(uid uint, dates []string) []ShoppingCategory {
 	if len(dates) == 0 {
 		return []ShoppingCategory{}
 	}
 
 	var checks []models.ShoppingCheck
-	database.DB.Where("meal_date IN ?", dates).Find(&checks)
+	database.DB.Scopes(database.OwnedBy(uid)).Where("meal_date IN ?", dates).Find(&checks)
 	if len(checks) == 0 {
 		return []ShoppingCategory{}
 	}
@@ -447,7 +483,7 @@ func BuildShoppingList(dates []string) []ShoppingCategory {
 	}
 
 	var inventory []models.HomeInventory
-	database.DB.Where("in_stock = ?", true).Find(&inventory)
+	database.DB.Scopes(database.OwnedBy(uid)).Where("in_stock = ?", true).Find(&inventory)
 	inStockByName := make(map[string]bool, len(inventory))
 	for _, inv := range inventory {
 		inStockByName[inv.ItemName] = true
@@ -597,26 +633,29 @@ func DeleteShoppingCategoryOverride(itemName string) {
 	database.DB.Where("item_name = ?", itemName).Delete(&models.ShoppingItemCategory{})
 }
 
-func ToggleShoppingCheck(itemName string, mealDate string, checked bool) {
-	database.DB.Model(&models.ShoppingCheck{}).
-		Where("item_name = ?", itemName).
-		Update("checked", checked)
+// ToggleShoppingCheck 勾选/取消某食材（只影响该用户在这些日期里的清单）。
+func ToggleShoppingCheck(uid uint, itemName string, dates []string, checked bool) {
+	q := database.DB.Model(&models.ShoppingCheck{}).Scopes(database.OwnedBy(uid)).Where("item_name = ?", itemName)
+	if len(dates) > 0 {
+		q = q.Where("meal_date IN ?", dates)
+	}
+	q.Update("checked", checked)
 }
 
-func ToggleHomeInventory(itemName string, inStock bool) {
+func ToggleHomeInventory(uid uint, itemName string, inStock bool) {
 	itemName = strings.TrimSpace(itemName)
 	if itemName == "" {
 		return
 	}
 
 	if !inStock {
-		database.DB.Where("item_name = ?", itemName).Delete(&models.HomeInventory{})
+		database.DB.Scopes(database.OwnedBy(uid)).Where("item_name = ?", itemName).Delete(&models.HomeInventory{})
 		return
 	}
 
-	database.DB.Where("item_name = ?", itemName).
+	database.DB.Where("user_id = ? AND item_name = ?", uid, itemName).
 		Assign(models.HomeInventory{InStock: true}).
-		FirstOrCreate(&models.HomeInventory{ItemName: itemName})
+		FirstOrCreate(&models.HomeInventory{UserID: uid, ItemName: itemName})
 }
 
 func hasKeyword(s string, keywords []string) bool {

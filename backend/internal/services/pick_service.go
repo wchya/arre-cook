@@ -17,66 +17,8 @@ type TomorrowPickOptions struct {
 	ExcludeIDs []uint
 }
 
-func PickDishes(mealType string, count int, excludeRecent bool) ([]models.Dish, error) {
-	var dishes []models.Dish
-	query := database.DB.Where("enabled = ?", true)
-
-	if mealType != "" {
-		query = query.Where("meal_type IN ?", []string{mealType, "all"})
-	}
-
-	query.Find(&dishes)
-
-	if len(dishes) == 0 {
-		return nil, nil
-	}
-
-	if excludeRecent {
-		dishes = filterRecent(dishes, config.C.RepeatDays)
-	}
-
-	if len(dishes) == 0 {
-		var allDishes []models.Dish
-		database.DB.Where("enabled = ?", true).Find(&allDishes)
-		if mealType != "" {
-			var filtered []models.Dish
-			for _, d := range allDishes {
-				if d.MealType == mealType || d.MealType == "all" {
-					filtered = append(filtered, d)
-				}
-			}
-			dishes = filtered
-		} else {
-			dishes = allDishes
-		}
-	}
-
-	if len(dishes) == 0 {
-		return nil, nil
-	}
-
-	weighted := buildWeightedIndices(dishes)
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(weighted), func(i, j int) {
-		weighted[i], weighted[j] = weighted[j], weighted[i]
-	})
-
-	seen := make(map[int]bool)
-	var result []models.Dish
-	for _, idx := range weighted {
-		if !seen[idx] {
-			seen[idx] = true
-			result = append(result, dishes[idx])
-			if len(result) >= count {
-				break
-			}
-		}
-	}
-
-	return result, nil
-}
-
-func PickTomorrowDishes(opts TomorrowPickOptions) ([]models.Dish, error) {
+// PickTomorrowDishes 明日菜单：按偏好档位（快手/清淡/辣/收藏/均衡）过滤排序，用户的过敏原/忌口始终生效。
+func PickTomorrowDishes(uid uint, opts TomorrowPickOptions) ([]models.Dish, error) {
 	count := opts.Count
 	if count < 1 {
 		count = 1
@@ -95,16 +37,25 @@ func PickTomorrowDishes(opts TomorrowPickOptions) ([]models.Dish, error) {
 		profile = "balanced"
 	}
 
-	var dishes []models.Dish
-	query := database.DB.Where("enabled = ?", true)
+	var all []models.Dish
+	query := database.DB.Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true)
 	if mealType != "" {
 		query = query.Where("meal_type IN ?", []string{mealType, "all", ""})
 	}
-	query.Find(&dishes)
+	query.Find(&all)
 
+	prefs := GetPreferences(uid)
+	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
+	dishes := make([]models.Dish, 0, len(all))
+	for _, d := range all {
+		if !containsAny(dishSearchText(d), blocked) {
+			dishes = append(dishes, d)
+		}
+	}
 	if len(dishes) == 0 {
 		return nil, nil
 	}
+	MarkFavorites(uid, dishes)
 
 	excluded := make(map[uint]bool, len(opts.ExcludeIDs))
 	for _, id := range opts.ExcludeIDs {
@@ -113,7 +64,7 @@ func PickTomorrowDishes(opts TomorrowPickOptions) ([]models.Dish, error) {
 		}
 	}
 
-	recent := recentDishIDMap(config.C.RepeatDays)
+	recent := recentDishIDMap(uid, UserRepeatDays(uid))
 	pool := filterTomorrowPool(dishes, profile, excluded, recent, true)
 	if len(pool) == 0 {
 		pool = filterTomorrowPool(dishes, profile, excluded, recent, false)
@@ -240,13 +191,13 @@ func tomorrowDishScore(d models.Dish, profile string) int {
 	return score
 }
 
-func recentDishIDMap(days int) map[uint]bool {
+func recentDishIDMap(uid uint, days int) map[uint]bool {
 	if days <= 0 {
 		return map[uint]bool{}
 	}
 	since := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
 	var recentIDs []uint
-	database.DB.Model(&models.MealRecord{}).
+	database.DB.Model(&models.MealRecord{}).Scopes(database.OwnedBy(uid)).
 		Where("meal_date >= ?", since).
 		Pluck("dish_id", &recentIDs)
 
@@ -256,6 +207,8 @@ func recentDishIDMap(days int) map[uint]bool {
 	}
 	return result
 }
+
+func defaultRepeatDays() int { return config.C.RepeatDays }
 
 func containsTaste(raw string, target string) bool {
 	raw = strings.TrimSpace(raw)
@@ -278,32 +231,6 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
-}
-
-func filterRecent(dishes []models.Dish, days int) []models.Dish {
-	recentMap := recentDishIDMap(days)
-
-	var filtered []models.Dish
-	for _, d := range dishes {
-		if !recentMap[d.ID] {
-			filtered = append(filtered, d)
-		}
-	}
-	return filtered
-}
-
-func buildWeightedIndices(dishes []models.Dish) []int {
-	indices := make([]int, 0)
-	for i, d := range dishes {
-		w := 1
-		if d.Favorite {
-			w += 2
-		}
-		for j := 0; j < w; j++ {
-			indices = append(indices, i)
-		}
-	}
-	return indices
 }
 
 func GetRandomQuote(scene string) string {

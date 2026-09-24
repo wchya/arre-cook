@@ -11,31 +11,30 @@ import (
 )
 
 func GetWeekPlan(c *gin.Context) {
-	plan := services.GetCachedWeekPlan()
+	plan := services.GetCachedWeekPlan(uid(c))
 	if plan != nil && len(plan.Days) > 0 {
-		services.RecordUniqueAchievementEvent("week_plan", plan.Days[0].Date)
+		services.RecordUniqueAchievementEvent(uid(c), "week_plan", plan.Days[0].Date)
 	}
 	utils.Success(c, plan)
 }
 
 func RegenerateWeekPlanHandler(c *gin.Context) {
-	plan := services.RegenerateWeekPlan()
-	services.RecordAchievementEvent("week_plan", "")
+	plan := services.RegenerateWeekPlan(uid(c))
+	services.RecordAchievementEvent(uid(c), "week_plan", "")
 	utils.Success(c, plan)
 }
 
-func GetShoppingList(c *gin.Context) {
-	today := time.Now().Format("2006-01-02")
-	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-	dates := []string{today, tomorrow}
+func shoppingDates() []string {
+	return []string{time.Now().Format("2006-01-02"), time.Now().AddDate(0, 0, 1).Format("2006-01-02")}
+}
 
-	list := services.BuildShoppingList(dates)
-	utils.Success(c, list)
+func GetShoppingList(c *gin.Context) {
+	utils.Success(c, services.BuildShoppingList(uid(c), shoppingDates()))
 }
 
 type ToggleShoppingCheckRequest struct {
 	ItemName string `json:"item_name" binding:"required"`
-	MealDate string `json:"meal_date" binding:"required"`
+	MealDate string `json:"meal_date"`
 	Checked  bool   `json:"checked"`
 }
 
@@ -45,9 +44,9 @@ func ToggleShoppingCheckHandler(c *gin.Context) {
 		utils.BadRequest(c, "参数无效")
 		return
 	}
-	services.ToggleShoppingCheck(req.ItemName, req.MealDate, req.Checked)
+	services.ToggleShoppingCheck(uid(c), req.ItemName, shoppingDates(), req.Checked)
 	if req.Checked {
-		services.QueueAutoAchievementSync()
+		services.QueueAutoAchievementSync(uid(c))
 	}
 	utils.SuccessMsg(c, "已更新")
 }
@@ -63,8 +62,8 @@ func ToggleHomeInventoryHandler(c *gin.Context) {
 		utils.BadRequest(c, "参数无效")
 		return
 	}
-	services.ToggleHomeInventory(req.ItemName, req.InStock)
-	services.QueueAutoAchievementSync()
+	services.ToggleHomeInventory(uid(c), req.ItemName, req.InStock)
+	services.QueueAutoAchievementSync(uid(c))
 	utils.SuccessMsg(c, "已更新")
 }
 
@@ -91,14 +90,12 @@ func UpsertShoppingCategoryHandler(c *gin.Context) {
 }
 
 func DeleteShoppingCategoryHandler(c *gin.Context) {
-	itemName := c.Param("itemName")
-	services.DeleteShoppingCategoryOverride(itemName)
+	services.DeleteShoppingCategoryOverride(c.Param("itemName"))
 	utils.SuccessMsg(c, "已删除")
 }
 
 func GetUpcomingHolidays(c *gin.Context) {
 	var holidays []models.Holiday
-	now := time.Now().Format("2006-01-02")
-	database.DB.Where("date >= ?", now).Order("date ASC").Limit(5).Find(&holidays)
+	database.DB.Where("date >= ?", todayStr()).Order("date ASC").Limit(5).Find(&holidays)
 	utils.Success(c, holidays)
 }

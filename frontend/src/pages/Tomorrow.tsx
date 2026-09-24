@@ -157,6 +157,7 @@ function recordToDish(record: MealRecord): Dish {
     remark: "",
     favorite: false,
     enabled: true,
+    owner_id: 0,
     tags: [],
     sort_order: 0,
     created_at: record.created_at,
@@ -686,6 +687,8 @@ export default function Tomorrow() {
     if (records.length > 0) {
       const nextLunch = mealRecords(records, "lunch").map(recordToDish)
       const nextDinner = mealRecords(records, "dinner").map(recordToDish)
+      // Hydrate the plan editor from the selected date's server records.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLunch(nextLunch)
       setDinner(nextDinner)
       setTargets({

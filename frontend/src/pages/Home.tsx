@@ -88,6 +88,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!initialPick?.items?.length) return
+    // Seed the recommendation interaction state once the query result is available.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecItems((prev) => (prev.length > 0 ? prev : initialPick.items))
     setProfileSummary((prev) => prev || initialPick.profile_summary || "")
   }, [initialPick])

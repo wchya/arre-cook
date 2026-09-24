@@ -32,6 +32,8 @@ export default function AnimatedBottomSheet({
       )
   }, { scope: rootRef })
 
+  // GSAP's contextSafe wrapper invokes this only after the sheet has mounted.
+  // eslint-disable-next-line react-hooks/refs
   const close = contextSafe(() => {
     if (closingRef.current) return
     closingRef.current = true

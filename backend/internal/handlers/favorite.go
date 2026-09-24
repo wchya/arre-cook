@@ -6,6 +6,7 @@ import (
 	"ninimenu/internal/services"
 	"ninimenu/internal/utils"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,9 +17,9 @@ type favoriteDishEntry struct {
 	Dish     models.Dish
 }
 
-func loadFavoriteDishEntries() ([]favoriteDishEntry, error) {
+func loadFavoriteDishEntries(u uint) ([]favoriteDishEntry, error) {
 	var favorites []models.Favorite
-	if err := database.DB.Order("created_at DESC").Find(&favorites).Error; err != nil {
+	if err := database.DB.Scopes(database.OwnedBy(u)).Order("created_at DESC").Find(&favorites).Error; err != nil {
 		return nil, err
 	}
 
@@ -32,12 +33,13 @@ func loadFavoriteDishEntries() ([]favoriteDishEntry, error) {
 	}
 
 	var dishes []models.Dish
-	if err := database.DB.Where("id IN ?", dishIDs).Find(&dishes).Error; err != nil {
+	if err := database.DB.Scopes(database.VisibleDishes(u)).Where("id IN ?", dishIDs).Find(&dishes).Error; err != nil {
 		return nil, err
 	}
 
 	dishByID := make(map[uint]models.Dish, len(dishes))
 	for _, d := range dishes {
+		d.Favorite = true
 		dishByID[d.ID] = d
 	}
 
@@ -55,7 +57,7 @@ func loadFavoriteDishEntries() ([]favoriteDishEntry, error) {
 }
 
 func GetFavorites(c *gin.Context) {
-	entries, err := loadFavoriteDishEntries()
+	entries, err := loadFavoriteDishEntries(uid(c))
 	if err != nil {
 		utils.InternalError(c, "获取收藏失败")
 		return
@@ -118,7 +120,7 @@ type FavoriteOverview struct {
 	NeedTry    []FavoriteOverviewItem    `json:"need_try"`
 }
 
-func loadFavoriteRecordStats(dishIDs []uint) (map[uint]FavoriteRecordStats, error) {
+func loadFavoriteRecordStats(u uint, dishIDs []uint) (map[uint]FavoriteRecordStats, error) {
 	statsByDish := make(map[uint]FavoriteRecordStats, len(dishIDs))
 	if len(dishIDs) == 0 {
 		return statsByDish, nil
@@ -134,7 +136,7 @@ func loadFavoriteRecordStats(dishIDs []uint) (map[uint]FavoriteRecordStats, erro
 			max(meal_date) as last_eaten_at,
 			coalesce(avg(case when rating > 0 then rating end), 0) as avg_rating
 		`).
-		Where("dish_id IN ?", dishIDs).
+		Where("user_id = ? AND dish_id IN ?", u, dishIDs).
 		Group("dish_id").
 		Find(&rows).Error
 	if err != nil {
@@ -148,7 +150,7 @@ func loadFavoriteRecordStats(dishIDs []uint) (map[uint]FavoriteRecordStats, erro
 }
 
 func GetFavoritesOverview(c *gin.Context) {
-	entries, err := loadFavoriteDishEntries()
+	entries, err := loadFavoriteDishEntries(uid(c))
 	if err != nil {
 		utils.InternalError(c, "获取收藏概览失败")
 		return
@@ -159,7 +161,7 @@ func GetFavoritesOverview(c *gin.Context) {
 		dishIDs = append(dishIDs, entry.Dish.ID)
 	}
 
-	recordStats, err := loadFavoriteRecordStats(dishIDs)
+	recordStats, err := loadFavoriteRecordStats(uid(c), dishIDs)
 	if err != nil {
 		utils.InternalError(c, "获取收藏记录失败")
 		return
@@ -336,33 +338,16 @@ func limitFavoriteItems(items []FavoriteOverviewItem, limit int) []FavoriteOverv
 }
 
 func AddFavorite(c *gin.Context) {
-	dishID := c.Param("dishId")
-	var dish models.Dish
-	if err := database.DB.First(&dish, dishID).Error; err != nil {
+	id, _ := strconv.Atoi(c.Param("dishId"))
+	if err := services.SetFavorite(uid(c), uint(id), true); err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
-
-	var existing models.Favorite
-	if err := database.DB.Where("dish_id = ?", dish.ID).First(&existing).Error; err == nil {
-		utils.SuccessMsg(c, "已收藏")
-		return
-	}
-
-	fav := models.Favorite{DishID: dish.ID}
-	database.DB.Create(&fav)
-	database.DB.Model(&dish).Update("favorite", true)
-	services.QueueAutoAchievementSync()
-
 	utils.SuccessMsg(c, "收藏成功")
 }
 
 func RemoveFavorite(c *gin.Context) {
-	dishID := c.Param("dishId")
-
-	database.DB.Where("dish_id = ?", dishID).Delete(&models.Favorite{})
-	database.DB.Model(&models.Dish{}).Where("id = ?", dishID).Update("favorite", false)
-	services.QueueAutoAchievementSync()
-
+	id, _ := strconv.Atoi(c.Param("dishId"))
+	_ = services.SetFavorite(uid(c), uint(id), false)
 	utils.SuccessMsg(c, "取消收藏成功")
 }

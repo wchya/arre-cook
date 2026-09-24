@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 type PickRequest struct {
@@ -28,10 +26,10 @@ type TomorrowPickRequest struct {
 }
 
 // recommendForApp 站内推荐统一走推荐引擎（口味画像 + 约束打分），并带一点随机抖动保证“换一个”有变化。
-func recommendForApp(req services.RecommendRequest) []models.Dish {
+func recommendForApp(u uint, req services.RecommendRequest) []models.Dish {
 	req.Source = "app"
 	req.Jitter = true
-	result, err := services.RecommendDishes(req)
+	result, err := services.RecommendDishes(u, req)
 	if err != nil || result == nil {
 		return nil
 	}
@@ -43,22 +41,22 @@ func recommendForApp(req services.RecommendRequest) []models.Dish {
 }
 
 func PickLunch(c *gin.Context) {
-	dishes := recommendForApp(services.RecommendRequest{MealType: "lunch", Count: getPickCount(c)})
+	dishes := recommendForApp(uid(c), services.RecommendRequest{MealType: "lunch", Count: getPickCount(c)})
 	if len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
-	services.RecordAchievementEvent("recommend_lunch", "")
+	services.RecordAchievementEvent(uid(c), "recommend_lunch", "")
 	utils.Success(c, gin.H{"dishes": dishes, "quote": services.GetRandomQuote("lunch")})
 }
 
 func PickDinner(c *gin.Context) {
-	dishes := recommendForApp(services.RecommendRequest{MealType: "dinner", Count: getPickCount(c)})
+	dishes := recommendForApp(uid(c), services.RecommendRequest{MealType: "dinner", Count: getPickCount(c)})
 	if len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
-	services.RecordAchievementEvent("recommend_dinner", "")
+	services.RecordAchievementEvent(uid(c), "recommend_dinner", "")
 	utils.Success(c, gin.H{"dishes": dishes, "quote": services.GetRandomQuote("dinner")})
 }
 
@@ -76,12 +74,12 @@ func PickMood(c *gin.Context) {
 	case "spicy":
 		rec.Tastes = []string{"辣"}
 	}
-	dishes := recommendForApp(rec)
+	dishes := recommendForApp(uid(c), rec)
 	if len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
-	services.RecordAchievementEvent("recommend_mood", "")
+	services.RecordAchievementEvent(uid(c), "recommend_mood", "")
 
 	scene := ""
 	switch req.Mood {
@@ -104,13 +102,13 @@ func PickSmart(c *gin.Context) {
 	}
 	req.Source = "app"
 	req.Jitter = true
-	result, err := services.RecommendDishes(req)
+	result, err := services.RecommendDishes(uid(c), req)
 	if err != nil || result == nil || len(result.Items) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
 	if req.Mode != "home_auto" {
-		services.RecordAchievementEvent("recommend_mood", req.Mood)
+		services.RecordAchievementEvent(uid(c), "recommend_mood", req.Mood)
 	}
 	utils.Success(c, gin.H{
 		"items":           result.Items,
@@ -127,27 +125,20 @@ func PickTomorrow(c *gin.Context) {
 		return
 	}
 
-	dishes, err := services.PickTomorrowDishes(services.TomorrowPickOptions{
-		MealType:   req.MealType,
-		Profile:    req.Profile,
-		Count:      req.Count,
-		ExcludeIDs: req.ExcludeIDs,
+	dishes, err := services.PickTomorrowDishes(uid(c), services.TomorrowPickOptions{
+		MealType: req.MealType, Profile: req.Profile, Count: req.Count, ExcludeIDs: req.ExcludeIDs,
 	})
 	if err != nil || len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
 
-	services.RecordAchievementEvent("recommend_mood", req.Profile)
-	utils.Success(c, gin.H{
-		"dishes": dishes,
-		"quote":  services.GetRandomQuote(req.Profile),
-	})
+	services.RecordAchievementEvent(uid(c), "recommend_mood", req.Profile)
+	utils.Success(c, gin.H{"dishes": dishes, "quote": services.GetRandomQuote(req.Profile)})
 }
 
 func PickBlindBox(c *gin.Context) {
-	var dishes []models.Dish
-	database.DB.Where("enabled = ?", true).Find(&dishes)
+	dishes := services.VisibleEnabledDishes(uid(c))
 	if len(dishes) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
@@ -155,20 +146,17 @@ func PickBlindBox(c *gin.Context) {
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	dish := dishes[r.Intn(len(dishes))]
+	services.MarkFavorite(uid(c), &dish)
 
 	hint := "点我揭晓今日惊喜~"
 	var box models.BlindBox
-	if err := database.DB.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).Where("active = ?", true).First(&box).Error; err == nil && box.Hint != "" {
+	if err := database.DB.Where("active = ?", true).Limit(1).Find(&box).Error; err == nil && box.Hint != "" {
 		hint = box.Hint
 	}
 
-	services.RecordAchievementEvent("blind_box", "")
-	logBehavior("recommend", dish.ID, dish.Name, "app", "", map[string]any{"mode": "blind_box"})
-	utils.Success(c, gin.H{
-		"hint":  hint,
-		"dish":  dish,
-		"quote": services.GetRandomQuote(""),
-	})
+	services.RecordAchievementEvent(uid(c), "blind_box", "")
+	services.LogBehavior(uid(c), "recommend", dish.ID, dish.Name, "app", "", map[string]any{"mode": "blind_box"})
+	utils.Success(c, gin.H{"hint": hint, "dish": dish, "quote": services.GetRandomQuote("")})
 }
 
 func getPickCount(c *gin.Context) int {

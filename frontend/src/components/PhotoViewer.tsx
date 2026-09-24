@@ -25,6 +25,8 @@ export default function PhotoViewer({ photos, idx, setIdx, onClose }: PhotoViewe
     gsap.fromTo(layerRef.current, { autoAlpha: 0 }, { autoAlpha: 1, duration: motionDuration(0.2) })
   }, { scope: layerRef })
 
+  // GSAP contextSafe callbacks run from user events after the viewer has mounted.
+  // eslint-disable-next-line react-hooks/refs
   const close = contextSafe(() => {
     gsap.to(layerRef.current, {
       autoAlpha: 0,
@@ -34,6 +36,7 @@ export default function PhotoViewer({ photos, idx, setIdx, onClose }: PhotoViewe
     })
   })
 
+  // eslint-disable-next-line react-hooks/refs
   const snapTo = contextSafe((newIdx: number, animate: boolean) => {
     if (!stripRef.current) return
     animating.current = true

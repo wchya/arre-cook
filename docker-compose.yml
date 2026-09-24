@@ -7,20 +7,49 @@ services:
     container_name: arre-cook-ninimenu
     restart: unless-stopped
     ports:
-      # 对外开放 9925
-      - "9925:8080"
+      - "127.0.0.1:9925:8080"
+    networks:
+      - default
+      - blog-storage
     environment:
       TZ: Asia/Shanghai
       GIN_MODE: release
-      # 生产请自行修改以下值（也可用 .env 文件覆盖）
-      APP_PASSWORD: ${APP_PASSWORD:-nini123}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-nini123}
-      JWT_SECRET: ${JWT_SECRET:-please-change-me}
+      APP_ENV: production
+      PORT: "8080"
+      DB_PATH: /app/data/ninimenu.db
+      UPLOAD_DIR: /app/uploads
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set the initial administrator email}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set a strong initial administrator password}
+      JWT_SECRET: ${JWT_SECRET:?Set a random JWT signing secret}
+      ALLOW_REGISTER: ${ALLOW_REGISTER:-true}
+      EMAIL_DOMAINS: ${EMAIL_DOMAINS:-qq.com,foxmail.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://cook.arrebyte.top}
+      PUBLIC_URL: ${PUBLIC_URL:-https://cook.arrebyte.top}
+      SMTP_HOST: ${SMTP_HOST:-${MAIL_HOST:-smtp.qq.com}}
+      SMTP_PORT: ${SMTP_PORT:-${MAIL_PORT:-587}}
+      SMTP_USER: ${SMTP_USER:-${MAIL_USERNAME:-}}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-${MAIL_PASSWORD:-}}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-NiniMenu}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://garage:3900}
+      S3_REGION: ${S3_REGION:-garage}
+      S3_BUCKET: ${S3_BUCKET:-cook-uploads}
+      S3_ACCESS_KEY: ${COOK_S3_ACCESS_KEY:?Create an app-specific Garage access key}
+      S3_SECRET_KEY: ${COOK_S3_SECRET_KEY:?Set the Garage access key secret}
+      S3_PATH_STYLE: ${S3_PATH_STYLE:-true}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-/uploads/}
+      S3_PREFIX: ${S3_PREFIX:-cook}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      WECHAT_APPID: ${WECHAT_APPID:-}
+      WECHAT_SECRET: ${WECHAT_SECRET:-}
+      AGENT_RATE_LIMIT: ${AGENT_RATE_LIMIT:-120}
     volumes:
       - ninimenu-data:/app/data
       - ninimenu-uploads:/app/uploads
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/app-info >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -34,3 +63,8 @@ services:
 volumes:
   ninimenu-data:
   ninimenu-uploads:
+
+networks:
+  blog-storage:
+    external: true
+    name: ${BLOG_DOCKER_NETWORK:-web-arrebyte_default}

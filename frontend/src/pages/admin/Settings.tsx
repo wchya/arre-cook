@@ -180,7 +180,7 @@ export default function AdminSettings() {
           </button>
         </div>
         <div className="text-[11px] text-text3 mt-2 leading-relaxed">
-          智能体访问本站全量接口（/api/agent/*）需携带 X-Agent-Token，值由环境变量 AGENT_TOKEN 控制（默认与管理密码相同）。
+          外部智能体请由每位用户在「我的 → AI 连接」创建独立令牌，并按需授权。令牌只访问签发者自己的数据。
         </div>
       </div>
 
@@ -297,9 +297,9 @@ export default function AdminSettings() {
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="text-[13px] font-semibold text-text2 mb-1">密码来源</div>
+        <div className="text-[13px] font-semibold text-text2 mb-1">账号安全</div>
         <div className="text-xs text-text3 leading-relaxed">
-          应用密码由环境变量 APP_PASSWORD 控制，管理密码由 ADMIN_PASSWORD 控制。修改后重启服务生效。
+          邮箱验证码登录由服务端邮件配置提供。登录密码可在「我的 → 账号与安全」中管理；修改部署环境变量不会重置已有账号密码。
         </div>
       </div>
     </div>

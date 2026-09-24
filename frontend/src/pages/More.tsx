@@ -269,6 +269,8 @@ export default function More() {
     })
   }, { dependencies: [displayDays], scope: weekListRef })
 
+  // GSAP contextSafe invokes this from a click handler after the list mounts.
+  // eslint-disable-next-line react-hooks/refs
   const toggleWeekDays = contextSafe(() => {
     if (weekListRef.current) {
       flipStateRef.current = Flip.getState(".week-day-card", { props: "opacity,transform" })

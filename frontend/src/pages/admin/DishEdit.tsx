@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { dishesApi, uploadApi, settingsApi, getUploadErrorMessage } from "@/api"
+import { adminApi, dishesApi, uploadApi, getUploadErrorMessage } from "@/api"
+import type { DishInput } from "@/types"
 import { asArray } from "@/lib/utils"
 import toast from "react-hot-toast"
 
@@ -17,6 +18,24 @@ const diffLabels = { easy: "简单", medium: "中等", hard: "困难" }
 
 interface Ingredient { name: string; amount: string }
 interface Step { text: string; time?: number }
+
+function fmtIngredient(item: unknown): string {
+  if (typeof item === "string") return item
+  if (typeof item === "object" && item !== null) {
+    const value = item as Record<string, unknown>
+    return `${value.name || ""} ${value.amount || ""}`.trim()
+  }
+  return String(item)
+}
+
+function fmtStep(item: unknown, index: number): string {
+  if (typeof item === "string") return `${index + 1}. ${item}`
+  if (typeof item === "object" && item !== null) {
+    const value = item as Record<string, unknown>
+    return `${index + 1}. ${value.text || ""}${value.time ? ` (${value.time}分钟)` : ""}`
+  }
+  return `${index + 1}. ${String(item)}`
+}
 
 function parseList(raw: unknown, fallback: string[]): string[] {
   const arr = asArray<string>(raw).filter((x) => typeof x === "string")
@@ -47,7 +66,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 const inputCls = "w-full py-2.5 px-3.5 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none transition-all focus:border-primary focus:shadow-[0_0_0_3px_rgba(232,115,74,.1)]"
 const textareaCls = "w-full py-2.5 px-3.5 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none min-h-[80px] resize-y leading-relaxed transition-all focus:border-primary"
 
-export default function AdminDishEdit() {
+export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "user" }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -61,8 +80,9 @@ export default function AdminDishEdit() {
   })
 
   const { data: settings } = useQuery({
-    queryKey: ["settings"],
-    queryFn: () => settingsApi.get(),
+    queryKey: ["admin-site-settings"],
+    queryFn: () => adminApi.settings(),
+    enabled: mode === "admin",
   })
   const categories = parseList(settings?.categories, DEFAULT_CATEGORIES)
   const tastes = parseList(settings?.tastes, DEFAULT_TASTES)
@@ -93,6 +113,8 @@ export default function AdminDishEdit() {
 
   useEffect(() => {
     if (!dish) return
+    // Hydrate form fields when the requested dish is loaded.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(dish.name || "")
     setCategory(dish.category || "川菜")
     setMealType(dish.meal_type || "all")
@@ -109,23 +131,6 @@ export default function AdminDishEdit() {
     setSeasoningsText(asArray(dish.seasonings).map(fmtIngredient).join("\n"))
     setStepsText(asArray(dish.steps).map(fmtStep).join("\n"))
   }, [dish])
-
-  function fmtIngredient(item: unknown): string {
-    if (typeof item === "string") return item
-    if (typeof item === "object" && item !== null) {
-      const o = item as Record<string, unknown>
-      return `${o.name || ""} ${o.amount || ""}`.trim()
-    }
-    return String(item)
-  }
-  function fmtStep(item: unknown, i: number): string {
-    if (typeof item === "string") return `${i + 1}. ${item}`
-    if (typeof item === "object" && item !== null) {
-      const o = item as Record<string, unknown>
-      return `${i + 1}. ${o.text || ""}${o.time ? ` (${o.time}分钟)` : ""}`
-    }
-    return `${i + 1}. ${String(item)}`
-  }
 
   function parseIngredients(text: string): Ingredient[] {
     return text.split("\n").filter((l) => l.trim()).map((l) => {
@@ -145,7 +150,7 @@ export default function AdminDishEdit() {
 
   const saveMut = useMutation({
     mutationFn: () => {
-      const data = {
+      const data: DishInput = {
         name,
         category,
         meal_type: mealType,
@@ -162,6 +167,7 @@ export default function AdminDishEdit() {
         tags: JSON.stringify(tags),
         sort_order: sortOrder,
       }
+      if (isNew && mode === "admin") data.public = true
       return isNew ? dishesApi.create(data) : dishesApi.update(dishId, data)
     },
     onSuccess: () => {
@@ -174,9 +180,9 @@ export default function AdminDishEdit() {
   })
 
   const addCategoryMut = useMutation({
-    mutationFn: (val: string) => settingsApi.update({ categories: JSON.stringify([...categories, val]) }),
+    mutationFn: (val: string) => adminApi.updateSettings({ categories: JSON.stringify([...categories, val]) }),
     onSuccess: (_d, val) => {
-      qc.invalidateQueries({ queryKey: ["settings"] })
+      qc.invalidateQueries({ queryKey: ["admin-site-settings"] })
       setCategory(val)
       setNewCategory("")
       setAddingCategory(false)
@@ -186,9 +192,9 @@ export default function AdminDishEdit() {
   })
 
   const addTasteMut = useMutation({
-    mutationFn: (val: string) => settingsApi.update({ tastes: JSON.stringify([...tastes, val]) }),
+    mutationFn: (val: string) => adminApi.updateSettings({ tastes: JSON.stringify([...tastes, val]) }),
     onSuccess: (_d, val) => {
-      qc.invalidateQueries({ queryKey: ["settings"] })
+      qc.invalidateQueries({ queryKey: ["admin-site-settings"] })
       setTasteList((prev) => prev.includes(val) ? prev : [...prev, val])
       setNewTaste("")
       setAddingTaste(false)
@@ -198,9 +204,9 @@ export default function AdminDishEdit() {
   })
 
   const delCategoryMut = useMutation({
-    mutationFn: (val: string) => settingsApi.update({ categories: JSON.stringify(categories.filter((c) => c !== val)) }),
+    mutationFn: (val: string) => adminApi.updateSettings({ categories: JSON.stringify(categories.filter((c) => c !== val)) }),
     onSuccess: (_d, val) => {
-      qc.invalidateQueries({ queryKey: ["settings"] })
+      qc.invalidateQueries({ queryKey: ["admin-site-settings"] })
       if (category === val) setCategory("")
       setPendingDelete(null)
       toast.success("已删除分类")
@@ -209,9 +215,9 @@ export default function AdminDishEdit() {
   })
 
   const delTasteMut = useMutation({
-    mutationFn: (val: string) => settingsApi.update({ tastes: JSON.stringify(tastes.filter((t) => t !== val)) }),
+    mutationFn: (val: string) => adminApi.updateSettings({ tastes: JSON.stringify(tastes.filter((t) => t !== val)) }),
     onSuccess: (_d, val) => {
-      qc.invalidateQueries({ queryKey: ["settings"] })
+      qc.invalidateQueries({ queryKey: ["admin-site-settings"] })
       setTasteList((prev) => prev.filter((x) => x !== val))
       setPendingDelete(null)
       toast.success("已删除口味")
@@ -283,7 +289,7 @@ export default function AdminDishEdit() {
         <Field label="分类">
           <div className="flex items-center justify-between mb-1.5">
             <span />
-            <button onClick={() => setManageCategory((v) => !v)} className={`text-[12px] px-2 py-0.5 rounded-full transition-all ${manageCategory ? "bg-primary text-white" : "text-text3 hover:text-primary"}`}>{manageCategory ? "完成" : "管理"}</button>
+            {mode === "admin" && <button onClick={() => setManageCategory((v) => !v)} className={`text-[12px] px-2 py-0.5 rounded-full transition-all ${manageCategory ? "bg-primary text-white" : "text-text3 hover:text-primary"}`}>{manageCategory ? "完成" : "管理"}</button>}
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             {categories.map((c) => (
@@ -294,7 +300,7 @@ export default function AdminDishEdit() {
                 )}
               </span>
             ))}
-            {addingCategory ? (
+            {mode === "admin" && addingCategory ? (
               <div className="flex items-center gap-1">
                 <input autoFocus value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && newCategory.trim()) addCategoryMut.mutate(newCategory.trim()); if (e.key === "Escape") setAddingCategory(false) }}
@@ -302,9 +308,9 @@ export default function AdminDishEdit() {
                 <button onClick={() => newCategory.trim() && addCategoryMut.mutate(newCategory.trim())} className="px-2.5 py-1.5 rounded-full text-xs bg-primary text-white">✓</button>
                 <button onClick={() => { setAddingCategory(false); setNewCategory("") }} className="px-2.5 py-1.5 rounded-full text-xs border border-border text-text2">✕</button>
               </div>
-            ) : (
+            ) : mode === "admin" ? (
               <button onClick={() => setAddingCategory(true)} className="px-3.5 py-1.5 rounded-full text-xs border-[1.5px] border-dashed border-border2 text-text2">+ 自定义</button>
-            )}
+            ) : null}
           </div>
         </Field>
 
@@ -328,7 +334,7 @@ export default function AdminDishEdit() {
         <Field label="口味（可多选）">
           <div className="flex items-center justify-between mb-1.5">
             <span />
-            <button onClick={() => setManageTaste((v) => !v)} className={`text-[12px] px-2 py-0.5 rounded-full transition-all ${manageTaste ? "bg-primary text-white" : "text-text3 hover:text-primary"}`}>{manageTaste ? "完成" : "管理"}</button>
+            {mode === "admin" && <button onClick={() => setManageTaste((v) => !v)} className={`text-[12px] px-2 py-0.5 rounded-full transition-all ${manageTaste ? "bg-primary text-white" : "text-text3 hover:text-primary"}`}>{manageTaste ? "完成" : "管理"}</button>}
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             {tastes.map((t) => (
@@ -339,7 +345,7 @@ export default function AdminDishEdit() {
                 )}
               </span>
             ))}
-            {addingTaste ? (
+            {mode === "admin" && addingTaste ? (
               <div className="flex items-center gap-1">
                 <input autoFocus value={newTaste} onChange={(e) => setNewTaste(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && newTaste.trim()) addTasteMut.mutate(newTaste.trim()); if (e.key === "Escape") setAddingTaste(false) }}
@@ -347,9 +353,9 @@ export default function AdminDishEdit() {
                 <button onClick={() => newTaste.trim() && addTasteMut.mutate(newTaste.trim())} className="px-2.5 py-1.5 rounded-full text-xs bg-primary text-white">✓</button>
                 <button onClick={() => { setAddingTaste(false); setNewTaste("") }} className="px-2.5 py-1.5 rounded-full text-xs border border-border text-text2">✕</button>
               </div>
-            ) : (
+            ) : mode === "admin" ? (
               <button onClick={() => setAddingTaste(true)} className="px-3.5 py-1.5 rounded-full text-xs border-[1.5px] border-dashed border-border2 text-text2">+ 自定义</button>
-            )}
+            ) : null}
           </div>
         </Field>
 

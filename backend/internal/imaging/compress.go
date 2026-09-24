@@ -1,20 +1,21 @@
 package imaging
 
 import (
+	"bytes"
 	"image"
 	"image/draw"
 	"image/jpeg"
-	"os"
-	"path/filepath"
 
 	imgproc "github.com/disintegration/imaging"
 	_ "golang.org/x/image/webp"
 )
 
-func ProcessUpload(srcPath, dstDir, baseName string, maxDim, quality int) (string, error) {
-	img, err := imgproc.Open(srcPath, imgproc.AutoOrientation(true))
+// CompressJPEG EXIF 方向修正 → 等比缩放到不超过 maxDim → 透明区域铺白底 → 编码为 JPG。
+// 手机截图/照片通常能减少 70-90% 体积。
+func CompressJPEG(src []byte, maxDim, quality int) ([]byte, error) {
+	img, err := imgproc.Decode(bytes.NewReader(src), imgproc.AutoOrientation(true))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	b := img.Bounds()
@@ -27,17 +28,9 @@ func ProcessUpload(srcPath, dstDir, baseName string, maxDim, quality int) (strin
 	draw.Draw(rgba, rgba.Bounds(), image.White, image.Point{}, draw.Src)
 	draw.Draw(rgba, rgba.Bounds(), img, b.Min, draw.Over)
 
-	dstPath := filepath.Join(dstDir, baseName+".jpg")
-	f, err := os.Create(dstPath)
-	if err != nil {
-		return "", err
+	var out bytes.Buffer
+	if err := jpeg.Encode(&out, rgba, &jpeg.Options{Quality: quality}); err != nil {
+		return nil, err
 	}
-	defer f.Close()
-
-	if err := jpeg.Encode(f, rgba, &jpeg.Options{Quality: quality}); err != nil {
-		os.Remove(dstPath)
-		return "", err
-	}
-
-	return dstPath, nil
+	return out.Bytes(), nil
 }

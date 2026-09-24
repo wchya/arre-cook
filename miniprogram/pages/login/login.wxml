@@ -1,0 +1,34 @@
+<view class="page">
+  <view class="brand">
+    <view class="mark">N</view>
+    <view class="eyebrow">NINIMENU</view>
+    <view class="title">今天吃什么</view>
+    <view class="subtitle">按你的口味安排每一餐</view>
+  </view>
+
+  <view class="login-panel">
+    <view class="panel-title">登录或创建账号</view>
+    <view wx:if="{{message}}" class="message">{{message}}</view>
+    <view wx:if="{{error}}" class="error" role="alert">{{error}}</view>
+
+    <button wx:if="{{wechatEnabled}}" class="wechat-button" loading="{{loading}}" disabled="{{loading}}" bindtap="loginWithWechat">微信快捷登录</button>
+    <view wx:if="{{wechatEnabled && emailEnabled}}" class="divider"><text>或使用邮箱</text></view>
+
+    <block wx:if="{{emailEnabled}}">
+      <view class="field-label">QQ 邮箱</view>
+      <input class="input" type="text" maxlength="120" value="{{email}}" placeholder="name@qq.com" autocomplete="email" bindinput="onEmailInput" />
+      <view class="field-label code-label">邮箱验证码</view>
+      <view class="code-row">
+        <input class="input code-input" type="number" maxlength="6" value="{{code}}" placeholder="6 位数字" bindinput="onCodeInput" />
+        <button class="send-button" loading="{{sending}}" disabled="{{sending || cooldown > 0}}" bindtap="sendCode">{{cooldown > 0 ? cooldown + ' 秒' : '发送验证码'}}</button>
+      </view>
+      <button class="submit-button" loading="{{loading}}" disabled="{{loading || code.length !== 6}}" bindtap="submitEmail">登录并继续</button>
+      <view wx:if="{{!registerOpen}}" class="footnote">目前暂停新账号注册</view>
+      <view wx:elif="{{wechatEnabled}}" class="footnote">首次使用会将微信绑定到这个邮箱账号</view>
+      <view wx:else class="footnote">验证邮箱后自动创建账号</view>
+    </block>
+    <view wx:else class="unavailable">邮箱登录暂不可用，请稍后再试</view>
+  </view>
+
+  <view class="privacy"><text>仅读取你本人授权的数据</text><text> · </text><text>账号数据彼此隔离</text></view>
+</view>

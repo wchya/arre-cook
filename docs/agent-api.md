@@ -1,116 +1,102 @@
-# 智能体开放接口（/api/agent/*）
+# NiniMenu Agent 接口
 
-食谱站把菜单、用餐记录、收藏、评价、行为事件、口味画像与推荐引擎全部开放给外部智能体，用于食谱推荐与用户行为分析。
+NiniMenu 为 Hermes、DeepSeek Harness、自建 Agent 和兼容 MCP 的客户端提供个人数据接口。每个访问凭据绑定到一个用户；服务端从凭据解析用户身份，不接受调用方指定数据所有者。
 
-## 凭证
+## 创建访问凭据
 
-所有 `/api/agent/*` 接口需携带令牌，三选一：
+登录 NiniMenu 后进入「我的 → AI 连接」，创建个人令牌并选择权限和有效期。令牌明文只在创建时显示一次，之后服务端只保存摘要。请将它作为密码保管，不要放进前端代码、公开仓库或客户端日志；泄露后立即撤销并重建。
 
-| 方式 | 示例 |
-|---|---|
-| 请求头 `X-Agent-Token` | `X-Agent-Token: <AGENT_TOKEN>` |
-| `Authorization: Bearer <AGENT_TOKEN>` | 同上 |
-| 管理端 JWT | `Authorization: Bearer <admin jwt>` |
-
-`AGENT_TOKEN` 由环境变量控制，未设置时等于 `ADMIN_PASSWORD`（默认 `nini123`）。
-
-响应结构与站内一致：`{ "code": 0, "message": "success", "data": … }`，非 0 为失败。
-
-## 接口一览
-
-| 方法 | 路径 | 说明 |
+| 预设 | 权限 | 适用场景 |
 |---|---|---|
-| GET | `/api/agent/capabilities` | 能力清单：枚举值（菜系/口味/餐段/难度/心情/事件类型）、数据规模、全部端点 |
-| GET | `/api/agent/dishes` | 菜品查询（完整字段含食材/调料/步骤）。参数：`category`、`taste`、`difficulty`、`meal_type`、`search`、`ingredient`、`exclude_ingredient`、`max_cook_time`、`exclude_recent=1`、`enabled`、`ids`、`limit`(≤500)、`offset` |
-| GET | `/api/agent/dishes/:id` | 菜品详情 + 该菜用餐记录与统计（次数、好吃/一般/不行、均分、最近日期、浏览数、是否收藏） |
-| GET | `/api/agent/profile?days=90` | 口味画像（见下） |
-| POST | `/api/agent/recommend` | 推荐引擎（见下） |
-| GET | `/api/agent/records` | 用餐记录，附菜系/口味/当天心情。参数：`date_from`、`date_to`、`meal_type`、`dish_id`、`limit`(≤2000)；默认最近 90 天 |
-| POST | `/api/agent/records` | 写入用餐记录（单条或 `records` 数组），每条成功写入记一条 `accept` 事件并更新买菜清单 |
-| DELETE | `/api/agent/records/:id` | 删除用餐记录 |
-| GET | `/api/agent/favorites` | 收藏列表 |
-| POST / DELETE | `/api/agent/favorites/:dishId` | 收藏 / 取消收藏 |
-| GET | `/api/agent/behavior` | 行为事件流。参数：`type`(逗号分隔)、`source`、`dish_id`、`since`(日期或 RFC3339)、`limit`(≤2000) |
-| POST | `/api/agent/behavior` | 写入行为事件（单条或 `events` 数组） |
-| GET | `/api/agent/day-ratings` | 整餐评价与首页心情。参数：`date_from`、`date_to` |
-| GET | `/api/agent/stats` | 整体统计（同管理端仪表盘） |
-| GET | `/api/agent/week-plan` | 本周菜单 |
-| POST | `/api/agent/week-plan/regenerate` | 重新生成本周菜单 |
-| GET | `/api/agent/shopping-list` | 今明两日买菜清单 |
-| GET | `/api/agent/settings` | 站点设置（分类、口味、去重天数等） |
-| GET | `/api/agent/export?days=365` | 一次性导出菜品、记录、收藏、评价、事件与画像 |
+| `readonly` | `profile:read`、`dishes:read`、`records:read` | 查询画像、菜单和记录 |
+| `advisor` | 只读权限，加 `suggestions:write`、`behavior:write` | 分析并提交待用户确认的建议 |
+| `full` | 全部权限 | 允许 Agent 代记用餐、改偏好、收藏和重排周菜单 |
 
-站内应用端（`X-App-Token`）也新增了两个接口：`POST /api/pick/smart`（同推荐引擎，供首页与「AI 推荐官」页使用）、`POST /api/behavior`（前端埋点）、`GET /api/profile`。
+可单独选择的 scope：
 
-## 口味画像 `GET /api/agent/profile`
+| Scope | 能力 |
+|---|---|
+| `profile:read` | 读取口味画像、偏好和统计 |
+| `dishes:read` | 读取公共菜谱和当前用户的私房菜 |
+| `records:read` | 读取用餐记录、评分、收藏、行为、周菜单和购物清单 |
+| `records:write` | 记录或删除用餐 |
+| `favorites:write` | 收藏或取消收藏 |
+| `plan:write` | 重新生成周菜单 |
+| `preferences:write` | 修改饮食偏好 |
+| `suggestions:write` | 向用户提交建议 |
+| `behavior:write` | 写入行为反馈 |
 
-由最近 `days` 天（默认 90，最大 365）的用餐记录、评价、收藏、首页心情、行为事件聚合；记录按时间衰减加权（45 天半衰期），好吃/高分加权、不行/低分降权。
+所有 Agent 请求使用：
+
+```http
+Authorization: Bearer nm_个人令牌
+```
+
+也兼容 `X-Agent-Token: nm_个人令牌`。`/api/agent/*` 和 `/mcp` 还接受用户自己的登录令牌或短期嵌入会话令牌；第三方集成建议使用可撤销、可限权的个人令牌。旧的全站 `AGENT_TOKEN` 已移除。
+
+## MCP
+
+Streamable HTTP 地址为 `https://你的域名/mcp`。在 MCP 客户端配置该 URL 和 Bearer 令牌即可。以通用 JSON 配置为例：
 
 ```json
 {
-  "summary": "近 90 天记录了 38 餐、21 道不同的菜；偏好口味：香辣、麻辣、酸辣；常吃菜系：湘菜、川菜；辣味占比 81%；平均烹饪 28 分钟；收藏 6 道；近 3 天已吃过 4 道（推荐时避开）。",
-  "window_days": 90, "repeat_days": 3,
-  "total_records": 120, "window_records": 38, "distinct_dishes": 21,
-  "meal_type_counts": {"lunch": 16, "dinner": 22},
-  "taste_weights": [{"name": "香辣", "weight": 0.34, "count": 13}],
-  "category_weights": [{"name": "湘菜", "weight": 0.41, "count": 15}],
-  "difficulty_counts": {"easy": 12, "medium": 20, "hard": 3},
-  "avg_cook_time": 28.4, "spicy_ratio": 0.81,
-  "top_ingredients": [{"name": "鸡腿肉", "weight": 0.09, "count": 6}],
-  "top_dishes": [{"dish_id": 1, "dish_name": "剁椒鱼头", "count": 5, "last_date": "2026-09-20"}],
-  "recent_dish_ids": [1, 9, 41, 57],
-  "last_eaten": {"1": "2026-09-20"},
-  "favorite_dishes": [{"id": 9, "name": "辣子鸡", "category": "川菜", "taste": "香辣", "cook_time": 35, "difficulty": "medium"}],
-  "liked_dishes": [], "disliked_dishes": [],
-  "mood_counts": {"yum": 20, "ok": 6, "no": 2},
-  "home_mood_counts": {"tired": 5, "spicy": 3},
-  "behavior_counts": {"view": 40, "recommend": 24, "accept": 9, "reject": 6},
-  "most_viewed_dishes": [{"dish_id": 8, "dish_name": "毛血旺", "count": 5, "last_date": ""}]
+  "mcpServers": {
+    "ninimenu": {
+      "type": "http",
+      "url": "https://cook.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer nm_个人令牌"
+      }
+    }
+  }
 }
 ```
 
-## 推荐引擎 `POST /api/agent/recommend`
+服务端提供 `tools/list` 与 `tools/call`；MCP 和 `/api/agent/capabilities` 的工具清单都会按令牌权限过滤。每次调用都以令牌所属用户作为数据范围，并写入该用户的调用记录。
 
-所有字段可选；空请求 = 按画像给 3 道。
+## 函数调用
 
-```json
-{
-  "meal_type": "dinner",
-  "mood": "spicy",
-  "count": 3,
-  "keyword": "",
-  "tastes": ["辣"],
-  "categories": ["川菜", "湘菜"],
-  "max_cook_time": 30,
-  "difficulty": "easy",
-  "include_ingredients": ["牛肉"],
-  "exclude_ingredients": ["香菜"],
-  "exclude_dish_ids": [12, 34],
-  "exclude_recent_days": 3,
-  "profile_days": 90,
-  "diversity": true,
-  "source": "agent:xxx",
-  "actor": "user-1"
-}
+`GET /api/agent/tools` 返回 OpenAI 兼容的工具定义，`POST /api/agent/tools/{name}` 的请求体是对应工具参数。`get_context` 包含今天已记录的餐，需要 `records:read`。统一响应为 `{ "code": 0, "message": "success", "data": ... }`。
+
+```sh
+curl -fsS 'https://cook.example.com/api/agent/tools' \
+  -H 'Authorization: Bearer nm_个人令牌'
+
+curl -fsS 'https://cook.example.com/api/agent/tools/recommend_dishes' \
+  -H 'Authorization: Bearer nm_个人令牌' \
+  -H 'Content-Type: application/json' \
+  -d '{"meal_type":"dinner","mood":"spicy","count":3}'
 ```
 
-打分规则：画像口味/菜系权重、显式口味、收藏、喜恶评价、距上次食用天数（3 天内强降权、21 天以上加分、从未做过加分）、心情（tired/lazy 偏简单快手、spicy 必辣、healthy 偏清淡、happy 偏硬菜）、耗时与画像匹配度；候选为空时逐级放宽（先去口味硬过滤，再去近期去重，`applied.relaxed` 会说明）。`diversity=true` 时同一菜系最多占一半名额。每次推荐写入 `recommend` 行为事件。
+可用工具包括：`get_context`、`get_taste_profile`、`get_preferences`、`update_preferences`、`search_dishes`、`get_dish`、`recommend_dishes`、`list_meal_records`、`log_meal`、`rate_meal`、`delete_meal_record`、`list_favorites`、`set_favorite`、`get_week_plan`、`regenerate_week_plan`、`get_shopping_list`、`get_stats`、`list_behavior_events`、`log_feedback`、`create_suggestion`、`list_suggestions`、`get_day_ratings`。参数 schema 以实时工具清单为准。
 
-响应：
+DeepSeek 等 OpenAI 兼容模型的推荐流程：把 `/api/agent/tools` 返回的 `data` 作为模型的 `tools`；收到 `tool_calls` 后，逐个 POST 到 `/api/agent/tools/{function.name}`，并把工具响应作为对应的 `tool` 消息交回模型。模型服务密钥由调用方自己的服务端持有，不能使用 NiniMenu 用户令牌替代。
 
-```json
-{
-  "items": [{"dish": {…完整菜品…}, "score": 78.5, "reasons": ["常吃口味「香辣」", "有 12 天没吃了，换换口味"]}],
-  "candidate_count": 37,
-  "profile_summary": "…",
-  "applied": {"meal_type": "dinner", "mood": "spicy", "count": 3, "exclude_recent_days": 3, "diversity": true, "profile_days": 90, "relaxed": []}
-}
-```
+## REST 接口
 
-## 行为事件 `POST /api/agent/behavior`
+工具接口适合新集成；下列资源接口用于需要直接读写结构化数据的客户端。所有资源都只作用于当前凭据对应的用户。
 
-```json
-{ "event_type": "reject", "dish_id": 12, "dish_name": "夫妻肺片", "source": "agent:recipe", "actor": "user-1", "meta": {"note": "太麻了"} }
-```
+| 方法 | 路径 | Scope |
+|---|---|---|
+| GET | `/api/agent/capabilities`、`/api/agent/me`、`/api/agent/tools` | 无额外 scope；返回身份、权限或授权后的工具清单 |
+| GET | `/api/agent/dishes`、`/api/agent/dishes/:id` | `dishes:read` |
+| POST | `/api/agent/recommend` | `dishes:read` + `profile:read` |
+| GET | `/api/agent/profile`、`/api/agent/stats`、`/api/agent/settings`、`/api/agent/preferences` | `profile:read` |
+| PUT | `/api/agent/preferences` | `preferences:write` |
+| GET | `/api/agent/records`、`/api/agent/favorites`、`/api/agent/behavior`、`/api/agent/suggestions`、`/api/agent/day-ratings`、`/api/agent/week-plan`、`/api/agent/shopping-list` | `records:read` |
+| POST / DELETE | `/api/agent/records`、`/api/agent/records/:id` | `records:write` |
+| POST / DELETE | `/api/agent/favorites/:dishId` | `favorites:write` |
+| POST | `/api/agent/behavior` | `behavior:write` |
+| POST | `/api/agent/suggestions` | `suggestions:write` |
+| POST | `/api/agent/week-plan/regenerate` | `plan:write` |
+| GET | `/api/agent/export` | 同时需要 `records:read` 和 `profile:read` |
 
-`event_type`：`view` 浏览、`recommend` 推荐、`accept` 采纳、`reject` 拒绝、`search` 搜索、`chat` 对话诉求、`feedback` 反馈、`custom`。站内前端会自动写 `view`（进入详情）、`accept`（记录用餐）、`reject`（首页「换一个」、推荐官「不想吃」）；推荐引擎自动写 `recommend`。`source` 用于区分来源：`app` 站内、`agent…` 智能体。
+越权请求返回 HTTP 403。无效或撤销的令牌返回 HTTP 401。建议使用 `/api/agent/capabilities` 查询部署实例公布的能力和完整端点清单。
+
+## 建议闭环
+
+顾问型 Agent 使用 `create_suggestion` 提交菜品或周计划建议。用户在「建议收件箱」查看后选择采纳或忽略；只有用户采纳时才会写入对应的用餐记录。Agent 可用 `list_suggestions` 查看状态，后续建议可结合用户反馈调整。
+
+## OpenAPI
+
+`GET /api/agent/openapi.json` 提供 OpenAPI 3.1 文档，可导入支持 Bearer 鉴权的 Dify、Coze 或 GPT Actions。该文档描述工具调用接口；访问数据仍需使用用户个人令牌。

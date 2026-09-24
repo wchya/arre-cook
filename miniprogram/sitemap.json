@@ -1,0 +1,4 @@
+{
+  "desc": "NiniMenu mini program pages",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

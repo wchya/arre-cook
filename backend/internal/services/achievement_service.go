@@ -17,7 +17,7 @@ var (
 	defaultAchievementsMu      sync.Mutex
 	defaultAchievementsEnsured bool
 	achievementSyncMu          sync.Mutex
-	achievementSyncTimer       *time.Timer
+	achievementSyncTimers      = map[uint]*time.Timer{}
 	achievementRunMu           sync.Mutex
 )
 
@@ -115,69 +115,76 @@ func EnsureDefaultAchievements() {
 	defaultAchievementsEnsured = true
 }
 
-func QueueAutoAchievementSync() {
+// QueueAutoAchievementSync 防抖：同一用户 300ms 内的多次变更只触发一次成就检测。
+func QueueAutoAchievementSync(uid uint) {
+	if uid == 0 {
+		return
+	}
 	achievementSyncMu.Lock()
 	defer achievementSyncMu.Unlock()
 
-	if achievementSyncTimer != nil {
-		achievementSyncTimer.Reset(achievementSyncDelay)
+	if t := achievementSyncTimers[uid]; t != nil {
+		t.Reset(achievementSyncDelay)
 		return
 	}
 
-	achievementSyncTimer = time.AfterFunc(achievementSyncDelay, func() {
+	achievementSyncTimers[uid] = time.AfterFunc(achievementSyncDelay, func() {
 		achievementSyncMu.Lock()
-		achievementSyncTimer = nil
+		delete(achievementSyncTimers, uid)
 		achievementSyncMu.Unlock()
-		SyncAutoAchievements()
+		SyncAutoAchievements(uid)
 	})
 }
 
-func cancelQueuedAutoAchievementSync() {
+func cancelQueuedAutoAchievementSync(uid uint) {
 	achievementSyncMu.Lock()
 	defer achievementSyncMu.Unlock()
 
-	if achievementSyncTimer != nil {
-		achievementSyncTimer.Stop()
-		achievementSyncTimer = nil
+	if t := achievementSyncTimers[uid]; t != nil {
+		t.Stop()
+		delete(achievementSyncTimers, uid)
 	}
 }
 
-func RecordAchievementEvent(eventType string, refKey string) {
+func RecordAchievementEvent(uid uint, eventType string, refKey string) {
 	eventType = strings.TrimSpace(eventType)
 	refKey = strings.TrimSpace(refKey)
-	if eventType == "" {
+	if eventType == "" || uid == 0 {
 		return
 	}
 
-	event := models.AchievementEvent{EventType: eventType, RefKey: refKey}
+	event := models.AchievementEvent{UserID: uid, EventType: eventType, RefKey: refKey}
 	database.DB.Create(&event)
 
-	QueueAutoAchievementSync()
+	QueueAutoAchievementSync(uid)
 }
 
-func RecordUniqueAchievementEvent(eventType string, refKey string) {
+func RecordUniqueAchievementEvent(uid uint, eventType string, refKey string) {
 	eventType = strings.TrimSpace(eventType)
 	refKey = strings.TrimSpace(refKey)
-	if eventType == "" || refKey == "" {
+	if eventType == "" || refKey == "" || uid == 0 {
 		return
 	}
 
-	event := models.AchievementEvent{EventType: eventType, RefKey: refKey}
-	database.DB.Where("event_type = ? AND ref_key = ?", eventType, refKey).
+	event := models.AchievementEvent{UserID: uid, EventType: eventType, RefKey: refKey}
+	database.DB.Where("user_id = ? AND event_type = ? AND ref_key = ?", uid, eventType, refKey).
 		FirstOrCreate(&event)
 
-	QueueAutoAchievementSync()
+	QueueAutoAchievementSync(uid)
 }
 
-func SyncAutoAchievements() {
-	cancelQueuedAutoAchievementSync()
+func SyncAutoAchievements(uid uint) {
+	if uid == 0 {
+		return
+	}
+	cancelQueuedAutoAchievementSync(uid)
 
 	achievementRunMu.Lock()
 	defer achievementRunMu.Unlock()
 
 	EnsureDefaultAchievements()
 
-	unlockable := evaluateAchievementCodes(buildAchievementSnapshot())
+	unlockable := evaluateAchievementCodes(buildAchievementSnapshot(uid))
 	if len(unlockable) == 0 {
 		return
 	}
@@ -199,7 +206,7 @@ func SyncAutoAchievements() {
 	}
 
 	var unlocked []models.UserAchievement
-	database.DB.Where("achievement_id IN ?", achievementIDs).Find(&unlocked)
+	database.DB.Scopes(database.OwnedBy(uid)).Where("achievement_id IN ?", achievementIDs).Find(&unlocked)
 	unlockedMap := make(map[uint]bool, len(unlocked))
 	for _, u := range unlocked {
 		unlockedMap[u.AchievementID] = true
@@ -212,6 +219,7 @@ func SyncAutoAchievements() {
 			continue
 		}
 		newUnlocks = append(newUnlocks, models.UserAchievement{
+			UserID:        uid,
 			AchievementID: a.ID,
 			UnlockedAt:    now,
 		})
@@ -222,7 +230,8 @@ func SyncAutoAchievements() {
 	}
 }
 
-func buildAchievementSnapshot() achievementSnapshot {
+func buildAchievementSnapshot(uid uint) achievementSnapshot {
+	own := database.OwnedBy(uid)
 	s := achievementSnapshot{
 		distinctDishes:     map[uint]bool{},
 		recordDates:        map[string]bool{},
@@ -239,8 +248,8 @@ func buildAchievementSnapshot() achievementSnapshot {
 	}
 
 	var allDishes []models.Dish
-	database.DB.Unscoped().
-		Select("id", "name", "image_url", "images", "video_url", "category", "taste", "ingredients", "steps", "cook_time", "difficulty", "deleted_at").
+	database.DB.Unscoped().Scopes(database.VisibleDishes(uid)).
+		Select("id", "name", "image_url", "images", "video_url", "category", "taste", "ingredients", "steps", "cook_time", "difficulty", "owner_id", "deleted_at").
 		Find(&allDishes)
 	dishByID := make(map[uint]models.Dish, len(allDishes))
 	for _, d := range allDishes {
@@ -266,7 +275,7 @@ func buildAchievementSnapshot() achievementSnapshot {
 	}
 
 	var records []models.MealRecord
-	database.DB.
+	database.DB.Scopes(own).
 		Select("id", "dish_id", "meal_type", "meal_date", "remark", "mood", "created_at").
 		Order("created_at ASC, id ASC").
 		Find(&records)
@@ -353,7 +362,7 @@ func buildAchievementSnapshot() achievementSnapshot {
 	s.longestDateStreak = longestDateStreak(s.recordDates)
 
 	var ratings []models.DayRating
-	database.DB.Select("home_mood", "mood", "remark", "photos").Find(&ratings)
+	database.DB.Scopes(own).Select("home_mood", "mood", "remark", "photos").Find(&ratings)
 	for _, r := range ratings {
 		if strings.TrimSpace(r.Mood) != "" {
 			s.dayRatingCount++
@@ -372,11 +381,11 @@ func buildAchievementSnapshot() achievementSnapshot {
 	}
 
 	var n int64
-	database.DB.Model(&models.Favorite{}).Count(&n)
+	database.DB.Model(&models.Favorite{}).Scopes(own).Count(&n)
 	s.favoriteCount = int(n)
-	database.DB.Model(&models.ShoppingCheck{}).Where("checked = ?", true).Count(&n)
+	database.DB.Model(&models.ShoppingCheck{}).Scopes(own).Where("checked = ?", true).Count(&n)
 	s.shoppingChecked = int(n)
-	database.DB.Model(&models.HomeInventory{}).Where("in_stock = ?", true).Count(&n)
+	database.DB.Model(&models.HomeInventory{}).Scopes(own).Where("in_stock = ?", true).Count(&n)
 	s.inventoryCount = int(n)
 
 	type eventCount struct {
@@ -384,7 +393,7 @@ func buildAchievementSnapshot() achievementSnapshot {
 		Count     int
 	}
 	var eventCounts []eventCount
-	database.DB.Model(&models.AchievementEvent{}).
+	database.DB.Model(&models.AchievementEvent{}).Scopes(own).
 		Select("event_type, count(*) as count").
 		Group("event_type").
 		Find(&eventCounts)
@@ -392,10 +401,10 @@ func buildAchievementSnapshot() achievementSnapshot {
 		s.eventCounts[event.EventType] = event.Count
 	}
 
-	// 采纳 AI 推荐：行为事件里由智能体来源写入的 accept
+	// 采纳 AI 推荐：行为事件里由智能体/站内助手来源写入的 accept
 	var acceptCount int64
-	database.DB.Model(&models.BehaviorEvent{}).
-		Where("event_type = ? AND source LIKE ?", "accept", "agent%").
+	database.DB.Model(&models.BehaviorEvent{}).Scopes(own).
+		Where("event_type = ? AND (source LIKE ? OR source = ?)", "accept", "agent%", "assistant").
 		Count(&acceptCount)
 	s.agentAcceptCount = int(acceptCount)
 

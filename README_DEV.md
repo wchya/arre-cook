@@ -54,21 +54,28 @@ chmod +x ninimenu
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
+| `APP_ENV` | `development` | `production` / `release` 启用生产配置 |
 | `PORT` | `8080` | 服务端口 |
-| `APP_PASSWORD` | `nini123` | 应用端密码 |
-| `ADMIN_PASSWORD` | `nini123` | 管理端密码 |
-| `AGENT_TOKEN` | 同 `ADMIN_PASSWORD` | 智能体开放接口 `/api/agent/*` 的访问令牌（请求头 `X-Agent-Token`） |
-| `JWT_SECRET` | `ninimenu-secret-key` | JWT 签名密钥 |
-| `JWT_EXPIRE` | `24h` | Token 过期时间 |
-| `DB_PATH` | `data/ninimenu.db` | 数据库路径 |
-| `UPLOAD_DIR` | `uploads` | 上传目录（压缩后的图片） |
-| `BACKUP_DIR` | `uploads_backup` | 上传原图备份目录 |
-| `MAX_UPLOAD_SIZE_MB` | `5` | 上传文件大小上限（MB） |
-| `COMPRESS_MAX_DIM` | `1200` | 图片压缩最大宽高（px） |
-| `JPEG_QUALITY` | `85` | JPG 压缩质量（1-100） |
-| `REPEAT_DAYS` | `3` | 推荐去重天数 |
+| `ADMIN_EMAIL` | 空 | 初始管理员邮箱；旧单用户数据迁移给该管理员 |
+| `ADMIN_USERNAME` | `admin` | 初始管理员用户名 |
+| `ADMIN_PASSWORD` | `nini123` | 仅用于首次创建管理员和密码登录兜底；生产环境必须显式设置强密码 |
+| `JWT_SECRET` | 开发用固定值 | JWT 签名密钥；生产环境必须设置至少 32 字节随机值 |
+| `ALLOW_REGISTER` | `true` | 是否允许新邮箱注册 |
+| `JWT_EXPIRE` | `720h` | 登录令牌有效期 |
+| `DB_PATH` | `data/ninimenu.db` | SQLite 数据库路径 |
+| `UPLOAD_DIR` | `uploads` | 本地上传目录；配置 S3 后使用对象存储 |
+| `MAX_UPLOAD_SIZE_MB` | `5` | 图片上传大小上限 |
+| `COMPRESS_MAX_DIM` / `JPEG_QUALITY` | `1200` / `85` | 图片压缩尺寸和 JPG 质量 |
+| `SMTP_HOST` / `SMTP_PORT` | `smtp.qq.com` / `465` | 验证码邮件 SMTP 服务 |
+| `SMTP_USER` / `SMTP_PASSWORD` | 空 | 邮箱账号与 SMTP 授权码；开发环境未配置时验证码写入后端日志 |
+| `EMAIL_DOMAINS` | 空 | 邮箱域名白名单，逗号分隔 |
+| `WECHAT_APPID` / `WECHAT_SECRET` | 空 | 小程序服务端登录配置；Secret 只放服务端环境变量 |
+| `S3_ENDPOINT` / `S3_BUCKET` | `http://127.0.0.1:3900` / `cook-uploads` | S3 兼容对象存储；生产环境使用博客 Garage 的独立 bucket |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | 空 | 容器内的对象存储访问凭据；Compose 从 `.env` 的 `COOK_S3_ACCESS_KEY` / `COOK_S3_SECRET_KEY` 注入 |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | DeepSeek 默认地址 / 空 / `deepseek-chat` | 可选的站内 AI 模型服务 |
+| `AGENT_RATE_LIMIT` | `120` | 每个 Agent 令牌每分钟请求上限 |
 
-可写入项目根目录 `.env` 文件，运行时自动加载。发布包中使用 `env.bak`。
+可在项目根目录创建 `.env`。生产部署请按 `.env.example` 配置，具体 Compose、QQ 邮箱、Garage 和反向代理步骤见 [部署指南](docs/deployment.md)。`APP_PASSWORD` 与全站 `AGENT_TOKEN` 已不再使用；Agent 访问凭据由用户在「我的 → AI 连接」单独创建。
 
 ## 上传图片压缩机制
 

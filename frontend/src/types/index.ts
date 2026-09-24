@@ -27,6 +27,8 @@ export interface Dish {
   remark: string
   favorite: boolean
   enabled: boolean
+  // 0 = 公共菜谱；否则为该用户的私房菜
+  owner_id: number
   tags: string[]
   sort_order: number
   created_at: string
@@ -50,6 +52,7 @@ export interface DishInput {
   remark?: string
   tags?: string
   sort_order?: number
+  public?: boolean
 }
 
 export interface MealRecord {
@@ -103,12 +106,21 @@ export interface DashboardData {
   total_dishes: number
   enabled_dishes: number
   disabled_dishes: number
+  private_dishes: number
   total_records: number
   today_records: number
   favorite_count: number
+  user_count: number
+  active_users_7d: number
+  new_users_7d: number
+  agent_tokens: number
+  chat_messages_7d: number
+  pending_suggestions: number
+  ai_enabled: boolean
+  smtp_enabled: boolean
   category_counts: { category: string; count: number }[]
   top_dishes: { dish_id: number; dish_name: string; count: number }[]
-  recent_records: { id: number; dish_id: number; dish_name: string; meal_type: string; meal_date: string; mood: string; rating: number }[]
+  recent_records: { id: number; dish_id: number; dish_name: string; meal_type: string; meal_date: string; mood: string; rating: number; user_name: string }[]
   week_trend: { date: string; count: number }[]
   difficulty_counts: { difficulty: string; count: number }[]
 }
@@ -377,4 +389,192 @@ export interface BehaviorEventInput {
 export interface AppInfo {
   app_name: string
   agent_embed_url: string
+  announcement: string
+  ai_enabled: boolean
+  wechat_login: boolean
+  register_open: boolean
+}
+
+// ---- 账号 ----
+
+export interface User {
+  id: number
+  email: string
+  username: string
+  nickname: string
+  avatar: string
+  role: "user" | "admin"
+  wechat_bound: boolean
+  has_password: boolean
+  disabled: boolean
+  last_login_at: string | null
+  created_at: string
+}
+
+export interface LoginResult {
+  token: string
+  expires_at: string
+  user: User
+  created?: boolean
+  need_bind?: boolean
+}
+
+export interface AuthOptions {
+  email: boolean
+  email_dev: boolean
+  email_domains: string[] | null
+  wechat: boolean
+  register_open: boolean
+}
+
+export interface Preferences {
+  avoid_ingredients: string[]
+  allergies: string[]
+  favorite_tastes: string[]
+  spice_level: number
+  household_size: number
+  max_cook_time: number
+  goals: string
+  notes: string
+  updated_at?: string
+}
+
+export interface UserStats {
+  total_records: number
+  total_dishes: number
+  private_dishes: number
+  lunch_count: number
+  dinner_count: number
+  favorite_count: number
+  distinct_dishes: number
+  cook_days: number
+  current_streak: number
+  this_month: number
+  top_dishes: { dish_id: number; dish_name: string; count: number }[]
+  category_counts: { name: string; count: number }[]
+  week_trend: { date: string; count: number }[]
+}
+
+// ---- AI 连接 ----
+
+export interface AgentToken {
+  id: number
+  name: string
+  prefix: string
+  scopes: string[]
+  active: boolean
+  last_used_at: string | null
+  expires_at: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
+export interface AgentTokenList {
+  tokens: AgentToken[]
+  scopes: Record<string, string>
+  presets: Record<string, string[]>
+  mcp_url: string
+  api_url: string
+}
+
+export interface AgentAuditLog {
+  id: number
+  token_id: number
+  actor: string
+  channel: string
+  tool: string
+  args: string
+  status: "ok" | "error" | "denied"
+  error: string
+  duration_ms: number
+  created_at: string
+}
+
+export interface AgentSession {
+  token: string
+  expires_at: string
+  scopes: string[]
+  api_base: string
+  mcp_url: string
+}
+
+export interface Suggestion {
+  id: number
+  source: string
+  title: string
+  reason: string
+  meal_type: "" | "lunch" | "dinner"
+  meal_date: string
+  status: "pending" | "accepted" | "dismissed" | "expired"
+  expires_at: string | null
+  resolved_at: string | null
+  created_at: string
+  dishes: Dish[]
+}
+
+// ---- AI 助手 ----
+
+export interface DishCardData {
+  id: number
+  name: string
+  category: string
+  taste: string
+  cook_time: number
+  difficulty: string
+  meal_type: string
+  ingredients: string[]
+  image?: string
+  favorite: boolean
+  private?: boolean
+}
+
+export interface ChatCard {
+  type: "dishes" | "action"
+  title?: string
+  text?: string
+  items?: { dish: DishCardData; reasons?: string[]; score?: number }[]
+}
+
+export interface ChatToolStep {
+  id: string
+  name: string
+  label: string
+  status: "running" | "ok" | "error"
+  error?: string
+}
+
+export interface ChatMessage {
+  id: number | string
+  role: "user" | "assistant"
+  content: string
+  cards: ChatCard[]
+  tools?: ChatToolStep[]
+  streaming?: boolean
+  error?: string
+  created_at?: string
+}
+
+export interface ChatSession {
+  id: number
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AssistantStatus {
+  llm_enabled: boolean
+  model: string
+  suggestions: string[]
+}
+
+export interface AdminUser extends User {
+  record_count: number
+}
+
+export interface SiteSettings {
+  [key: string]: unknown
+  llm_effective?: { base_url: string; model: string; enabled: boolean; from_env: boolean }
+  llm_api_key_set?: boolean
+  smtp_enabled?: boolean
+  wechat_enabled?: boolean
 }

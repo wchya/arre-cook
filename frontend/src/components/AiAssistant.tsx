@@ -22,30 +22,28 @@ export default function AiAssistant() {
   const [shown, setShown] = useState(false) // 面板可见态，驱动进/出过渡
   // 首次打开后常驻 iframe（收起只隐藏）：避免每次打开都重载嵌入页造成闪烁，也保留对话上下文。
   const [mounted, setMounted] = useState(false)
-  const [seen, setSeen] = useState(true)    // 是否已打开过（默认 true，避免 SSR/首帧闪现）
+  const [seen, setSeen] = useState(() => {
+    try {
+      return localStorage.getItem(SEEN_KEY) === "1"
+    } catch {
+      return true
+    }
+  })
   const [showHint, setShowHint] = useState(false) // 首次引导气泡
   const closeTimer = useRef<number | null>(null)
   const hintTimer = useRef<number | null>(null)
 
   // 首帧读取"是否已见过"。未见过则稍延迟弹出引导气泡（等页面稳定，避免与入场动画打架）。
   useEffect(() => {
-    let firstVisit = false
-    try {
-      firstVisit = localStorage.getItem(SEEN_KEY) !== "1"
-    } catch {
-      firstVisit = false
-    }
-    setSeen(!firstVisit)
-    if (firstVisit) {
-      hintTimer.current = window.setTimeout(() => setShowHint(true), 1200)
-      // 气泡出现后 8s 自动收起，不长期占屏。
-      window.setTimeout(() => setShowHint(false), 1200 + 8000)
-    }
+    if (seen) return
+    hintTimer.current = window.setTimeout(() => setShowHint(true), 1200)
+    const dismissTimer = window.setTimeout(() => setShowHint(false), 1200 + 8000)
     return () => {
       if (hintTimer.current) window.clearTimeout(hintTimer.current)
+      window.clearTimeout(dismissTimer)
       if (closeTimer.current) window.clearTimeout(closeTimer.current)
     }
-  }, [])
+  }, [seen])
 
   // 展开时锁定父页滚动（移动端近全屏，避免背景跟随滚动）。
   useEffect(() => {

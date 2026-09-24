@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/webview/webview"
+  ],
+  "window": {
+    "navigationBarTitleText": "NiniMenu",
+    "navigationBarBackgroundColor": "#fafaf8",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#fafaf8"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

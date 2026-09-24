@@ -1,0 +1,16 @@
+{
+  "appid": "wx1c4522af7a2e72d1",
+  "compileType": "miniprogram",
+  "libVersion": "3.7.12",
+  "miniprogramRoot": "./",
+  "projectname": "nini-menu",
+  "setting": {
+    "checkSiteMap": false,
+    "coverView": true,
+    "es6": true,
+    "minified": true,
+    "postcss": true,
+    "urlCheck": true
+  },
+  "condition": {}
+}

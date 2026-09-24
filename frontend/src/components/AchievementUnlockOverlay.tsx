@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { achievementsApi } from "@/api"
+import { useAuthStore } from "@/store/useAuthStore"
 import type { Achievement } from "@/types"
 
-const STORAGE_KEY = "ninimenu_known_unlocked_achievements"
-const INSTANCE_KEY = "__ninimenu_achievement_overlay_active"
 const colors = ["#E8734A", "#6EC6B8", "#F5D76E", "#F4A8A0", "#8B5CF6", "#FFFFFF"]
+
+// 已展示过的成就按用户分开记，同一台设备切换账号互不干扰
+function storageKey() {
+  return `ninimenu_known_unlocked_achievements:${useAuthStore.getState().user?.id ?? 0}`
+}
 
 function loadKnownCodes() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(storageKey())
     const parsed = raw ? JSON.parse(raw) : []
     return new Set(Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [])
   } catch {
@@ -18,7 +22,11 @@ function loadKnownCodes() {
 }
 
 function saveKnownCodes(codes: Set<string>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(codes)))
+  try {
+    localStorage.setItem(storageKey(), JSON.stringify(Array.from(codes)))
+  } catch {
+    /* ignore */
+  }
 }
 
 function sortUnlocked(a: Achievement, b: Achievement) {
@@ -48,7 +56,6 @@ function confettiStyle(i: number): React.CSSProperties {
 export default function AchievementUnlockOverlay() {
   const initializedRef = useRef(false)
   const knownCodesRef = useRef<Set<string> | null>(null)
-  const [activeInstance, setActiveInstance] = useState(false)
 
   const queueRef = useRef<Achievement[]>([])
   const timerRef = useRef({ leave: 0, next: 0 })
@@ -86,21 +93,13 @@ export default function AchievementUnlockOverlay() {
     }, 3200)
   }, [])
 
-  showNextRef.current = showNext
-
   useEffect(() => {
-    if ((window as unknown as Record<string, boolean>)[INSTANCE_KEY]) return
-    ;(window as unknown as Record<string, boolean>)[INSTANCE_KEY] = true
-    setActiveInstance(true)
-    return () => {
-      ;(window as unknown as Record<string, boolean>)[INSTANCE_KEY] = false
-    }
-  }, [])
+    showNextRef.current = showNext
+  }, [showNext])
 
   const { data: rawAchievements } = useQuery({
     queryKey: ["achievements"],
     queryFn: () => achievementsApi.list(),
-    enabled: activeInstance,
     refetchOnWindowFocus: true,
   })
   const achievements = Array.isArray(rawAchievements) ? rawAchievements : []

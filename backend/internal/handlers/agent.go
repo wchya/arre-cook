@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
+	"ninimenu/internal/agent"
+	"ninimenu/internal/auth"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
 	"ninimenu/internal/dishes"
@@ -19,312 +22,279 @@ import (
 
 // 智能体开放接口（/api/agent/*）
 //
-// 食谱站把菜单、用餐记录、收藏、评价、行为事件、口味画像与推荐引擎全部开放给外部智能体，
-// 供其做食谱推荐与用户行为分析。凭证为 X-Agent-Token（见 AgentAuthMiddleware）。
-// 返回结构与站内接口一致：{code, message, data}。
+// 所有凭证都归属到某一个用户：个人访问令牌（nm_…，用户在「我的 → AI 连接」创建）、
+// 嵌入式会话令牌（App 通过 postMessage 交给内嵌智能体），或用户本人的登录态。
+// 数据只落在该用户上，并受令牌 scopes 限制。工具定义见 internal/agent，与 MCP、站内助手共用。
 
-const agentAPIVersion = "1.0"
+const agentAPIVersion = "2.0"
 
-type agentEndpoint struct {
-	Method string `json:"method"`
-	Path   string `json:"path"`
-	Desc   string `json:"desc"`
+func principal(c *gin.Context) *auth.Principal { return auth.GetPrincipal(c) }
+
+func toolCtx(c *gin.Context, channel string) *agent.Ctx {
+	return &agent.Ctx{Context: c.Request.Context(), Principal: principal(c), Channel: channel}
 }
 
-// GetAgentCapabilities 能力清单：让智能体自描述可用接口、枚举值与当前数据规模。
+// invokeTool REST 形式调用工具并按统一结构返回。
+func invokeTool(c *gin.Context, name string, args any) {
+	var raw json.RawMessage
+	switch v := args.(type) {
+	case nil:
+		raw = json.RawMessage("{}")
+	case json.RawMessage:
+		raw = v
+	default:
+		b, _ := json.Marshal(v)
+		raw = b
+	}
+	result, err := agent.Invoke(toolCtx(c, "rest"), name, raw)
+	if err != nil {
+		toolError(c, err)
+		return
+	}
+	utils.Success(c, result)
+}
+
+func toolError(c *gin.Context, err error) {
+	var forbidden agent.ErrForbidden
+	switch {
+	case errors.As(err, &forbidden):
+		utils.Forbidden(c, err.Error())
+	case errors.Is(err, agent.ErrUnknownTool):
+		utils.NotFound(c, err.Error())
+	case errors.Is(err, services.ErrDishNotFound), errors.Is(err, services.ErrRecordNotFound):
+		utils.NotFound(c, err.Error())
+	default:
+		utils.BadRequest(c, err.Error())
+	}
+}
+
+func baseURL(c *gin.Context) string {
+	if config.C.PublicURL != "" {
+		return config.C.PublicURL
+	}
+	scheme := "http"
+	if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	return scheme + "://" + c.Request.Host
+}
+
+// GetAgentCapabilities 能力清单：调用者身份、已授权范围、可用工具、接入方式。
 func GetAgentCapabilities(c *gin.Context) {
-	var dishCount, enabledCount, recordCount, favoriteCount, eventCount int64
-	database.DB.Model(&models.Dish{}).Count(&dishCount)
-	database.DB.Model(&models.Dish{}).Where("enabled = ?", true).Count(&enabledCount)
-	database.DB.Model(&models.MealRecord{}).Count(&recordCount)
-	database.DB.Model(&models.Favorite{}).Count(&favoriteCount)
-	database.DB.Model(&models.BehaviorEvent{}).Count(&eventCount)
-
-	appName := "NiniMenu"
-	var setting models.Setting
-	if err := database.DB.Where("`key` = ?", "app_name").First(&setting).Error; err == nil && strings.TrimSpace(setting.Value) != "" {
-		appName = strings.TrimSpace(setting.Value)
-	}
-
+	p := principal(c)
+	base := baseURL(c)
 	utils.Success(c, gin.H{
-		"app_name":    appName,
+		"app_name":    database.GetSetting("app_name", "NiniMenu"),
 		"api_version": agentAPIVersion,
-		"auth":        gin.H{"header": "X-Agent-Token", "alt": "Authorization: Bearer <AGENT_TOKEN 或管理端 JWT>"},
-		"categories":  dishes.DefaultCategories(),
-		"tastes":      dishes.DefaultTastes(),
-		"meal_types":  []string{"lunch", "dinner", "all"},
-		"difficulty":  []string{"easy", "medium", "hard"},
-		"moods":       []string{"happy", "tired", "lazy", "spicy", "healthy"},
-		"record_moods": gin.H{
-			"meal": []string{"yum", "ok", "no", "great", "meh"},
-			"desc": "yum/great=好吃, ok=一般, no/meh=不想再吃",
+		"user":        gin.H{"id": p.UserID(), "nickname": p.User.DisplayName()},
+		"credential":  gin.H{"kind": p.Kind, "actor": p.Actor, "scopes": p.Scopes.List()},
+		"auth": gin.H{
+			"header": "Authorization: Bearer <个人访问令牌 nm_… 或嵌入会话令牌>",
+			"alt":    "X-Agent-Token: <令牌>",
+			"note":   "令牌只能访问签发者本人的数据，由用户在 App「我的 → AI 连接」创建与撤销",
 		},
-		"event_types": []string{"view", "recommend", "accept", "reject", "search", "chat", "feedback", "custom"},
-		"repeat_days": config.C.RepeatDays,
-		"counts": gin.H{
-			"dishes":          dishCount,
-			"enabled_dishes":  enabledCount,
-			"meal_records":    recordCount,
-			"favorites":       favoriteCount,
-			"behavior_events": eventCount,
+		"integrations": gin.H{
+			"mcp":              gin.H{"transport": "streamable-http", "url": base + "/mcp"},
+			"function_calling": gin.H{"tools": base + "/api/agent/tools", "invoke": base + "/api/agent/tools/{name}"},
+			"openapi":          base + "/api/agent/openapi.json",
 		},
-		"endpoints": []agentEndpoint{
-			{"GET", "/api/agent/capabilities", "能力清单（本接口）"},
-			{"GET", "/api/agent/dishes", "菜品全量/筛选查询：category, taste, difficulty, meal_type, search, ingredient, exclude_ingredient, max_cook_time, exclude_recent=1, enabled, limit(≤500), offset"},
-			{"GET", "/api/agent/dishes/:id", "菜品详情 + 该菜的用餐记录与统计"},
-			{"GET", "/api/agent/profile?days=90", "口味画像（口味/菜系权重、常吃食材、喜恶、近期已吃、心情、行为统计）"},
-			{"POST", "/api/agent/recommend", "推荐引擎：按画像 + 约束（餐段/心情/口味/食材/时长/去重）打分推荐，返回理由"},
-			{"GET", "/api/agent/records", "用餐记录（含菜品口味/菜系与当日评价）：date_from, date_to, meal_type, limit"},
-			{"POST", "/api/agent/records", "写入用餐记录（单条或 records 数组），可代用户“采纳推荐”"},
-			{"DELETE", "/api/agent/records/:id", "删除用餐记录"},
-			{"GET", "/api/agent/favorites", "收藏列表"},
-			{"POST", "/api/agent/favorites/:dishId", "收藏"},
-			{"DELETE", "/api/agent/favorites/:dishId", "取消收藏"},
-			{"GET", "/api/agent/behavior", "行为事件流：type, source, dish_id, since, limit"},
-			{"POST", "/api/agent/behavior", "写入行为事件（单条或 events 数组）：event_type, dish_id, dish_name, source, actor, meta"},
-			{"GET", "/api/agent/day-ratings", "整餐评价与首页心情：date_from, date_to"},
-			{"GET", "/api/agent/stats", "整体统计（记录数、热门菜、菜系分布、周趋势）"},
-			{"GET", "/api/agent/week-plan", "本周菜单"},
-			{"POST", "/api/agent/week-plan/regenerate", "重新生成本周菜单"},
-			{"GET", "/api/agent/shopping-list", "今明两日买菜清单"},
-			{"GET", "/api/agent/settings", "站点设置（分类、口味、去重天数等）"},
-			{"GET", "/api/agent/export?days=365", "一次性导出全部分析所需数据（菜品、记录、收藏、评价、事件、画像）"},
+		"enums": gin.H{
+			"categories":   dishes.DefaultCategories(),
+			"tastes":       dishes.DefaultTastes(),
+			"meal_types":   []string{"lunch", "dinner"},
+			"difficulty":   []string{"easy", "medium", "hard"},
+			"moods":        []string{"happy", "tired", "lazy", "spicy", "healthy"},
+			"record_moods": gin.H{"values": []string{"yum", "ok", "no"}, "desc": "yum=好吃, ok=一般, no=不想再吃"},
+			"event_types":  []string{"view", "recommend", "accept", "reject", "search", "chat", "feedback", "custom"},
+			"scopes":       auth.ScopeLabels,
+		},
+		"tools": agent.Catalog(p),
+		"rest_endpoints": []gin.H{
+			{"method": "GET", "path": "/api/agent/me", "scope": ""},
+			{"method": "GET", "path": "/api/agent/dishes", "scope": auth.ScopeDishesRead},
+			{"method": "GET", "path": "/api/agent/dishes/:id", "scope": auth.ScopeDishesRead},
+			{"method": "GET", "path": "/api/agent/profile", "scope": auth.ScopeProfileRead},
+			{"method": "GET|PUT", "path": "/api/agent/preferences", "scope": auth.ScopeProfileRead + " / " + auth.ScopePreferencesWrite},
+			{"method": "POST", "path": "/api/agent/recommend", "scope": auth.ScopeDishesRead + " + " + auth.ScopeProfileRead},
+			{"method": "GET|POST", "path": "/api/agent/records", "scope": auth.ScopeRecordsRead + " / " + auth.ScopeRecordsWrite},
+			{"method": "DELETE", "path": "/api/agent/records/:id", "scope": auth.ScopeRecordsWrite},
+			{"method": "GET", "path": "/api/agent/favorites", "scope": auth.ScopeRecordsRead},
+			{"method": "POST|DELETE", "path": "/api/agent/favorites/:dishId", "scope": auth.ScopeFavoritesWrite},
+			{"method": "GET|POST", "path": "/api/agent/behavior", "scope": auth.ScopeRecordsRead + " / " + auth.ScopeBehaviorWrite},
+			{"method": "GET|POST", "path": "/api/agent/suggestions", "scope": auth.ScopeRecordsRead + " / " + auth.ScopeSuggestionsWrite},
+			{"method": "GET", "path": "/api/agent/day-ratings", "scope": auth.ScopeRecordsRead},
+			{"method": "GET", "path": "/api/agent/stats", "scope": auth.ScopeProfileRead},
+			{"method": "GET", "path": "/api/agent/week-plan", "scope": auth.ScopeRecordsRead},
+			{"method": "POST", "path": "/api/agent/week-plan/regenerate", "scope": auth.ScopePlanWrite},
+			{"method": "GET", "path": "/api/agent/shopping-list", "scope": auth.ScopeRecordsRead},
+			{"method": "GET", "path": "/api/agent/export", "scope": auth.ScopeRecordsRead},
 		},
 	})
 }
 
-func agentLimit(c *gin.Context, def, maxLimit int) int {
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(def)))
-	if err != nil || limit < 1 {
-		limit = def
-	}
-	if limit > maxLimit {
-		limit = maxLimit
-	}
-	return limit
-}
-
-func agentBool(v string) bool {
-	v = strings.ToLower(strings.TrimSpace(v))
-	return v == "1" || v == "true" || v == "yes"
-}
-
-// GetAgentDishes 菜品查询：返回完整字段（含食材、调料、步骤），支持按食材筛选与近期去重。
-func GetAgentDishes(c *gin.Context) {
-	query := database.DB.Model(&models.Dish{})
-	if enabled := c.Query("enabled"); enabled != "" {
-		query = query.Where("enabled = ?", agentBool(enabled))
-	} else {
-		query = query.Where("enabled = ?", true)
-	}
-	if category := c.Query("category"); category != "" {
-		query = query.Where("category IN ?", splitParam(category))
-	}
-	if difficulty := c.Query("difficulty"); difficulty != "" {
-		query = query.Where("difficulty = ?", difficulty)
-	}
-	if mealType := c.Query("meal_type"); mealType != "" {
-		query = query.Where("meal_type IN ?", []string{mealType, "all", ""})
-	}
-	if maxCook, err := strconv.Atoi(c.Query("max_cook_time")); err == nil && maxCook > 0 {
-		query = query.Where("cook_time > 0 AND cook_time <= ?", maxCook)
-	}
-	if ids := c.Query("ids"); ids != "" {
-		query = query.Where("id IN ?", splitParam(ids))
-	}
-
-	var all []models.Dish
-	query.Order("sort_order ASC, id ASC").Find(&all)
-
-	search := strings.ToLower(strings.TrimSpace(c.Query("search")))
-	tastes := splitParam(c.Query("taste"))
-	include := splitParam(c.Query("ingredient"))
-	exclude := splitParam(c.Query("exclude_ingredient"))
-	recent := map[uint]bool{}
-	if agentBool(c.Query("exclude_recent")) {
-		for _, id := range services.RecentDishIDs(config.C.RepeatDays) {
-			recent[id] = true
-		}
-	}
-
-	filtered := make([]models.Dish, 0, len(all))
-	for _, d := range all {
-		if recent[d.ID] {
-			continue
-		}
-		text := agentDishText(d)
-		if search != "" && !strings.Contains(text, search) {
-			continue
-		}
-		if len(tastes) > 0 && !agentTasteMatch(d, tastes) {
-			continue
-		}
-		if !agentContainsAll(text, include) || agentContainsAny(text, exclude) {
-			continue
-		}
-		filtered = append(filtered, d)
-	}
-
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	if offset < 0 {
-		offset = 0
-	}
-	limit := agentLimit(c, 100, 500)
-	total := len(filtered)
-	if offset > total {
-		offset = total
-	}
-	end := offset + limit
-	if end > total {
-		end = total
-	}
-
+// GetAgentMe 调用者是谁（便于智能体确认身份与权限）。
+func GetAgentMe(c *gin.Context) {
+	p := principal(c)
 	utils.Success(c, gin.H{
-		"items":  filtered[offset:end],
-		"total":  total,
-		"offset": offset,
-		"limit":  limit,
+		"user_id": p.UserID(), "nickname": p.User.DisplayName(),
+		"kind": p.Kind, "actor": p.Actor, "scopes": p.Scopes.List(),
 	})
 }
 
-func splitParam(raw string) []string {
-	parts := strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == '，' || r == '、' || r == '|' })
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
+// ListAgentTools OpenAI / DeepSeek function calling 格式的工具清单（仅含已授权的）。
+func ListAgentTools(c *gin.Context) {
+	if c.Query("format") == "mcp" {
+		utils.Success(c, agent.MCPTools(principal(c)))
+		return
 	}
-	return out
+	utils.Success(c, agent.OpenAITools(principal(c)))
 }
 
-func agentDishText(d models.Dish) string {
-	parts := []string{d.Name, d.Category, d.Taste, d.Remark}
-	var items []nameAmount
-	if json.Unmarshal([]byte(d.Ingredients), &items) == nil {
-		for _, it := range items {
-			parts = append(parts, it.Name)
-		}
+// InvokeAgentTool POST /api/agent/tools/:name，请求体即工具参数。
+func InvokeAgentTool(c *gin.Context) {
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 64*1024))
+	if err != nil {
+		utils.BadRequest(c, "读取参数失败")
+		return
 	}
-	items = nil
-	if json.Unmarshal([]byte(d.Seasonings), &items) == nil {
-		for _, it := range items {
-			parts = append(parts, it.Name)
-		}
+	if len(strings.TrimSpace(string(body))) == 0 {
+		body = []byte("{}")
 	}
-	var tags []string
-	if json.Unmarshal([]byte(d.Tags), &tags) == nil {
-		parts = append(parts, tags...)
+	if !json.Valid(body) {
+		utils.BadRequest(c, "参数必须是 JSON 对象")
+		return
 	}
-	return strings.ToLower(strings.Join(parts, " "))
+	invokeTool(c, c.Param("name"), json.RawMessage(body))
 }
 
-func agentTasteMatch(d models.Dish, tastes []string) bool {
-	for _, t := range tastes {
-		if strings.Contains(d.Taste, t) || strings.Contains(d.Name, t) {
-			return true
+// GetAgentOpenAPI 把工具集描述成 OpenAPI 3.1，便于 GPTs Actions / Dify / Coze 等平台直接导入。
+func GetAgentOpenAPI(c *gin.Context) {
+	paths := gin.H{}
+	for _, t := range agent.List(&auth.Principal{Kind: auth.KindUser}) {
+		paths["/api/agent/tools/"+t.Name] = gin.H{
+			"post": gin.H{
+				"operationId": t.Name,
+				"summary":     t.Title,
+				"description": t.Description + "（需要权限：" + scopeOrNone(t.ScopeDescription()) + "）",
+				"requestBody": gin.H{
+					"required": false,
+					"content":  gin.H{"application/json": gin.H{"schema": t.Schema}},
+				},
+				"responses": gin.H{
+					"200": gin.H{
+						"description": "{code: 0, message: success, data: 工具结果}",
+						"content": gin.H{"application/json": gin.H{"schema": gin.H{
+							"type": "object",
+							"properties": gin.H{
+								"code":    gin.H{"type": "integer"},
+								"message": gin.H{"type": "string"},
+								"data":    gin.H{},
+							},
+						}}},
+					},
+					"401": gin.H{"description": "令牌无效"},
+					"403": gin.H{"description": "令牌缺少权限"},
+				},
+			},
 		}
 	}
-	return false
+	c.JSON(http.StatusOK, gin.H{
+		"openapi": "3.1.0",
+		"info": gin.H{
+			"title":       database.GetSetting("app_name", "NiniMenu") + " Agent API",
+			"version":     agentAPIVersion,
+			"description": "食谱与饮食数据工具集。令牌只能访问签发者本人的数据。",
+		},
+		"servers":    []gin.H{{"url": baseURL(c)}},
+		"paths":      paths,
+		"components": gin.H{"securitySchemes": gin.H{"bearerAuth": gin.H{"type": "http", "scheme": "bearer"}}},
+		"security":   []gin.H{{"bearerAuth": []string{}}},
+	})
 }
 
-func agentContainsAll(text string, needles []string) bool {
-	for _, n := range needles {
-		if !strings.Contains(text, strings.ToLower(n)) {
-			return false
+func scopeOrNone(s string) string {
+	if s == "" {
+		return "无"
+	}
+	return s
+}
+
+// ---------------- 兼容旧版 REST 接口（数据按令牌所属用户隔离） ----------------
+
+func intQuery(c *gin.Context, key string, def int) int {
+	if n, err := strconv.Atoi(c.Query(key)); err == nil {
+		return n
+	}
+	return def
+}
+
+// GetAgentDishes GET /api/agent/dishes
+func GetAgentDishes(c *gin.Context) {
+	q := services.DishQuery{
+		Keyword:           c.Query("search"),
+		Categories:        splitParam(c.Query("category")),
+		Tastes:            splitParam(c.Query("taste")),
+		Ingredients:       splitParam(c.Query("ingredient")),
+		ExcludeIngredient: splitParam(c.Query("exclude_ingredient")),
+		MaxCookTime:       intQuery(c, "max_cook_time", 0),
+		Difficulty:        c.Query("difficulty"),
+		MealType:          c.Query("meal_type"),
+		OnlyFavorites:     queryBool(c.Query("favorite")),
+		OnlyMine:          c.Query("scope") == "mine",
+		ExcludeRecent:     queryBool(c.Query("exclude_recent")),
+		IncludeDisabled:   c.Query("enabled") != "" && !queryBool(c.Query("enabled")),
+		Offset:            intQuery(c, "offset", 0),
+		Limit:             intQuery(c, "limit", 100),
+	}
+	for _, s := range splitParam(c.Query("ids")) {
+		if id, err := strconv.Atoi(s); err == nil && id > 0 {
+			q.IDs = append(q.IDs, uint(id))
 		}
 	}
-	return true
-}
-
-func agentContainsAny(text string, needles []string) bool {
-	for _, n := range needles {
-		if strings.Contains(text, strings.ToLower(n)) {
-			return true
-		}
+	list, total := services.SearchDishes(uid(c), q)
+	if list == nil {
+		list = []models.Dish{}
 	}
-	return false
+	utils.Success(c, gin.H{"items": list, "total": total, "offset": q.Offset, "limit": q.Limit})
 }
 
-// GetAgentDish 菜品详情 + 记录统计。
+// GetAgentDish GET /api/agent/dishes/:id
 func GetAgentDish(c *gin.Context) {
-	id := c.Param("id")
-	var dish models.Dish
-	if err := database.DB.First(&dish, id).Error; err != nil {
+	dish, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	if err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
-
-	var records []models.MealRecord
-	database.DB.Where("dish_id = ?", dish.ID).Order("meal_date DESC, created_at DESC").Limit(50).Find(&records)
-
-	yum, ok, no, ratingSum, ratingN := 0, 0, 0, 0, 0
-	for _, r := range records {
-		switch r.Mood {
-		case "yum", "great":
-			yum++
-		case "ok":
-			ok++
-		case "no", "meh":
-			no++
-		}
-		if r.Rating > 0 {
-			ratingSum += r.Rating
-			ratingN++
-		}
+	stats, records := services.DishStatsForUser(uid(c), dish.ID)
+	dish.Favorite = stats.Favorite
+	if records == nil {
+		records = []models.MealRecord{}
 	}
-	avg := 0.0
-	if ratingN > 0 {
-		avg = float64(ratingSum) / float64(ratingN)
-	}
-	lastDate := ""
-	if len(records) > 0 {
-		lastDate = records[0].MealDate
-	}
-
-	var isFav int64
-	database.DB.Model(&models.Favorite{}).Where("dish_id = ?", dish.ID).Count(&isFav)
-
-	var viewCount int64
-	database.DB.Model(&models.BehaviorEvent{}).Where("dish_id = ? AND event_type = ?", dish.ID, "view").Count(&viewCount)
-
-	utils.Success(c, gin.H{
-		"dish":     dish,
-		"records":  records,
-		"favorite": isFav > 0,
-		"stats": gin.H{
-			"total_count": len(records),
-			"yum_count":   yum,
-			"ok_count":    ok,
-			"no_count":    no,
-			"avg_rating":  avg,
-			"last_date":   lastDate,
-			"view_count":  viewCount,
-		},
-	})
+	utils.Success(c, gin.H{"dish": dish, "records": records, "favorite": stats.Favorite, "stats": stats})
 }
 
-// GetAgentProfile 口味画像。
+// GetAgentProfile GET /api/agent/profile 与 App 的 GET /api/profile。
 func GetAgentProfile(c *gin.Context) {
-	days, _ := strconv.Atoi(c.DefaultQuery("days", "90"))
-	utils.Success(c, services.BuildTasteProfile(days))
+	utils.Success(c, services.BuildTasteProfile(uid(c), intQuery(c, "days", 90)))
 }
 
-// AgentRecommend 推荐引擎。
+// AgentRecommend POST /api/agent/recommend
 func AgentRecommend(c *gin.Context) {
 	var req services.RecommendRequest
 	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 		utils.BadRequest(c, "请求数据无效: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(req.Source) == "" {
-		req.Source = "agent"
-	}
-	result, err := services.RecommendDishes(req)
+	p := principal(c)
+	req.Source = p.Source()
+	req.Actor = p.Actor
+	req.IgnorePreferences = false
+	result, err := services.RecommendDishes(uid(c), req)
 	if err != nil {
 		utils.InternalError(c, "推荐失败")
 		return
 	}
+	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "recommend", Status: "ok"})
 	utils.Success(c, result)
 }
 
@@ -337,9 +307,10 @@ type agentRecordItem struct {
 	DayMood  string `json:"day_mood"`
 }
 
-// GetAgentRecords 用餐记录（带菜品口味/菜系、当日心情），默认最近 90 天。
+// GetAgentRecords GET /api/agent/records（带菜品口味/菜系与当日心情，默认最近 90 天）
 func GetAgentRecords(c *gin.Context) {
-	query := database.DB.Model(&models.MealRecord{})
+	own := database.OwnedBy(uid(c))
+	query := database.DB.Model(&models.MealRecord{}).Scopes(own)
 	dateFrom := c.Query("date_from")
 	if dateFrom == "" && c.Query("date_to") == "" {
 		dateFrom = time.Now().AddDate(0, 0, -90).Format("2006-01-02")
@@ -356,14 +327,17 @@ func GetAgentRecords(c *gin.Context) {
 	if dishID := c.Query("dish_id"); dishID != "" {
 		query = query.Where("dish_id = ?", dishID)
 	}
+	limit := intQuery(c, "limit", 200)
+	if limit < 1 || limit > 2000 {
+		limit = 200
+	}
 
 	var total int64
 	query.Count(&total)
 	var records []models.MealRecord
-	query.Order("meal_date DESC, created_at DESC").Limit(agentLimit(c, 200, 2000)).Find(&records)
+	query.Order("meal_date DESC, created_at DESC").Limit(limit).Find(&records)
 
-	dishIDs := make([]uint, 0, len(records))
-	dates := make([]string, 0, len(records))
+	dishIDs, dates := []uint{}, []string{}
 	seenID, seenDate := map[uint]bool{}, map[string]bool{}
 	for _, r := range records {
 		if !seenID[r.DishID] {
@@ -378,7 +352,7 @@ func GetAgentRecords(c *gin.Context) {
 	dishMap := map[uint]models.Dish{}
 	if len(dishIDs) > 0 {
 		var list []models.Dish
-		database.DB.Unscoped().Select("id", "category", "taste", "cook_time").Where("id IN ?", dishIDs).Find(&list)
+		database.DB.Unscoped().Scopes(database.VisibleDishes(uid(c))).Select("id", "category", "taste", "cook_time").Where("id IN ?", dishIDs).Find(&list)
 		for _, d := range list {
 			dishMap[d.ID] = d
 		}
@@ -386,12 +360,11 @@ func GetAgentRecords(c *gin.Context) {
 	ratingMap := map[string]models.DayRating{}
 	if len(dates) > 0 {
 		var ratings []models.DayRating
-		database.DB.Where("meal_date IN ?", dates).Find(&ratings)
+		database.DB.Scopes(own).Where("meal_date IN ?", dates).Find(&ratings)
 		for _, r := range ratings {
 			ratingMap[r.MealDate] = r
 		}
 	}
-
 	items := make([]agentRecordItem, 0, len(records))
 	for _, r := range records {
 		it := agentRecordItem{MealRecord: r}
@@ -403,99 +376,62 @@ func GetAgentRecords(c *gin.Context) {
 		}
 		items = append(items, it)
 	}
-
 	utils.Success(c, gin.H{"items": items, "total": total})
 }
 
-type agentRecordInput struct {
-	DishID   uint   `json:"dish_id"`
-	DishName string `json:"dish_name"`
-	MealType string `json:"meal_type"`
-	MealDate string `json:"meal_date"`
-	Rating   int    `json:"rating"`
-	Remark   string `json:"remark"`
-	Mood     string `json:"mood"`
-	Photo    string `json:"photo"`
-}
-
-type agentRecordRequest struct {
-	agentRecordInput
-	Source  string             `json:"source"`
-	Actor   string             `json:"actor"`
-	Records []agentRecordInput `json:"records"`
-}
-
-// CreateAgentRecords 写入用餐记录（单条或 records 数组）。每条成功写入都会记一条 accept 行为事件。
+// CreateAgentRecords POST /api/agent/records（单条或 records 数组）
 func CreateAgentRecords(c *gin.Context) {
-	var req agentRecordRequest
+	var req struct {
+		services.MealInput
+		Source  string               `json:"source"`
+		Actor   string               `json:"actor"`
+		Records []services.MealInput `json:"records"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "请求数据无效: "+err.Error())
 		return
 	}
-
 	list := req.Records
 	if len(list) == 0 {
-		list = []agentRecordInput{req.agentRecordInput}
+		list = []services.MealInput{req.MealInput}
 	}
-	source := strings.TrimSpace(req.Source)
-	if source == "" {
-		source = "agent"
+	if len(list) > 50 {
+		utils.BadRequest(c, "一次最多 50 条")
+		return
 	}
-
+	p := principal(c)
 	created := make([]models.MealRecord, 0, len(list))
-	skipped := 0
-	for _, r := range list {
-		if r.DishID == 0 || (r.MealType != "lunch" && r.MealType != "dinner") {
-			skipped++
+	errs := make([]string, 0)
+	for _, in := range list {
+		rec, err := services.CreateMealRecord(uid(c), in, p.Source(), firstNonEmpty(req.Actor, p.Actor))
+		if err != nil {
+			errs = append(errs, err.Error())
 			continue
 		}
-		if r.MealDate == "" {
-			r.MealDate = time.Now().Format("2006-01-02")
-		}
-		var dish models.Dish
-		if err := database.DB.First(&dish, r.DishID).Error; err != nil {
-			skipped++
-			continue
-		}
-		if r.DishName == "" {
-			r.DishName = dish.Name
-		}
-		var existing int64
-		database.DB.Model(&models.MealRecord{}).
-			Where("dish_id = ? AND meal_type = ? AND meal_date = ?", r.DishID, r.MealType, r.MealDate).
-			Count(&existing)
-		if existing > 0 {
-			skipped++
-			continue
-		}
-		record := models.MealRecord{
-			DishID: r.DishID, DishName: r.DishName, MealType: r.MealType, MealDate: r.MealDate,
-			Rating: r.Rating, Remark: r.Remark, Mood: r.Mood, Photo: r.Photo,
-		}
-		if err := database.DB.Create(&record).Error; err != nil {
-			skipped++
-			continue
-		}
-		addShoppingItems(r.DishID, r.DishName, r.MealType, r.MealDate)
-		created = append(created, record)
-		logBehavior("accept", r.DishID, r.DishName, source, req.Actor, map[string]any{
-			"meal_type": r.MealType, "meal_date": r.MealDate,
-		})
+		created = append(created, *rec)
 	}
-	if len(created) > 0 {
-		services.QueueAutoAchievementSync()
-	}
-	utils.Success(c, gin.H{"created": created, "skipped": skipped, "total": len(list)})
+	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "log_meal", Args: list, Status: "ok"})
+	utils.Success(c, gin.H{"created": created, "skipped": len(list) - len(created), "total": len(list), "errors": errs})
 }
 
-// DeleteAgentRecord 删除用餐记录。
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// DeleteAgentRecord DELETE /api/agent/records/:id
 func DeleteAgentRecord(c *gin.Context) {
-	DeleteRecord(c)
+	id, _ := strconv.Atoi(c.Param("id"))
+	invokeTool(c, "delete_meal_record", gin.H{"record_id": id})
 }
 
-// GetAgentFavorites 收藏列表。
+// GetAgentFavorites GET /api/agent/favorites
 func GetAgentFavorites(c *gin.Context) {
-	entries, err := loadFavoriteDishEntries()
+	entries, err := loadFavoriteDishEntries(uid(c))
 	if err != nil {
 		utils.InternalError(c, "获取收藏失败")
 		return
@@ -507,7 +443,17 @@ func GetAgentFavorites(c *gin.Context) {
 	utils.Success(c, items)
 }
 
-type agentBehaviorRequest struct {
+func AgentAddFavorite(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("dishId"))
+	invokeTool(c, "set_favorite", gin.H{"dish_id": id, "favorite": true})
+}
+
+func AgentRemoveFavorite(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("dishId"))
+	invokeTool(c, "set_favorite", gin.H{"dish_id": id, "favorite": false})
+}
+
+type behaviorInput struct {
 	EventType string         `json:"event_type"`
 	DishID    uint           `json:"dish_id"`
 	DishName  string         `json:"dish_name"`
@@ -516,37 +462,11 @@ type agentBehaviorRequest struct {
 	Meta      map[string]any `json:"meta"`
 }
 
-func logBehavior(eventType string, dishID uint, dishName, source, actor string, meta map[string]any) {
-	eventType = strings.TrimSpace(eventType)
-	if eventType == "" {
-		return
-	}
-	if dishName == "" && dishID > 0 {
-		var d models.Dish
-		if err := database.DB.Unscoped().Select("name").First(&d, dishID).Error; err == nil {
-			dishName = d.Name
-		}
-	}
-	metaJSON := "{}"
-	if meta != nil {
-		if b, err := json.Marshal(meta); err == nil {
-			metaJSON = string(b)
-		}
-	}
-	if source == "" {
-		source = "app"
-	}
-	database.DB.Create(&models.BehaviorEvent{
-		EventType: eventType, DishID: dishID, DishName: dishName,
-		Source: strings.TrimSpace(source), Actor: strings.TrimSpace(actor), Meta: metaJSON,
-	})
-}
-
-// CreateAgentBehavior 写入行为事件（单条或 events 数组）。
+// CreateAgentBehavior POST /api/agent/behavior（单条或 events 数组）。source 一律按令牌标记，不可伪造成 app。
 func CreateAgentBehavior(c *gin.Context) {
 	var body struct {
-		agentBehaviorRequest
-		Events []agentBehaviorRequest `json:"events"`
+		behaviorInput
+		Events []behaviorInput `json:"events"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.BadRequest(c, "请求数据无效")
@@ -554,40 +474,38 @@ func CreateAgentBehavior(c *gin.Context) {
 	}
 	list := body.Events
 	if len(list) == 0 {
-		list = []agentBehaviorRequest{body.agentBehaviorRequest}
+		list = []behaviorInput{body.behaviorInput}
 	}
+	if len(list) > 100 {
+		utils.BadRequest(c, "一次最多 100 条")
+		return
+	}
+	p := principal(c)
 	saved := 0
 	for _, e := range list {
-		if strings.TrimSpace(e.EventType) == "" {
+		if !services.IsValidEventType(e.EventType) {
 			continue
 		}
-		source := e.Source
-		if source == "" {
-			source = "agent"
-		}
-		logBehavior(e.EventType, e.DishID, e.DishName, source, e.Actor, e.Meta)
+		services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, p.Source(), firstNonEmpty(e.Actor, p.Actor), e.Meta)
 		saved++
 	}
 	utils.Success(c, gin.H{"saved": saved})
 }
 
-// CreateAppBehavior 站内前端埋点（应用密码即可）：浏览菜品、采纳/拒绝推荐等。
+// CreateAppBehavior 站内前端埋点：浏览、采纳、拒绝等（source 固定为 app）。
 func CreateAppBehavior(c *gin.Context) {
-	var e agentBehaviorRequest
-	if err := c.ShouldBindJSON(&e); err != nil || strings.TrimSpace(e.EventType) == "" {
+	var e behaviorInput
+	if err := c.ShouldBindJSON(&e); err != nil || !services.IsValidEventType(e.EventType) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-	if e.Source == "" {
-		e.Source = "app"
-	}
-	logBehavior(e.EventType, e.DishID, e.DishName, e.Source, e.Actor, e.Meta)
+	services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, "app", "", e.Meta)
 	utils.Success(c, nil)
 }
 
-// GetAgentBehavior 行为事件流。
+// GetAgentBehavior GET /api/agent/behavior
 func GetAgentBehavior(c *gin.Context) {
-	query := database.DB.Model(&models.BehaviorEvent{})
+	query := database.DB.Model(&models.BehaviorEvent{}).Scopes(database.OwnedBy(uid(c)))
 	if t := c.Query("type"); t != "" {
 		query = query.Where("event_type IN ?", splitParam(t))
 	}
@@ -598,16 +516,20 @@ func GetAgentBehavior(c *gin.Context) {
 		query = query.Where("dish_id = ?", id)
 	}
 	if since := c.Query("since"); since != "" {
-		if t, err := time.Parse("2006-01-02", since); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", since, time.Local); err == nil {
 			query = query.Where("created_at >= ?", t)
 		} else if t, err := time.Parse(time.RFC3339, since); err == nil {
 			query = query.Where("created_at >= ?", t)
 		}
 	}
+	limit := intQuery(c, "limit", 200)
+	if limit < 1 || limit > 2000 {
+		limit = 200
+	}
 	var total int64
 	query.Count(&total)
 	var events []models.BehaviorEvent
-	query.Order("created_at DESC, id DESC").Limit(agentLimit(c, 200, 2000)).Find(&events)
+	query.Order("created_at DESC, id DESC").Limit(limit).Find(&events)
 
 	type eventOut struct {
 		models.BehaviorEvent
@@ -624,51 +546,63 @@ func GetAgentBehavior(c *gin.Context) {
 	utils.Success(c, gin.H{"items": items, "total": total})
 }
 
-// GetAgentDayRatings 整餐评价与首页心情。
+// GetAgentDayRatings GET /api/agent/day-ratings
 func GetAgentDayRatings(c *gin.Context) {
-	query := database.DB.Model(&models.DayRating{})
-	if from := c.Query("date_from"); from != "" {
-		query = query.Where("meal_date >= ?", from)
-	} else {
-		query = query.Where("meal_date >= ?", time.Now().AddDate(0, 0, -90).Format("2006-01-02"))
+	query := database.DB.Model(&models.DayRating{}).Scopes(database.OwnedBy(uid(c)))
+	from := c.Query("date_from")
+	if from == "" {
+		from = time.Now().AddDate(0, 0, -90).Format("2006-01-02")
 	}
+	query = query.Where("meal_date >= ?", from)
 	if to := c.Query("date_to"); to != "" {
 		query = query.Where("meal_date <= ?", to)
 	}
 	var ratings []models.DayRating
-	query.Order("meal_date DESC").Limit(agentLimit(c, 200, 1000)).Find(&ratings)
+	query.Order("meal_date DESC").Limit(1000).Find(&ratings)
 	utils.Success(c, ratings)
 }
 
-// GetAgentStats 整体统计，复用管理端仪表盘。
-func GetAgentStats(c *gin.Context) {
-	GetDashboard(c)
+// GetAgentPreferences / UpdateAgentPreferences
+func GetAgentPreferences(c *gin.Context) {
+	utils.Success(c, services.GetPreferences(uid(c)))
 }
 
-// GetAgentSettings 站点设置（复用应用端设置接口，已过滤密码类键）。
-func GetAgentSettings(c *gin.Context) {
-	GetSettings(c)
+func UpdateAgentPreferences(c *gin.Context) {
+	body, _ := io.ReadAll(io.LimitReader(c.Request.Body, 16*1024))
+	invokeTool(c, "update_preferences", json.RawMessage(body))
 }
 
-// GetAgentExport 一次性导出全部分析数据。
+// Suggestions（智能体侧）
+func CreateAgentSuggestion(c *gin.Context) {
+	body, _ := io.ReadAll(io.LimitReader(c.Request.Body, 16*1024))
+	invokeTool(c, "create_suggestion", json.RawMessage(body))
+}
+
+func ListAgentSuggestions(c *gin.Context) {
+	utils.Success(c, services.ListSuggestions(uid(c), c.DefaultQuery("status", "all"), intQuery(c, "limit", 50)))
+}
+
+// GetAgentExport GET /api/agent/export —— 分析所需数据一次导出（不含对话记录）。
 func GetAgentExport(c *gin.Context) {
-	days, _ := strconv.Atoi(c.DefaultQuery("days", "365"))
-	if days <= 0 {
+	days := intQuery(c, "days", 365)
+	if days <= 0 || days > 3650 {
 		days = 365
 	}
 	since := time.Now().AddDate(0, 0, -days)
 	sinceDate := since.Format("2006-01-02")
+	own := database.OwnedBy(uid(c))
 
-	var dishList []models.Dish
-	database.DB.Order("sort_order ASC, id ASC").Find(&dishList)
-	var records []models.MealRecord
-	database.DB.Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&records)
-	var favorites []models.Favorite
-	database.DB.Find(&favorites)
-	var ratings []models.DayRating
-	database.DB.Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&ratings)
-	var events []models.BehaviorEvent
-	database.DB.Where("created_at >= ?", since).Order("created_at ASC").Limit(5000).Find(&events)
+	var (
+		records   []models.MealRecord
+		favorites []models.Favorite
+		ratings   []models.DayRating
+		events    []models.BehaviorEvent
+	)
+	database.DB.Scopes(own).Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&records)
+	database.DB.Scopes(own).Find(&favorites)
+	database.DB.Scopes(own).Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&ratings)
+	database.DB.Scopes(own).Where("created_at >= ?", since).Order("created_at ASC").Limit(5000).Find(&events)
+	dishList, _ := services.SearchDishes(uid(c), services.DishQuery{Limit: 500})
 
 	utils.Success(c, gin.H{
 		"exported_at":     time.Now().Format(time.RFC3339),
@@ -678,6 +612,119 @@ func GetAgentExport(c *gin.Context) {
 		"favorites":       favorites,
 		"day_ratings":     ratings,
 		"behavior_events": events,
-		"profile":         services.BuildTasteProfile(days),
+		"preferences":     services.GetPreferences(uid(c)),
+		"profile":         services.BuildTasteProfile(uid(c), days),
 	})
+}
+
+// ---------------- App 侧：AI 连接管理 ----------------
+
+// ListMyAgentTokens GET /api/me/agent-tokens
+func ListMyAgentTokens(c *gin.Context) {
+	utils.Success(c, gin.H{
+		"tokens":  services.ListAgentTokens(uid(c)),
+		"scopes":  auth.ScopeLabels,
+		"presets": auth.ScopePresets,
+		"mcp_url": baseURL(c) + "/mcp",
+		"api_url": baseURL(c) + "/api/agent",
+	})
+}
+
+// CreateMyAgentToken POST /api/me/agent-tokens —— 明文令牌只在这里返回一次。
+func CreateMyAgentToken(c *gin.Context) {
+	var req struct {
+		Name          string   `json:"name"`
+		Scopes        []string `json:"scopes"`
+		ExpiresInDays int      `json:"expires_in_days"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "请求数据无效")
+		return
+	}
+	if req.ExpiresInDays < 0 || req.ExpiresInDays > 3650 {
+		utils.BadRequest(c, "有效期无效")
+		return
+	}
+	plain, view, err := services.CreateAgentToken(uid(c), req.Name, req.Scopes, req.ExpiresInDays)
+	if err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
+	utils.Success(c, gin.H{"token": plain, "info": view})
+}
+
+// RevokeMyAgentToken DELETE /api/me/agent-tokens/:id
+func RevokeMyAgentToken(c *gin.Context) {
+	if err := services.RevokeAgentToken(uid(c), c.Param("id")); err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
+	utils.SuccessMsg(c, "已撤销")
+}
+
+// CreateAgentSession POST /api/me/agent-session —— 给内嵌智能体（iframe）签发短期令牌，
+// 前端通过 postMessage 交给嵌入页；令牌只代表当前用户，默认 2 小时过期。
+func CreateAgentSession(c *gin.Context) {
+	var req struct {
+		Scopes []string `json:"scopes"`
+		Actor  string   `json:"actor"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	scopes := req.Scopes
+	if len(scopes) == 0 {
+		scopes = splitParam(database.GetSetting("agent_embed_scopes", "full"))
+	}
+	actor := strings.TrimSpace(req.Actor)
+	if actor == "" {
+		actor = "embed"
+	}
+	if len([]rune(actor)) > 32 {
+		actor = string([]rune(actor)[:32])
+	}
+	token, exp, err := auth.IssueAgentSession(auth.CurrentUser(c), scopes, actor, config.C.AgentSessionTTL)
+	if err != nil {
+		utils.InternalError(c, "签发失败")
+		return
+	}
+	utils.Success(c, gin.H{
+		"token": token, "expires_at": exp, "scopes": auth.NormalizeScopes(scopes),
+		"api_base": baseURL(c) + "/api/agent", "mcp_url": baseURL(c) + "/mcp",
+	})
+}
+
+// ListMyAgentAudit GET /api/me/agent-audit
+func ListMyAgentAudit(c *gin.Context) {
+	page, pageSize := pageParams(c, 30)
+	q := database.DB.Model(&models.AgentAuditLog{}).Scopes(database.OwnedBy(uid(c)))
+	if actor := c.Query("actor"); actor != "" {
+		q = q.Where("actor = ?", actor)
+	}
+	var total int64
+	q.Count(&total)
+	var rows []models.AgentAuditLog
+	q.Order("id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows)
+	utils.SuccessPaginated(c, rows, total, page, pageSize)
+}
+
+// ---------------- App 侧：建议收件箱 ----------------
+
+func ListMySuggestions(c *gin.Context) {
+	utils.Success(c, services.ListSuggestions(uid(c), c.DefaultQuery("status", "pending"), intQuery(c, "limit", 20)))
+}
+
+func ResolveMySuggestion(c *gin.Context) {
+	var req services.ResolveInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "请求数据无效")
+		return
+	}
+	created, err := services.ResolveSuggestion(uid(c), c.Param("id"), req)
+	if err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
+	if created == nil {
+		created = []models.MealRecord{}
+	}
+	utils.Success(c, gin.H{"created": created})
 }

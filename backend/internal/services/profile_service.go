@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"ninimenu/internal/config"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"sort"
@@ -43,8 +42,8 @@ type DishFrequency struct {
 	LastDate string `json:"last_date"`
 }
 
-// TasteProfile 用户口味画像：由用餐记录、评价、收藏、首页心情与行为事件聚合而成。
-// 这是对外（其他智能体）开放的核心“用户行为信息”，也是站内推荐引擎的打分依据。
+// TasteProfile 用户口味画像：由该用户的用餐记录、评价、收藏、首页心情、行为事件与显式偏好聚合而成。
+// 这是对外（智能体）开放的核心“用户行为信息”，也是站内推荐引擎的打分依据。
 type TasteProfile struct {
 	GeneratedAt      string          `json:"generated_at"`
 	WindowDays       int             `json:"window_days"`
@@ -68,7 +67,10 @@ type TasteProfile struct {
 	MoodCounts       map[string]int  `json:"mood_counts"`
 	HomeMoodCounts   map[string]int  `json:"home_mood_counts"`
 	BehaviorCounts   map[string]int  `json:"behavior_counts"`
+	RejectedDishes   []DishFrequency `json:"rejected_dishes"`
 	MostViewedDishes []DishFrequency `json:"most_viewed_dishes"`
+	AcceptRate       float64         `json:"accept_rate"`
+	Preferences      Preferences     `json:"preferences"`
 	Summary          string          `json:"summary"`
 
 	tasteWeightMap    map[string]float64
@@ -78,6 +80,7 @@ type TasteProfile struct {
 	dislikedSet       map[uint]bool
 	eatenCount        map[uint]int
 	viewCount         map[uint]int
+	rejectCount       map[uint]int
 }
 
 func normalizeProfileDays(days int) int {
@@ -90,16 +93,17 @@ func normalizeProfileDays(days int) int {
 	return days
 }
 
-// BuildTasteProfile 聚合最近 days 天的行为数据生成口味画像。
-func BuildTasteProfile(days int) *TasteProfile {
+// BuildTasteProfile 聚合用户 uid 最近 days 天的行为数据生成口味画像。只读取该用户自己的数据。
+func BuildTasteProfile(uid uint, days int) *TasteProfile {
 	days = normalizeProfileDays(days)
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	repeatDays := UserRepeatDays(uid)
 
 	p := &TasteProfile{
 		GeneratedAt:       now.Format(time.RFC3339),
 		WindowDays:        days,
-		RepeatDays:        config.C.RepeatDays,
+		RepeatDays:        repeatDays,
 		MealTypeCounts:    map[string]int{},
 		TasteWeights:      []WeightItem{},
 		CategoryWeights:   []WeightItem{},
@@ -114,7 +118,9 @@ func BuildTasteProfile(days int) *TasteProfile {
 		MoodCounts:        map[string]int{},
 		HomeMoodCounts:    map[string]int{},
 		BehaviorCounts:    map[string]int{},
+		RejectedDishes:    []DishFrequency{},
 		MostViewedDishes:  []DishFrequency{},
+		Preferences:       GetPreferences(uid),
 		tasteWeightMap:    map[string]float64{},
 		categoryWeightMap: map[string]float64{},
 		favoriteSet:       map[uint]bool{},
@@ -122,11 +128,12 @@ func BuildTasteProfile(days int) *TasteProfile {
 		dislikedSet:       map[uint]bool{},
 		eatenCount:        map[uint]int{},
 		viewCount:         map[uint]int{},
+		rejectCount:       map[uint]int{},
 	}
 
 	var allDishes []models.Dish
-	database.DB.Unscoped().
-		Select("id", "name", "category", "taste", "ingredients", "seasonings", "cook_time", "difficulty", "favorite", "deleted_at").
+	database.DB.Unscoped().Scopes(database.VisibleDishes(uid)).
+		Select("id", "name", "category", "taste", "ingredients", "seasonings", "cook_time", "difficulty", "owner_id", "deleted_at").
 		Find(&allDishes)
 	dishByID := make(map[uint]models.Dish, len(allDishes))
 	for _, d := range allDishes {
@@ -134,7 +141,7 @@ func BuildTasteProfile(days int) *TasteProfile {
 	}
 
 	var records []models.MealRecord
-	database.DB.
+	database.DB.Scopes(database.OwnedBy(uid)).
 		Select("id", "dish_id", "dish_name", "meal_type", "meal_date", "rating", "mood", "created_at").
 		Order("meal_date ASC, created_at ASC").
 		Find(&records)
@@ -228,6 +235,11 @@ func BuildTasteProfile(days int) *TasteProfile {
 		}
 	}
 
+	// 显式偏好的口味作为先验加进画像（相当于 2 餐的权重），新用户也能有个性化推荐
+	for _, t := range p.Preferences.FavoriteTastes {
+		tasteAcc[t] += 2
+	}
+
 	p.DistinctDishes = len(windowDistinct)
 	if cookN > 0 {
 		p.AvgCookTime = math.Round(float64(cookSum)/float64(cookN)*10) / 10
@@ -251,13 +263,13 @@ func BuildTasteProfile(days int) *TasteProfile {
 		p.TopDishes = p.TopDishes[:10]
 	}
 
-	for id := range recentDishIDMap(config.C.RepeatDays) {
+	for id := range recentDishIDMap(uid, repeatDays) {
 		p.RecentDishIDs = append(p.RecentDishIDs, id)
 	}
 	sort.Slice(p.RecentDishIDs, func(i, j int) bool { return p.RecentDishIDs[i] < p.RecentDishIDs[j] })
 
 	var favorites []models.Favorite
-	database.DB.Order("created_at DESC").Find(&favorites)
+	database.DB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Find(&favorites)
 	for _, f := range favorites {
 		p.favoriteSet[f.DishID] = true
 		if d, ok := dishByID[f.DishID]; ok && !d.DeletedAt.Valid {
@@ -279,7 +291,7 @@ func BuildTasteProfile(days int) *TasteProfile {
 
 	since := today.AddDate(0, 0, -days)
 	var ratings []models.DayRating
-	database.DB.Select("home_mood", "mood", "meal_date").
+	database.DB.Scopes(database.OwnedBy(uid)).Select("home_mood", "mood", "meal_date").
 		Where("meal_date >= ?", since.Format("2006-01-02")).
 		Find(&ratings)
 	for _, r := range ratings {
@@ -289,27 +301,50 @@ func BuildTasteProfile(days int) *TasteProfile {
 	}
 
 	var events []models.BehaviorEvent
-	database.DB.Select("event_type", "dish_id").Where("created_at >= ?", since).Find(&events)
+	database.DB.Scopes(database.OwnedBy(uid)).Select("event_type", "dish_id", "created_at").Where("created_at >= ?", since).Find(&events)
+	rejectSince := now.AddDate(0, 0, -30)
 	for _, e := range events {
 		p.BehaviorCounts[e.EventType]++
-		if e.EventType == "view" && e.DishID > 0 {
+		if e.DishID == 0 {
+			continue
+		}
+		switch e.EventType {
+		case "view":
 			p.viewCount[e.DishID]++
+		case "reject":
+			// 近 30 天的“不想吃”才影响推荐，避免一次拒绝永久打入冷宫
+			if e.CreatedAt.After(rejectSince) {
+				p.rejectCount[e.DishID]++
+			}
 		}
 	}
-	for id, cnt := range p.viewCount {
+	if rec := p.BehaviorCounts["recommend"]; rec > 0 {
+		p.AcceptRate = math.Round(float64(p.BehaviorCounts["accept"])/float64(rec)*100) / 100
+		if p.AcceptRate > 1 {
+			p.AcceptRate = 1
+		}
+	}
+	p.MostViewedDishes = frequencyList(p.viewCount, dishByID, p.LastEaten, 8)
+	p.RejectedDishes = frequencyList(p.rejectCount, dishByID, p.LastEaten, 8)
+
+	p.Summary = buildProfileSummary(p)
+	return p
+}
+
+func frequencyList(counts map[uint]int, dishByID map[uint]models.Dish, lastEaten map[uint]string, top int) []DishFrequency {
+	out := make([]DishFrequency, 0, len(counts))
+	for id, cnt := range counts {
 		name := ""
 		if d, ok := dishByID[id]; ok {
 			name = d.Name
 		}
-		p.MostViewedDishes = append(p.MostViewedDishes, DishFrequency{DishID: id, DishName: name, Count: cnt, LastDate: p.LastEaten[id]})
+		out = append(out, DishFrequency{DishID: id, DishName: name, Count: cnt, LastDate: lastEaten[id]})
 	}
-	sortFrequencies(p.MostViewedDishes)
-	if len(p.MostViewedDishes) > 8 {
-		p.MostViewedDishes = p.MostViewedDishes[:8]
+	sortFrequencies(out)
+	if len(out) > top {
+		out = out[:top]
 	}
-
-	p.Summary = buildProfileSummary(p)
-	return p
+	return out
 }
 
 // ingredientNames 从 JSON 配料数组里取出名称（兼容对象数组与字符串数组）。
@@ -402,8 +437,13 @@ func topNames(items []WeightItem, n int) []string {
 }
 
 func buildProfileSummary(p *TasteProfile) string {
+	prefs := preferenceSummary(p.Preferences)
 	if p.WindowRecords == 0 {
-		return fmt.Sprintf("近 %d 天没有用餐记录，暂无口味画像；可先参考收藏（%d 道）或按菜单随机推荐。", p.WindowDays, len(p.FavoriteDishes))
+		s := fmt.Sprintf("近 %d 天没有用餐记录，暂无行为画像；收藏 %d 道。", p.WindowDays, len(p.FavoriteDishes))
+		if prefs != "" {
+			s += "已声明偏好：" + prefs + "。"
+		}
+		return s
 	}
 	parts := []string{fmt.Sprintf("近 %d 天记录了 %d 餐、%d 道不同的菜", p.WindowDays, p.WindowRecords, p.DistinctDishes)}
 	if names := topNames(p.TasteWeights, 3); len(names) > 0 {
@@ -422,5 +462,31 @@ func buildProfileSummary(p *TasteProfile) string {
 	if len(p.RecentDishIDs) > 0 {
 		parts = append(parts, fmt.Sprintf("近 %d 天已吃过 %d 道（推荐时避开）", p.RepeatDays, len(p.RecentDishIDs)))
 	}
+	if prefs != "" {
+		parts = append(parts, "已声明偏好："+prefs)
+	}
 	return strings.Join(parts, "；") + "。"
+}
+
+func preferenceSummary(pr Preferences) string {
+	var parts []string
+	if label := SpiceLevelLabel(pr.SpiceLevel); label != "" {
+		parts = append(parts, label)
+	}
+	if len(pr.Allergies) > 0 {
+		parts = append(parts, "过敏 "+strings.Join(pr.Allergies, "/"))
+	}
+	if len(pr.AvoidIngredients) > 0 {
+		parts = append(parts, "忌口 "+strings.Join(pr.AvoidIngredients, "/"))
+	}
+	if pr.MaxCookTime > 0 {
+		parts = append(parts, fmt.Sprintf("做饭不超过 %d 分钟", pr.MaxCookTime))
+	}
+	if pr.HouseholdSize > 0 {
+		parts = append(parts, fmt.Sprintf("%d 人吃饭", pr.HouseholdSize))
+	}
+	if pr.Goals != "" {
+		parts = append(parts, "目标 "+pr.Goals)
+	}
+	return strings.Join(parts, "，")
 }
