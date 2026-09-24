@@ -278,7 +278,9 @@ func scoreDish(d models.Dish, req RecommendRequest, mealType string, p *TastePro
 		}
 	}
 
-	if d.OwnerID != 0 {
+	if d.FamilyID != 0 {
+		add(6, "家里的共享菜谱")
+	} else if d.OwnerID != 0 {
 		add(6, "你的私房菜")
 	}
 	if p.favoriteSet[d.ID] {

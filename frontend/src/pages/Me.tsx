@@ -9,7 +9,7 @@ import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
 import toast from "react-hot-toast"
 import {
   Bot, Camera, ChevronRight, Heart, Images, Inbox, LayoutDashboard, LogOut, NotebookPen, Plug, Salad, Shield,
-  ShoppingBasket, Sparkles, Trophy, UserRound, type LucideIcon,
+  ShoppingBasket, Sparkles, Trophy, UserRound, UsersRound, Activity, type LucideIcon,
 } from "lucide-react"
 
 function Row({ icon: Icon, tone, title, desc, badge, onClick, right }: {
@@ -165,6 +165,8 @@ export default function Me() {
         </Group>
 
         <Group title="我的内容">
+          <Row icon={Activity} tone="bg-mint-light text-mint" title="饮食记录与报告" desc="记录实际吃的菜系，查看饮食变化" onClick={() => navigate("/health")} />
+          <Row icon={UsersRound} tone="bg-yellow-light text-yellow-dark" title="我的家庭" desc="共享菜谱、家庭菜单与买菜清单" onClick={() => navigate("/family")} />
           <Row icon={Heart} tone="bg-pink-light text-pink" title="我的收藏" onClick={() => navigate("/favorites")} />
           <Row icon={ShoppingBasket} tone="bg-mint-light text-mint" title="一周菜单与买菜清单" onClick={() => navigate("/plan")} />
           <Row icon={Images} tone="bg-primary-light text-primary" title="照片墙" onClick={() => navigate("/photo-wall")} />

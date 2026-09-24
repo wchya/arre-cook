@@ -28,8 +28,8 @@ var AllScopes = []string{
 var ScopeLabels = map[string]string{
 	ScopeProfileRead:      "读取口味画像与偏好",
 	ScopeDishesRead:       "读取菜品库",
-	ScopeRecordsRead:      "读取用餐记录、收藏、周菜单",
-	ScopeRecordsWrite:     "代我记录/删除用餐",
+	ScopeRecordsRead:      "读取用餐记录、饮食日记与报告",
+	ScopeRecordsWrite:     "代我记录/删除用餐与饮食日记",
 	ScopeFavoritesWrite:   "代我收藏菜品",
 	ScopePlanWrite:        "重新生成周菜单",
 	ScopePreferencesWrite: "修改我的饮食偏好",

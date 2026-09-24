@@ -27,6 +27,7 @@ type Dish struct {
 	Favorite bool `json:"favorite" gorm:"-"`
 	// OwnerID=0 为公共菜谱（管理员维护，所有人可见）；否则为该用户的私有菜谱，仅本人可见。
 	OwnerID     uint           `json:"owner_id" gorm:"not null;default:0;index"`
+	FamilyID    uint           `json:"family_id" gorm:"not null;default:0;index"`
 	Enabled     bool           `json:"enabled" gorm:"default:true;index;index:idx_dishes_pick,priority:1"`
 	Tags        string         `json:"tags" gorm:"default:'[]'"`
 	SortOrder   int            `json:"sort_order" gorm:"default:0"`

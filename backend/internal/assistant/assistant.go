@@ -49,6 +49,8 @@ var toolLabels = map[string]string{
 	"get_week_plan": "查看本周菜单", "regenerate_week_plan": "重排本周菜单", "get_shopping_list": "整理买菜清单",
 	"get_stats": "统计饮食数据", "list_behavior_events": "分析推荐反馈", "log_feedback": "记下你的反馈",
 	"create_suggestion": "放进建议收件箱", "list_suggestions": "查看建议", "get_day_ratings": "查看每日评价",
+	"list_food_journal": "查看饮食日记", "log_food_journal": "记下实际吃的食物", "delete_food_journal": "删除饮食记录",
+	"get_health_report": "整理饮食报告",
 }
 
 // Run 处理一轮用户输入。
@@ -165,10 +167,11 @@ func systemPrompt(p *auth.Principal) string {
 1. 推荐菜只能来自工具结果（优先 recommend_dishes，其次 search_dishes），绝不编造菜名或菜品 ID；推荐时用一两句话说明理由。
 2. 严格遵守用户的过敏原与忌口；用户临时提出的新限制，作为本次的 exclude_ingredients 等参数传入。
 3. 用户问做法时调用 get_dish，按步骤清晰列出，标出关键火候与用量。
-4. 只有当用户明确表示“就吃这个/帮我记上/收藏/改偏好”时才调用写入类工具（log_meal、set_favorite、update_preferences 等）；删除记录前先确认。
+4. 只有当用户明确表示“就吃这个/帮我记上/收藏/改偏好”时才调用写入类工具（log_meal、log_food_journal、set_favorite、update_preferences 等）；删除记录前先确认。用户说已经吃了什么但不在菜谱中时，用 log_food_journal。
 5. 用户说“不想吃某道菜”时，用 log_feedback 记录 reject，并换一批（exclude_dish_ids）。
 6. 回答控制在 200 字以内，菜品列表不必重复卡片里已有的细节（界面会自动展示菜品卡片）。
-7. 与饮食无关的问题，礼貌地拉回到吃饭这件事上。`,
+7. 用户问饮食报告或规划时调用 get_health_report；只按实际记录陈述，未记录不等于未吃，不推测热量或给医疗诊断。
+8. 与饮食无关的问题，礼貌地拉回到吃饭这件事上。`,
 		database.GetSetting("app_name", "NiniMenu"), p.User.DisplayName(),
 		now.Format("2006-01-02"), []string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}[now.Weekday()], now.Format("15:04"),
 		meal, profile.Summary)
@@ -176,6 +179,20 @@ func systemPrompt(p *auth.Principal) string {
 
 // fallback 未配置大模型或模型出错时，用关键词解析意图后直接调用推荐引擎。
 func fallback(p *auth.Principal, text string, emit Emit) (string, []Card) {
+	if strings.Contains(text, "报告") || strings.Contains(text, "饮食规划") || strings.Contains(text, "健康饮食") {
+		emit("tool_start", map[string]any{"id": "fallback", "name": "get_health_report", "label": labelOf("get_health_report")})
+		result, err := agent.Invoke(&agent.Ctx{Context: context.Background(), Principal: p, Channel: "chat"}, "get_health_report", json.RawMessage(`{"days":7}`))
+		if err == nil {
+			report := result.(map[string]any)
+			insights := report["insights"].([]string)
+			steps := report["plan_actions"].([]string)
+			msg := strings.Join(insights, "\n") + "\n接下来：" + steps[0]
+			emit("tool_end", map[string]any{"id": "fallback", "name": "get_health_report", "ok": true})
+			emit("delta", map[string]any{"text": msg})
+			return msg, nil
+		}
+		emit("tool_end", map[string]any{"id": "fallback", "name": "get_health_report", "ok": false, "error": err.Error()})
+	}
 	req := map[string]any{"count": 4}
 	switch {
 	case strings.Contains(text, "午"):
@@ -270,6 +287,15 @@ func cardFromResult(tool string, raw []byte) *Card {
 		}
 		meal := map[string]string{"lunch": "午餐", "dinner": "晚餐"}[r.MealType]
 		return &Card{Type: "action", Text: fmt.Sprintf("已记入 %s %s：%s", r.MealDate, meal, r.DishName)}
+	case "log_food_journal":
+		var r struct {
+			DishName string `json:"dish_name"`
+			MealDate string `json:"meal_date"`
+		}
+		if json.Unmarshal(raw, &r) != nil {
+			return nil
+		}
+		return &Card{Type: "action", Text: fmt.Sprintf("已记入 %s：%s", r.MealDate, r.DishName)}
 	case "set_favorite":
 		var r struct {
 			Favorite bool `json:"favorite"`
@@ -287,7 +313,7 @@ func cardFromResult(tool string, raw []byte) *Card {
 		return &Card{Type: "action", Text: "本周菜单已重新生成"}
 	case "create_suggestion":
 		return &Card{Type: "action", Text: "已放进首页的「AI 建议」"}
-	case "delete_meal_record":
+	case "delete_meal_record", "delete_food_journal":
 		return &Card{Type: "action", Text: "已删除这条记录"}
 	}
 	return nil

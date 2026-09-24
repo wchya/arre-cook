@@ -14,21 +14,32 @@ import (
 	"gorm.io/gorm"
 )
 
-// 菜品可见性：公共菜谱（owner_id=0，管理员维护）+ 本人私房菜（owner_id=uid）。
-// 编辑权限：私房菜仅本人；公共菜谱仅管理员。
+// 菜品可见性：公共菜谱、本人私房菜，以及当前家庭明确共享的菜谱。
 
 func dishScope(c *gin.Context) *gorm.DB {
 	q := database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c)))
 	switch c.Query("scope") {
 	case "mine":
-		q = q.Where("owner_id = ?", uid(c))
+		q = q.Where("owner_id = ? AND family_id = 0", uid(c))
 	case "public":
-		q = q.Where("owner_id = 0")
+		q = q.Where("owner_id = 0 AND family_id = 0")
+	case "family":
+		family, err := services.FamilyForUser(uid(c))
+		if err != nil || family == nil {
+			q = q.Where("1 = 0")
+		} else {
+			q = q.Where("family_id = ?", family.ID)
+		}
 	}
 	return q
 }
 
 func canEditDish(c *gin.Context, d *models.Dish) bool {
+	if d.FamilyID != 0 {
+		family, err := services.FamilyForUser(uid(c))
+		return err == nil && family != nil && family.ID == d.FamilyID &&
+			(d.OwnerID == uid(c) || family.OwnerID == uid(c))
+	}
 	if d.OwnerID == 0 {
 		return isAdmin(c)
 	}
@@ -42,7 +53,7 @@ func findEditableDish(c *gin.Context) (*models.Dish, bool) {
 		return nil, false
 	}
 	if !canEditDish(c, &dish) {
-		utils.Forbidden(c, "公共菜谱只有管理员可以修改，可以先“复制到我的菜谱”再改")
+		utils.Forbidden(c, "只有菜谱作者或家庭创建者可以修改")
 		return nil, false
 	}
 	return &dish, true
@@ -134,6 +145,7 @@ type CreateDishRequest struct {
 	SortOrder   int    `json:"sort_order"`
 	// Public 管理员创建公共菜谱；普通用户忽略此字段，一律创建私房菜。
 	Public bool `json:"public"`
+	Family bool `json:"family"`
 }
 
 func jsonOr(raw, def string) string {
@@ -180,13 +192,26 @@ func CreateDish(c *gin.Context) {
 	dish := models.Dish{Enabled: true, OwnerID: uid(c)}
 	if req.Public && isAdmin(c) {
 		dish.OwnerID = 0
+	} else if req.Family {
+		family, err := services.RequireFamily(uid(c))
+		if err != nil {
+			utils.BadRequest(c, "请先创建或加入家庭")
+			return
+		}
+		dish.FamilyID = family.ID
 	}
 	req.apply(&dish)
 	if dish.OwnerID != 0 {
 		var n int64
-		database.DB.Model(&models.Dish{}).Where("owner_id = ?", dish.OwnerID).Count(&n)
+		q := database.DB.Model(&models.Dish{})
+		if dish.FamilyID != 0 {
+			q = q.Where("family_id = ?", dish.FamilyID)
+		} else {
+			q = q.Where("owner_id = ? AND family_id = 0", dish.OwnerID)
+		}
+		q.Count(&n)
 		if n >= 500 {
-			utils.BadRequest(c, "私房菜已达 500 道上限")
+			utils.BadRequest(c, "菜谱已达 500 道上限")
 			return
 		}
 	}
@@ -224,6 +249,9 @@ func DeleteDish(c *gin.Context) {
 		return
 	}
 	database.DB.Delete(dish)
+	if dish.FamilyID != 0 {
+		database.DB.Where("family_id = ? AND dish_id = ?", dish.FamilyID, dish.ID).Delete(&models.FamilyPlanItem{})
+	}
 	services.InvalidateWeekPlan(uid(c))
 	services.QueueAutoAchievementSync(uid(c))
 	utils.SuccessMsg(c, "删除成功")
@@ -251,6 +279,7 @@ func CloneDish(c *gin.Context) {
 	newDish.ID = 0
 	newDish.CreatedAt, newDish.UpdatedAt = time.Time{}, time.Time{}
 	newDish.OwnerID = uid(c)
+	newDish.FamilyID = 0
 	newDish.Enabled = true
 	if isAdmin(c) && queryBool(c.Query("public")) {
 		newDish.OwnerID = 0
@@ -282,7 +311,7 @@ func GetDishCategoryCounts(c *gin.Context) {
 
 	var total, mine int64
 	database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c))).Where("enabled = ?", true).Count(&total)
-	database.DB.Model(&models.Dish{}).Where("owner_id = ?", uid(c)).Count(&mine)
+	database.DB.Model(&models.Dish{}).Where("owner_id = ? AND family_id = 0", uid(c)).Count(&mine)
 
 	utils.Success(c, gin.H{"total": total, "mine": mine, "categories": counts})
 }
@@ -290,10 +319,22 @@ func GetDishCategoryCounts(c *gin.Context) {
 // editableIDs 批量操作只作用于调用者有权编辑的菜品。
 func editableIDs(c *gin.Context, ids []uint) []uint {
 	q := database.DB.Model(&models.Dish{}).Where("id IN ?", ids)
+	family, err := services.FamilyForUser(uid(c))
+	familyClause := "1 = 0"
+	args := []any{}
+	if err == nil && family != nil {
+		if family.OwnerID == uid(c) {
+			familyClause = "family_id = ?"
+			args = append(args, family.ID)
+		} else {
+			familyClause = "family_id = ? AND owner_id = ?"
+			args = append(args, family.ID, uid(c))
+		}
+	}
 	if isAdmin(c) {
-		q = q.Where("owner_id IN ?", []uint{0, uid(c)})
+		q = q.Where("(family_id = 0 AND owner_id IN ?) OR ("+familyClause+")", append([]any{[]uint{0, uid(c)}}, args...)...)
 	} else {
-		q = q.Where("owner_id = ?", uid(c))
+		q = q.Where("(family_id = 0 AND owner_id = ?) OR ("+familyClause+")", append([]any{uid(c)}, args...)...)
 	}
 	var out []uint
 	q.Pluck("id", &out)

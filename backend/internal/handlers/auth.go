@@ -231,7 +231,7 @@ var userOwnedModels = []any{
 	&models.MealRecord{}, &models.Favorite{}, &models.DayRating{}, &models.ShoppingCheck{},
 	&models.HomeInventory{}, &models.BehaviorEvent{}, &models.AchievementEvent{}, &models.UserAchievement{},
 	&models.UserPreference{}, &models.UserSetting{}, &models.AgentToken{}, &models.AgentAuditLog{},
-	&models.AgentSuggestion{}, &models.ChatMessage{}, &models.ChatSession{},
+	&models.AgentSuggestion{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{},
 }
 
 // DeleteMe DELETE /api/me —— 注销账号并删除全部个人数据（不可恢复）。
@@ -253,13 +253,31 @@ func DeleteMe(c *gin.Context) {
 			return
 		}
 	}
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
+	family, err := services.FamilyForUser(u.ID)
+	if err != nil {
+		utils.InternalError(c, "注销失败，请稍后再试")
+		return
+	}
+	if family != nil && family.OwnerID == u.ID {
+		utils.BadRequest(c, "请先转让或解散家庭，再注销账号")
+		return
+	}
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		if family != nil {
+			if err := tx.Where("family_id = ? AND user_id = ?", family.ID, u.ID).Delete(&models.FamilyMember{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&models.Dish{}).Where("family_id = ? AND owner_id = ?", family.ID, u.ID).
+				Update("owner_id", family.OwnerID).Error; err != nil {
+				return err
+			}
+		}
 		for _, m := range userOwnedModels {
 			if err := tx.Where("user_id = ?", u.ID).Delete(m).Error; err != nil {
 				return err
 			}
 		}
-		if err := tx.Unscoped().Where("owner_id = ?", u.ID).Delete(&models.Dish{}).Error; err != nil {
+		if err := tx.Unscoped().Where("owner_id = ? AND family_id = 0", u.ID).Delete(&models.Dish{}).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&models.User{}, u.ID).Error
@@ -285,6 +303,7 @@ func ExportMe(c *gin.Context) {
 		suggestions []models.AgentSuggestion
 		sessions    []models.ChatSession
 		messages    []models.ChatMessage
+		journal     []models.FoodJournalEntry
 	)
 	database.DB.Scopes(own).Order("meal_date ASC").Find(&records)
 	database.DB.Scopes(own).Find(&favorites)
@@ -294,6 +313,7 @@ func ExportMe(c *gin.Context) {
 	database.DB.Scopes(own).Find(&suggestions)
 	database.DB.Scopes(own).Find(&sessions)
 	database.DB.Scopes(own).Order("id ASC").Find(&messages)
+	database.DB.Scopes(own).Order("meal_date ASC").Find(&journal)
 	c.Header("Content-Disposition", `attachment; filename="ninimenu-export.json"`)
 	utils.Success(c, gin.H{
 		"exported_at":     time.Now().Format(time.RFC3339),
@@ -307,6 +327,7 @@ func ExportMe(c *gin.Context) {
 		"suggestions":     suggestions,
 		"chat_sessions":   sessions,
 		"chat_messages":   messages,
+		"food_journal":    journal,
 	})
 }
 

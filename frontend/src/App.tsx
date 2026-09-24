@@ -26,6 +26,8 @@ const CookMode = lazy(() => import("@/pages/CookMode"))
 const Preferences = lazy(() => import("@/pages/Preferences"))
 const AiConnections = lazy(() => import("@/pages/AiConnections"))
 const Account = lazy(() => import("@/pages/Account"))
+const Family = lazy(() => import("@/pages/Family"))
+const Health = lazy(() => import("@/pages/Health"))
 const AdminLayout = lazy(() => import("@/layouts/AdminLayout"))
 const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"))
 const AdminDishes = lazy(() => import("@/pages/admin/Dishes"))
@@ -107,6 +109,8 @@ export default function App() {
               <Route path="/me/preferences" element={<Preferences />} />
               <Route path="/me/ai" element={<AiConnections />} />
               <Route path="/me/account" element={<Account />} />
+              <Route path="/family" element={<Family />} />
+              <Route path="/health" element={<Health />} />
             </Route>
 
             <Route path="/assistant" element={<RequireAuth><Assistant /></RequireAuth>} />

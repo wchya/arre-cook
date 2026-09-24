@@ -18,8 +18,8 @@ NiniMenu 为 Hermes、DeepSeek Harness、自建 Agent 和兼容 MCP 的客户端
 |---|---|
 | `profile:read` | 读取口味画像、偏好和统计 |
 | `dishes:read` | 读取公共菜谱和当前用户的私房菜 |
-| `records:read` | 读取用餐记录、评分、收藏、行为、周菜单和购物清单 |
-| `records:write` | 记录或删除用餐 |
+| `records:read` | 读取用餐记录、饮食日记、报告、评分、收藏、行为、周菜单和购物清单 |
+| `records:write` | 记录或删除用餐及手动饮食日记 |
 | `favorites:write` | 收藏或取消收藏 |
 | `plan:write` | 重新生成周菜单 |
 | `preferences:write` | 修改饮食偏好 |
@@ -68,7 +68,16 @@ curl -fsS 'https://cook.example.com/api/agent/tools/recommend_dishes' \
   -d '{"meal_type":"dinner","mood":"spicy","count":3}'
 ```
 
-可用工具包括：`get_context`、`get_taste_profile`、`get_preferences`、`update_preferences`、`search_dishes`、`get_dish`、`recommend_dishes`、`list_meal_records`、`log_meal`、`rate_meal`、`delete_meal_record`、`list_favorites`、`set_favorite`、`get_week_plan`、`regenerate_week_plan`、`get_shopping_list`、`get_stats`、`list_behavior_events`、`log_feedback`、`create_suggestion`、`list_suggestions`、`get_day_ratings`。参数 schema 以实时工具清单为准。
+饮食报告和日记工具：`list_food_journal`（`records:read`）、`log_food_journal` 与 `delete_food_journal`（`records:write`）、`get_health_report`（同时需要 `records:read`、`profile:read`、`dishes:read`）。`get_context` 的“今天已吃”也包含手动日记。报告只整理已记录数据，不根据缺失记录推断未进食，不估算热量或给出医疗诊断。其余工具包括 `get_taste_profile`、`get_preferences`、`update_preferences`、`search_dishes`、`get_dish`、`recommend_dishes`、`list_meal_records`、`log_meal`、`rate_meal`、`delete_meal_record`、`list_favorites`、`set_favorite`、`get_week_plan`、`regenerate_week_plan`、`get_shopping_list`、`get_stats`、`list_behavior_events`、`log_feedback`、`create_suggestion`、`list_suggestions`、`get_day_ratings`。参数 schema 以实时工具清单为准。
+
+例如使用只读个人令牌查看近 7 天报告：
+
+```sh
+curl -fsS 'https://cook.example.com/api/agent/tools/get_health_report' \
+  -H 'Authorization: Bearer nm_个人令牌' \
+  -H 'Content-Type: application/json' \
+  -d '{"days":7}'
+```
 
 DeepSeek 等 OpenAI 兼容模型的推荐流程：把 `/api/agent/tools` 返回的 `data` 作为模型的 `tools`；收到 `tool_calls` 后，逐个 POST 到 `/api/agent/tools/{function.name}`，并把工具响应作为对应的 `tool` 消息交回模型。模型服务密钥由调用方自己的服务端持有，不能使用 NiniMenu 用户令牌替代。
 

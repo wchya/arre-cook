@@ -29,6 +29,7 @@ export interface Dish {
   enabled: boolean
   // 0 = 公共菜谱；否则为该用户的私房菜
   owner_id: number
+  family_id: number
   tags: string[]
   sort_order: number
   created_at: string
@@ -53,6 +54,72 @@ export interface DishInput {
   tags?: string
   sort_order?: number
   public?: boolean
+  family?: boolean
+}
+
+export interface FamilyMember {
+  user_id: number
+  nickname: string
+  email: string
+  avatar: string
+  role: "owner" | "member"
+  joined_at: string
+}
+
+export interface FamilyInvitation {
+  id: number
+  email: string
+  expires_at: string
+}
+
+export interface FamilySnapshot {
+  family: { id: number; name: string; owner_id: number } | null
+  role: "owner" | "member" | ""
+  members: FamilyMember[]
+  invitations: FamilyInvitation[]
+}
+
+export interface FamilyPlanItem {
+  id: number
+  meal_date: string
+  meal_type: string
+  dish: Dish
+  added_by: number
+}
+
+export interface FamilyShoppingItem {
+  id: number
+  name: string
+  amount: string
+  checked: boolean
+  added_by: number
+}
+
+export interface FoodJournalEntry {
+  id: number
+  meal_date: string
+  meal_type: string
+  dish_name: string
+  cuisine: string
+  food_groups: string[]
+  notes: string
+  created_at: string
+}
+
+export type FoodJournalInput = Omit<FoodJournalEntry, "id" | "created_at">
+
+export interface HealthReport {
+  period_days: number
+  from: string
+  to: string
+  logged_days: number
+  meal_count: number
+  cuisine_counts: { name: string; count: number }[]
+  food_group_days: Record<string, number>
+  days: { date: string; meal_count: number; cuisines: string[]; food_groups: string[] }[]
+  insights: string[]
+  plan_actions: string[]
+  recommendations: { dish: Dish; reason: string }[]
 }
 
 export interface MealRecord {

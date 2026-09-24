@@ -5,7 +5,8 @@ import type {
   ShoppingCategory, ShoppingCategoryOverride, Holiday, Quote, DayRating, PhotoWall, DishRecordsResponse, DishCategoryCounts,
   FavoriteOverview, SmartPickRequest, SmartPickResult, TasteProfile, BehaviorEventInput, AuthOptions, LoginResult, User,
   Preferences, UserStats, AgentTokenList, AgentToken, AgentAuditLog, AgentSession, Suggestion, ChatSession, ChatMessage,
-  ChatCard, AssistantStatus, AdminUser, SiteSettings, AppInfo,
+  ChatCard, AssistantStatus, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
+  FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport,
 } from "@/types"
 
 export { getUploadErrorMessage, errorMessage, ApiError }
@@ -31,6 +32,34 @@ export const meApi = {
   remove: (confirm: string) => api<null>("DELETE", "/me", { confirm }),
   preferences: () => api<Preferences>("GET", "/me/preferences"),
   updatePreferences: (data: Partial<Preferences>) => api<Preferences>("PUT", "/me/preferences", data),
+}
+
+export const familyApi = {
+  get: () => api<FamilySnapshot>("GET", "/family"),
+  create: (name: string) => api<FamilySnapshot>("POST", "/family", { name }),
+  rename: (name: string) => api<FamilySnapshot>("PATCH", "/family", { name }),
+  remove: () => api<null>("DELETE", "/family", { confirm: "解散家庭" }),
+  invite: (email: string) => api<{ id: number; email: string; link: string; sent: boolean }>("POST", "/family/invitations", { email }),
+  revoke: (id: number) => api<null>("DELETE", `/family/invitations/${id}`),
+  join: (token: string) => api<FamilySnapshot>("POST", "/family/join", { token }),
+  transfer: (userId: number) => api<FamilySnapshot>("POST", "/family/transfer", { user_id: userId }),
+  kick: (userId: number) => api<null>("DELETE", `/family/members/${userId}`),
+  leave: () => api<null>("POST", "/family/leave"),
+  shareDish: (id: number) => api<Dish>("POST", `/family/dishes/${id}/share`),
+  plan: (start?: string) => api<FamilyPlanItem[]>("GET", "/family/plan", start ? { start } : undefined),
+  setPlan: (mealDate: string, mealType: string, dishId: number) => api<null>("PUT", "/family/plan", { meal_date: mealDate, meal_type: mealType, dish_id: dishId }),
+  shopping: () => api<FamilyShoppingItem[]>("GET", "/family/shopping"),
+  addShopping: (name: string, amount: string) => api<FamilyShoppingItem[]>("POST", "/family/shopping", { name, amount }),
+  checkShopping: (id: number, checked: boolean) => api<null>("PATCH", `/family/shopping/${id}`, { checked }),
+  deleteShopping: (id: number) => api<null>("DELETE", `/family/shopping/${id}`),
+  importIngredients: (dishId: number) => api<{ added: number }>("POST", "/family/shopping/import", { dish_id: dishId }),
+}
+
+export const healthApi = {
+  journal: (from?: string, to?: string) => api<FoodJournalEntry[]>("GET", "/food-journal", { from: from || "", to: to || "" }),
+  record: (input: FoodJournalInput) => api<FoodJournalEntry>("POST", "/food-journal", input),
+  remove: (id: number) => api<null>("DELETE", `/food-journal/${id}`),
+  report: (days: 7 | 30) => api<HealthReport>("GET", "/health-report", { days: String(days) }),
 }
 
 export const agentConnApi = {

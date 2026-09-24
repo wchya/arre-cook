@@ -50,6 +50,12 @@ func Init() error {
 		&models.AgentSuggestion{},
 		&models.ChatSession{},
 		&models.ChatMessage{},
+		&models.Family{},
+		&models.FamilyMember{},
+		&models.FamilyInvitation{},
+		&models.FamilyPlanItem{},
+		&models.FamilyShoppingItem{},
+		&models.FoodJournalEntry{},
 		&models.Dish{},
 		&models.MealRecord{},
 		&models.Favorite{},
@@ -92,13 +98,14 @@ func OwnedBy(uid uint) func(*gorm.DB) *gorm.DB {
 	}
 }
 
-// VisibleDishes 菜品可见范围：公共菜谱 + 本人私有菜谱。
+// VisibleDishes includes public, personal and explicitly shared family dishes.
 func VisibleDishes(uid uint) func(*gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if uid == 0 {
-			return db.Where("owner_id = 0")
+			return db.Where("owner_id = 0 AND family_id = 0")
 		}
-		return db.Where("owner_id IN ?", []uint{0, uid})
+		familyIDs := DB.Model(&models.FamilyMember{}).Select("family_id").Where("user_id = ?", uid)
+		return db.Where("(family_id = 0 AND owner_id IN ?) OR family_id IN (?)", []uint{0, uid}, familyIDs)
 	}
 }
 

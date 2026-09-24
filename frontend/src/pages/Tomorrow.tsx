@@ -158,6 +158,7 @@ function recordToDish(record: MealRecord): Dish {
     favorite: false,
     enabled: true,
     owner_id: 0,
+    family_id: 0,
     tags: [],
     sort_order: 0,
     created_at: record.created_at,

@@ -12,7 +12,7 @@ export default function RequireAuth({ children, adminOnly = false }: { children:
 
   if (status === "unknown") return <Splash />
   if (status === "anonymous") {
-    const redirect = encodeURIComponent(location.pathname + location.search)
+    const redirect = encodeURIComponent(location.pathname + location.search + location.hash)
     return <Navigate to={`/login?redirect=${redirect}`} replace />
   }
   if (adminOnly && !isAdmin) return <Navigate to="/" replace />

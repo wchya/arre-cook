@@ -31,6 +31,13 @@ func init() {
 			for _, r := range today {
 				eaten = append(eaten, map[string]any{"record_id": r.ID, "dish_id": r.DishID, "dish_name": r.DishName, "meal_type": r.MealType})
 			}
+			journal, err := services.ListFoodJournal(ctx.UID(), services.Today(), services.Today())
+			if err != nil {
+				return nil, err
+			}
+			for _, entry := range journal {
+				eaten = append(eaten, map[string]any{"journal_id": entry.ID, "dish_name": entry.DishName, "cuisine": entry.Cuisine, "meal_type": entry.MealType})
+			}
 			return map[string]any{
 				"nickname":          ctx.Principal.User.DisplayName(),
 				"today":             services.Today(),
