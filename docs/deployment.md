@@ -2,7 +2,7 @@
 
 ## 生产配置
 
-服务器 `/home/ubuntu/arre-cook` 已有旧版 `.env`，应保留其中的 `ADMIN_PASSWORD` 和 `JWT_SECRET`，参照 `.env.example` 补齐 `ADMIN_EMAIL`、SMTP、Garage 等新配置，不要直接覆盖旧文件。`ADMIN_EMAIL` 是首次管理员账号，也是旧版单用户数据迁移后的归属账号。不要把 `.env` 或小程序私钥提交到 Git，并将 `.env` 权限设为 `600`。目前线上旧版 `.env` 权限为 `644`，升级前需要收紧。
+生产 `.env` 位于服务器 `/home/ubuntu/arre-cook/.env`，包含管理员、SMTP 和 Garage 配置；当前权限为 `600`。`ADMIN_EMAIL` 是初始管理员账号，也是旧版单用户数据迁移后的归属账号。不要把 `.env` 或小程序私钥提交到 Git，也不要在日志或文档中记录密钥值。
 
 博客服务器 `/home/ubuntu/web-arrebyte/.env` 已有 QQ 邮箱的 `MAIL_HOST`、`MAIL_PORT`、`MAIL_USERNAME` 和 `MAIL_PASSWORD`。在本仓库根目录运行 Compose 时，让它读取博客和应用两份环境文件；博客 SMTP 变量会传给菜谱容器，博客数据库等变量不会传入。菜谱的 Garage 凭据必须填写 `COOK_S3_ACCESS_KEY` / `COOK_S3_SECRET_KEY`，Compose 不会复用博客的 `S3_ACCESS_KEY`。博客当前使用 `smtp.qq.com:587`（STARTTLS），`.env.example` 已对齐：
 
@@ -10,11 +10,38 @@
 docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --build
 ```
 
-服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。新版 Compose 会把菜谱容器接入该网络，通过 `http://garage:3900` 访问对象存储。若博客项目名改变，在 `.env` 中调整 `BLOG_DOCKER_NETWORK`。当前线上菜谱容器仍只连接旧的 `arre-cook_default` 网络，因此必须用新版 Compose 重建容器；单纯重启旧容器不会启用 S3。
+服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络，通过 `http://garage:3900` 访问对象存储。若博客项目名改变，在 `.env` 中调整 `BLOG_DOCKER_NETWORK`。Compose 文件或环境配置变更后使用 `docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --build` 重建容器。
+
+## Garage 单机运行与备份
+
+截至 2026-09-24，博客 Garage 运行在 `arre-tx` 单机，`replication_factor = 1`，当前布局只有一个健康节点；已弃用的 `cs` 主机已从布局移除，不要重新加入。博客与菜谱服务共用该 Garage 实例，通过 `web-arrebyte_default` 网络访问。
+
+单节点没有跨主机副本。Garage 主机或数据卷不可用时，图片存储也会中断。切换前的 meta/data、配置和密钥备份位于服务器 `/home/ubuntu/backups/garage-single-node-20260924/`，所有备份文件权限为 `600`。恢复时必须使用同一时间点的 meta 与 data 备份，并先保留当前数据副本；不要把备份的 Garage 密钥复制进仓库或公开日志。
+
+例行备份需安排短暂维护窗口，因为停止 Garage 时对象存储不可读写。先停止服务，再归档两个 Docker 卷和 Garage 配置，完成后启动服务并限制备份文件权限。当前线上卷路径为：
+
+```sh
+set -eu
+umask 077
+cd /home/ubuntu/web-arrebyte
+backup_path="/home/ubuntu/backups/garage-single-node-$(date +%Y%m%d-%H%M%S)"
+install -d -m 700 "$backup_path"
+docker compose --profile garage stop garage
+trap 'docker compose --profile garage start garage' EXIT
+tar -C /var/lib/docker/volumes/web-arrebyte_garage-meta/_data -czf "$backup_path/garage-meta.tar.gz" .
+tar -C /var/lib/docker/volumes/web-arrebyte_garage-data/_data -czf "$backup_path/garage-data.tar.gz" .
+config_path="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/garage.toml"}}{{.Source}}{{end}}{{end}}' web-arrebyte-garage-1)"
+cp "$config_path" "$backup_path/garage.toml"
+chmod 600 "$backup_path"/*
+docker compose --profile garage start garage
+trap - EXIT
+```
+
+确认 Garage 健康后再结束维护。备份目录包含存储配置和密钥材料，应限制访问并纳入异机备份；定期在隔离环境演练恢复。
 
 ## Garage 上传密钥
 
-博客 Garage 已有 `blog-uploads` bucket 和博客专用密钥。菜谱应用应在同一 Garage 创建独立的 `cook-uploads` bucket 与专用密钥，只给该 bucket 读写权限，避免菜谱服务取得博客图片的访问权。当前 Garage 尚无菜谱专用密钥：
+博客 Garage 有 `blog-uploads` bucket 和博客专用密钥。菜谱应用使用独立的 `cook-uploads` bucket 与专用密钥，该密钥只对该 bucket 有读写权限。生产环境已创建并配置菜谱专用密钥；以下命令只用于新环境初始化，不要在线上重复创建：
 
 ```sh
 cd /home/ubuntu/web-arrebyte
@@ -25,7 +52,9 @@ docker compose --profile garage exec garage /garage bucket allow --read --write 
 
 把创建密钥时输出的 access key 和 secret 写进菜谱应用服务器上的 `.env`：`COOK_S3_ACCESS_KEY`、`COOK_S3_SECRET_KEY`，不要使用博客站已有的 S3 凭据。上传对象放在 `cook/u/<user-id>/...` 前缀；服务端会校验删除权限。菜谱应用自身的 `/uploads/` 路由负责读取历史本地图片和 Garage 图片，无需改博客站的公开图片路由。
 
-首次启动新版前先用 SQLite 在线备份旧库。线上旧库位于 `arre-cook_ninimenu-data` 卷，当前使用 WAL，不能只复制 `ninimenu.db` 而漏掉 `-wal` 文件。备份后先在隔离环境迁移副本并核对数据，再升级线上服务：
+生产验证已通过：管理员登录后上传图片返回 `storage=s3`；应用 `/uploads/` 回读返回 `200 image/jpeg`；删除后回读返回 `404`。健康检查 `/healthz` 同时报告 `storage=s3`。
+
+升级新版前先用 SQLite 在线备份旧库。线上旧库位于 `arre-cook_ninimenu-data` 卷，使用 WAL，不能只复制 `ninimenu.db` 而漏掉 `-wal` 文件。此次升级前已执行在线备份，并在隔离副本完成迁移演练；后续升级仍应按以下方式先备份：
 
 ```sh
 mkdir -p /home/ubuntu/backups/arre-cook
@@ -35,11 +64,11 @@ sqlite3 "$backup_path" 'PRAGMA integrity_check;'
 chmod 600 "$backup_path" /home/ubuntu/arre-cook/.env
 ```
 
-完整性检查应输出 `ok`。启动时会自动把旧版个人数据归到 `ADMIN_EMAIL` 对应账号；第一次登录该邮箱后检查记录、收藏、偏好和上传图片，再开放新用户注册。
+完整性检查应输出 `ok`。启动时会自动把旧版个人数据归到 `ADMIN_EMAIL` 对应账号；迁移完成后，先检查管理员账号的记录、收藏、偏好和上传图片，再开放新用户注册。
 
 ## 反向代理
 
-将 `cook.arrebyte.top` 的 HTTPS 虚拟主机接到博客 Docker 网络内的 `ninimenu:8080`。API、H5 和 `/uploads/` 都由同一个 Go 服务处理。反向代理要传递原始 Host、客户端 IP 和 HTTPS scheme；生产环境的 `PUBLIC_URL`、`CORS_ORIGINS` 应与实际域名一致。
+`cook.arrebyte.top` 的 HTTPS 虚拟主机已接到博客 Docker 网络内的 `ninimenu:8080`，公网 `/healthz` 已验证返回 `UP` 和 `storage=s3`。API、H5 和 `/uploads/` 都由同一个 Go 服务处理。反向代理要传递原始 Host、客户端 IP 和 HTTPS scheme；生产环境的 `PUBLIC_URL`、`CORS_ORIGINS` 应与实际域名一致。
 
 应用也绑定宿主机 `127.0.0.1:9925` 供本机检查：
 
