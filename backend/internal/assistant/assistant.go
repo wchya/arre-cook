@@ -50,7 +50,8 @@ var toolLabels = map[string]string{
 	"get_stats": "统计饮食数据", "list_behavior_events": "分析推荐反馈", "log_feedback": "记下你的反馈",
 	"create_suggestion": "放进建议收件箱", "list_suggestions": "查看建议", "get_day_ratings": "查看每日评价",
 	"list_food_journal": "查看饮食日记", "log_food_journal": "记下实际吃的食物", "delete_food_journal": "删除饮食记录",
-	"get_health_report": "整理饮食报告",
+	"get_health_report":     "整理饮食报告",
+	"create_private_recipe": "保存私房菜", "update_private_recipe": "修改私房菜", "delete_private_recipe": "删除私房菜",
 }
 
 // Run 处理一轮用户输入。
@@ -167,7 +168,7 @@ func systemPrompt(p *auth.Principal) string {
 1. 推荐菜只能来自工具结果（优先 recommend_dishes，其次 search_dishes），绝不编造菜名或菜品 ID；推荐时用一两句话说明理由。
 2. 严格遵守用户的过敏原与忌口；用户临时提出的新限制，作为本次的 exclude_ingredients 等参数传入。
 3. 用户问做法时调用 get_dish，按步骤清晰列出，标出关键火候与用量。
-4. 只有当用户明确表示“就吃这个/帮我记上/收藏/改偏好”时才调用写入类工具（log_meal、log_food_journal、set_favorite、update_preferences 等）；删除记录前先确认。用户说已经吃了什么但不在菜谱中时，用 log_food_journal。
+4. 只有当用户明确表示“就吃这个/帮我记上/收藏/改偏好/保存菜谱”时才调用写入类工具（log_meal、log_food_journal、create_private_recipe、set_favorite、update_preferences 等）；删除记录或菜谱前先确认。用户说已经吃了什么但不在菜谱中时，用 log_food_journal。
 5. 用户说“不想吃某道菜”时，用 log_feedback 记录 reject，并换一批（exclude_dish_ids）。
 6. 回答控制在 200 字以内，菜品列表不必重复卡片里已有的细节（界面会自动展示菜品卡片）。
 7. 用户问饮食报告或规划时调用 get_health_report；只按实际记录陈述，未记录不等于未吃，不推测热量或给医疗诊断。
@@ -296,6 +297,18 @@ func cardFromResult(tool string, raw []byte) *Card {
 			return nil
 		}
 		return &Card{Type: "action", Text: fmt.Sprintf("已记入 %s：%s", r.MealDate, r.DishName)}
+	case "create_private_recipe", "update_private_recipe":
+		var r struct {
+			ID   uint   `json:"id"`
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(raw, &r) != nil || r.ID == 0 {
+			return nil
+		}
+		if tool == "create_private_recipe" {
+			return &Card{Type: "action", Text: "已保存私房菜：" + r.Name}
+		}
+		return &Card{Type: "action", Text: "已更新私房菜：" + r.Name}
 	case "set_favorite":
 		var r struct {
 			Favorite bool `json:"favorite"`
@@ -313,6 +326,8 @@ func cardFromResult(tool string, raw []byte) *Card {
 		return &Card{Type: "action", Text: "本周菜单已重新生成"}
 	case "create_suggestion":
 		return &Card{Type: "action", Text: "已放进首页的「AI 建议」"}
+	case "delete_private_recipe":
+		return &Card{Type: "action", Text: "已删除这道私房菜"}
 	case "delete_meal_record", "delete_food_journal":
 		return &Card{Type: "action", Text: "已删除这条记录"}
 	}

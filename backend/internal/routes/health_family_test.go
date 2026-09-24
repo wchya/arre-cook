@@ -137,3 +137,56 @@ func TestHealthJournalReportAndAgentScope(t *testing.T) {
 		t.Fatalf("agent journal count = %d", got)
 	}
 }
+
+func TestAgentPrivateRecipeManagement(t *testing.T) {
+	_, aliceLogin, err := testutil.NewUser("recipe-alice@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, bobLogin, err := testutil.NewUser("recipe-bob@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeToken := func(login, name, preset string) string {
+		status, response := call(t, "POST", "/api/me/agent-tokens", login, map[string]any{"name": name, "scopes": []string{preset}})
+		must(t, status, response, http.StatusOK)
+		return decode[struct {
+			Token string `json:"token"`
+		}](t, response.Data).Token
+	}
+	aliceRead := makeToken(aliceLogin, "Recipe Reader", "readonly")
+	aliceWrite := makeToken(aliceLogin, "Recipe Writer", "full")
+	bobWrite := makeToken(bobLogin, "Recipe Stranger", "full")
+	status, response := call(t, "POST", "/api/agent/tools/create_private_recipe", aliceRead, map[string]any{"name": "越权菜"})
+	must(t, status, response, http.StatusForbidden)
+	status, response = call(t, "POST", "/api/agent/tools/create_private_recipe", aliceWrite, map[string]any{
+		"name": "番茄面", "category": "家常", "ingredients": []string{"番茄 2 个", "面条 100 克"}, "steps": []string{"番茄切块", "煮熟面条"},
+	})
+	must(t, status, response, http.StatusOK)
+	created := decode[struct {
+		ID          uint     `json:"id"`
+		OwnerID     uint     `json:"owner_id"`
+		FamilyID    uint     `json:"family_id"`
+		Ingredients []string `json:"ingredients"`
+	}](t, response.Data)
+	if created.OwnerID == 0 || created.FamilyID != 0 || len(created.Ingredients) != 2 {
+		t.Fatalf("invalid private recipe: %+v", created)
+	}
+	status, response = call(t, "POST", "/api/agent/tools/update_private_recipe", bobWrite, map[string]any{"dish_id": created.ID, "name": "越权修改"})
+	must(t, status, response, http.StatusNotFound)
+	status, response = call(t, "POST", "/api/agent/tools/delete_private_recipe", bobWrite, map[string]any{"dish_id": created.ID})
+	must(t, status, response, http.StatusNotFound)
+	status, response = call(t, "POST", "/api/agent/tools/update_private_recipe", aliceWrite, map[string]any{"dish_id": created.ID, "name": "番茄鸡蛋面"})
+	must(t, status, response, http.StatusOK)
+	updated := decode[struct {
+		Name        string   `json:"name"`
+		Ingredients []string `json:"ingredients"`
+	}](t, response.Data)
+	if updated.Name != "番茄鸡蛋面" || len(updated.Ingredients) != 2 {
+		t.Fatalf("unexpected updated recipe: %+v", updated)
+	}
+	status, response = call(t, "POST", "/api/agent/tools/delete_private_recipe", aliceWrite, map[string]any{"dish_id": created.ID})
+	must(t, status, response, http.StatusOK)
+	status, response = call(t, "GET", fmt.Sprintf("/api/dishes/%d", created.ID), aliceLogin, nil)
+	must(t, status, response, http.StatusNotFound)
+}

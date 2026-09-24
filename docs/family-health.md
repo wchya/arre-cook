@@ -13,3 +13,5 @@
 报告只反映用户实际记录。未标注某类食物不代表没有吃，不估算热量、营养素或做医疗诊断。过敏原过滤沿用现有推荐引擎。
 
 第三方 Agent 通过个人令牌和 MCP 或函数调用接口访问 `list_food_journal`、`log_food_journal`、`delete_food_journal`、`get_health_report`；站内助手使用同一工具注册表。工具按令牌所属用户隔离并受 scope 限制。集成方式见 [Agent 接口](agent-api.md)。
+
+需要 Agent 代为管理菜谱时，可额外授予 `dishes:write`，使用 `create_private_recipe`、`update_private_recipe` 和 `delete_private_recipe`。这些工具只操作本人私房菜，不会把菜谱公开或共享到家庭；删除前助手应先征求确认。

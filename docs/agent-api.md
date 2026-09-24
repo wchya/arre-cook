@@ -18,6 +18,7 @@ NiniMenu 为 Hermes、DeepSeek Harness、自建 Agent 和兼容 MCP 的客户端
 |---|---|
 | `profile:read` | 读取口味画像、偏好和统计 |
 | `dishes:read` | 读取公共菜谱和当前用户的私房菜 |
+| `dishes:write` | 新建、修改、删除本人私房菜（不包含公共或家庭共享菜谱） |
 | `records:read` | 读取用餐记录、饮食日记、报告、评分、收藏、行为、周菜单和购物清单 |
 | `records:write` | 记录或删除用餐及手动饮食日记 |
 | `favorites:write` | 收藏或取消收藏 |
@@ -68,7 +69,7 @@ curl -fsS 'https://cook.example.com/api/agent/tools/recommend_dishes' \
   -d '{"meal_type":"dinner","mood":"spicy","count":3}'
 ```
 
-饮食报告和日记工具：`list_food_journal`（`records:read`）、`log_food_journal` 与 `delete_food_journal`（`records:write`）、`get_health_report`（同时需要 `records:read`、`profile:read`、`dishes:read`）。`get_context` 的“今天已吃”也包含手动日记。报告只整理已记录数据，不根据缺失记录推断未进食，不估算热量或给出医疗诊断。其余工具包括 `get_taste_profile`、`get_preferences`、`update_preferences`、`search_dishes`、`get_dish`、`recommend_dishes`、`list_meal_records`、`log_meal`、`rate_meal`、`delete_meal_record`、`list_favorites`、`set_favorite`、`get_week_plan`、`regenerate_week_plan`、`get_shopping_list`、`get_stats`、`list_behavior_events`、`log_feedback`、`create_suggestion`、`list_suggestions`、`get_day_ratings`。参数 schema 以实时工具清单为准。
+饮食报告和日记工具：`list_food_journal`（`records:read`）、`log_food_journal` 与 `delete_food_journal`（`records:write`）、`get_health_report`（同时需要 `records:read`、`profile:read`、`dishes:read`）。私房菜管理工具：`create_private_recipe`、`update_private_recipe`、`delete_private_recipe`（`dishes:write`）；只处理令牌所属用户的私房菜。`get_context` 的“今天已吃”也包含手动日记。报告只整理已记录数据，不根据缺失记录推断未进食，不估算热量或给出医疗诊断。其余工具包括 `get_taste_profile`、`get_preferences`、`update_preferences`、`search_dishes`、`get_dish`、`recommend_dishes`、`list_meal_records`、`log_meal`、`rate_meal`、`delete_meal_record`、`list_favorites`、`set_favorite`、`get_week_plan`、`regenerate_week_plan`、`get_shopping_list`、`get_stats`、`list_behavior_events`、`log_feedback`、`create_suggestion`、`list_suggestions`、`get_day_ratings`。参数 schema 以实时工具清单为准。
 
 例如使用只读个人令牌查看近 7 天报告：
 
