@@ -380,6 +380,41 @@ func TestAssistantFallbackStreamsAndIsolatesSessions(t *testing.T) {
 	}
 }
 
+func TestAssistantWithoutModelDoesNotWriteJournal(t *testing.T) {
+	_, token, err := testutil.NewUser("fallback-write@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, r := call(t, "GET", "/api/assistant/status", token, nil)
+	must(t, st, r, http.StatusOK)
+	status := decode[struct {
+		Enabled     bool     `json:"llm_enabled"`
+		Suggestions []string `json:"suggestions"`
+	}](t, r.Data)
+	if status.Enabled {
+		t.Skip("this test requires the local fallback")
+	}
+	for _, suggestion := range status.Suggestions {
+		if strings.Contains(suggestion, "帮我记") {
+			t.Fatalf("write suggestion shown without a model: %q", suggestion)
+		}
+	}
+
+	req := httptest.NewRequest("POST", "/api/assistant/chat", strings.NewReader(`{"message":"帮我记下今天午餐吃了番茄面"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "无法可靠地从对话写入数据") || !strings.Contains(w.Body.String(), "event: done") {
+		t.Fatalf("unexpected fallback response: status=%d body=%s", w.Code, w.Body.String())
+	}
+	st, r = call(t, "GET", "/api/food-journal", token, nil)
+	must(t, st, r, http.StatusOK)
+	if entries := decode[[]json.RawMessage](t, r.Data); len(entries) != 0 {
+		t.Fatalf("fallback wrote %d journal entries", len(entries))
+	}
+}
+
 func TestPreferencesDriveRecommendations(t *testing.T) {
 	_, tok, _ := testutil.NewUser("erin@qq.com")
 	st, r := call(t, "PUT", "/api/me/preferences", tok, map[string]any{"allergies": []string{"花生"}, "spice_level": 0})

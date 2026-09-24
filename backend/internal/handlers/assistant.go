@@ -18,10 +18,14 @@ import (
 // GetAssistantStatus 站内 AI 助手是否可用（未配置大模型时退化为本地推荐引擎）。
 func GetAssistantStatus(c *gin.Context) {
 	s := llm.Resolve()
+	suggestions := []string{"今晚吃什么？想吃辣的，半小时内", "我最近的饮食报告", "冰箱里有鸡蛋和番茄，能做什么"}
+	if s.Enabled() {
+		suggestions = append(suggestions, "帮我记下今天午餐吃了番茄面", "帮我保存一道私房菜")
+	}
 	utils.Success(c, gin.H{
 		"llm_enabled": s.Enabled(),
 		"model":       map[bool]string{true: s.Model, false: ""}[s.Enabled()],
-		"suggestions": []string{"今晚吃什么？想吃辣的，半小时内", "冰箱里有鸡蛋和番茄，能做什么", "帮我规划这周的晚餐", "我最近吃得健康吗", "我不吃香菜，帮我记住"},
+		"suggestions": suggestions,
 	})
 }
 

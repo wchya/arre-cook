@@ -191,7 +191,7 @@ export default function MainLayout() {
           {renderTab(1)}
           <div className="flex justify-center">
             <button
-              onClick={() => navigate("/assistant")}
+              onClick={() => navigate("/assistant/chat")}
               aria-label="AI 食谱助手"
               className="relative -mt-7 flex h-[58px] w-[58px] flex-col items-center justify-center rounded-[22px] bg-gradient-to-br from-[#F59A6B] via-primary to-[#D9573A] text-white shadow-[0_12px_28px_rgba(232,115,74,.45)] ring-4 ring-bg transition-all active:scale-95"
             >

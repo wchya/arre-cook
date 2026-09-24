@@ -87,12 +87,12 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 			}
 			emit("error", map[string]any{"message": err.Error()})
 			// 模型异常时退化为本地推荐，保证有结果
-			fbReply, fbCards := fallback(p, text, emit)
+			fbReply, fbCards := fallback(p, text, emit, true)
 			reply = strings.TrimSpace(reply + "\n\n" + fbReply)
 			cards = append(cards, fbCards...)
 		}
 	} else {
-		reply, cards = fallback(p, text, emit)
+		reply, cards = fallback(p, text, emit, false)
 	}
 
 	cardsJSON, _ := json.Marshal(cards)
@@ -179,7 +179,15 @@ func systemPrompt(p *auth.Principal) string {
 }
 
 // fallback 未配置大模型或模型出错时，用关键词解析意图后直接调用推荐引擎。
-func fallback(p *auth.Principal, text string, emit Emit) (string, []Card) {
+func fallback(p *auth.Principal, text string, emit Emit, modelFailed bool) (string, []Card) {
+	if isWriteRequest(text) {
+		msg := "当前未连接 AI 模型，无法可靠地从对话写入数据。请在「饮食记录」或「新建私房菜」页面直接填写。"
+		if modelFailed {
+			msg = "AI 模型暂时不可用，无法继续处理写入请求。请检查相关记录，或在页面中直接填写。"
+		}
+		emit("delta", map[string]any{"text": msg})
+		return msg, nil
+	}
 	if strings.Contains(text, "报告") || strings.Contains(text, "饮食规划") || strings.Contains(text, "健康饮食") {
 		emit("tool_start", map[string]any{"id": "fallback", "name": "get_health_report", "label": labelOf("get_health_report")})
 		result, err := agent.Invoke(&agent.Ctx{Context: context.Background(), Principal: p, Channel: "chat"}, "get_health_report", json.RawMessage(`{"days":7}`))
@@ -230,6 +238,15 @@ func fallback(p *auth.Principal, text string, emit Emit) (string, []Card) {
 		return msg, nil
 	}
 	return msg, []Card{*card}
+}
+
+func isWriteRequest(text string) bool {
+	for _, phrase := range []string{"帮我记", "记下", "我吃了", "我刚吃", "今天吃了", "保存菜谱", "保存私房菜", "新建菜谱", "新建私房菜", "添加菜谱", "修改菜谱", "删除菜谱", "删除记录", "收藏", "改偏好", "更新偏好", "帮我记住"} {
+		if strings.Contains(text, phrase) {
+			return true
+		}
+	}
+	return false
 }
 
 func cardFromResult(tool string, raw []byte) *Card {

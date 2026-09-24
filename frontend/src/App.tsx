@@ -19,6 +19,7 @@ const PhotoWall = lazy(() => import("@/pages/PhotoWall"))
 const Plan = lazy(() => import("@/pages/More"))
 const Tomorrow = lazy(() => import("@/pages/Tomorrow"))
 const Assistant = lazy(() => import("@/pages/Assistant"))
+const AssistantChat = lazy(() => import("@/pages/AssistantChat"))
 const TasteProfile = lazy(() => import("@/pages/TasteProfile"))
 const Suggestions = lazy(() => import("@/pages/Suggestions"))
 const Achievements = lazy(() => import("@/pages/Achievements"))
@@ -114,6 +115,7 @@ export default function App() {
             </Route>
 
             <Route path="/assistant" element={<RequireAuth><Assistant /></RequireAuth>} />
+            <Route path="/assistant/chat" element={<RequireAuth><AssistantChat /></RequireAuth>} />
             <Route path="/dishes/:id/cook" element={<RequireAuth><CookMode /></RequireAuth>} />
 
             <Route path="/admin" element={<RequireAuth adminOnly><AdminLayout /></RequireAuth>}>
