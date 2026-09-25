@@ -90,8 +90,12 @@ func Init() error {
 		return err
 	}
 	// The old global unique index blocks two users from recording the same meal.
-	if err := DB.Exec("DROP INDEX IF EXISTS idx_meal_records_unique_day").Error; err != nil {
-		return err
+	// Use GORM's migrator so the statement is valid for both SQLite and MySQL
+	// (MySQL does not support SQLite's `DROP INDEX IF EXISTS` syntax).
+	if DB.Migrator().HasIndex(&models.MealRecord{}, "idx_meal_records_unique_day") {
+		if err := DB.Migrator().DropIndex(&models.MealRecord{}, "idx_meal_records_unique_day"); err != nil {
+			return err
+		}
 	}
 
 	seedData()

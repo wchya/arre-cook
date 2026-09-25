@@ -81,7 +81,7 @@ Agent 请求始终按照 Token 绑定的 `user_id` 读取数据，不能通过�
 
 - **后端**：Go 1.25、Gin、GORM。
 - **前端**：React 19、TypeScript、Vite、Tailwind CSS、React Query、Zustand。
-- **数据库**：SQLite，启动时自动迁移；个人表统一使用 `user_id` 作用域。
+- **数据库**：博客服务器 MySQL 8 实例中的独立 `ninimenu` schema，启动时自动迁移；个人表统一使用 `user_id` 作用域。
 - **图片存储**：单机 Garage S3，使用独立的 `cook-uploads` bucket 和菜谱站专用密钥。
 - **AI 模型**：生产环境读取线上 DSH/CPA 配置，密钥不写入仓库、数据库或日志。
 - **反向代理**：博客 Nginx 通过共享 Docker 网络转发到 NiniMenu 容器。
@@ -89,7 +89,7 @@ Agent 请求始终按照 Token 绑定的 `user_id` 读取数据，不能通过�
 当前线上验证结果：
 
 ```text
-版本：baeadb2
+版本：193ca98
 容器：running / healthy
 健康检查：UP
 图片存储：s3
