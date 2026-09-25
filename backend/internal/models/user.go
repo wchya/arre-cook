@@ -149,6 +149,6 @@ type ChatMessage struct {
 	UserID    uint      `json:"-" gorm:"not null;index"`
 	Role      string    `json:"role" gorm:"size:16"` // user / assistant
 	Content   string    `json:"content"`
-	Cards     string    `json:"-" gorm:"type:longtext;default:'[]'"` // 助手回复附带的菜品卡片、工具轨迹（JSON）
+	Cards     string    `json:"-" gorm:"type:longtext"` // 助手回复附带的菜品卡片、工具轨迹（JSON）
 	CreatedAt time.Time `json:"created_at"`
 }
