@@ -653,6 +653,41 @@ func CreateMyAgentToken(c *gin.Context) {
 	utils.Success(c, gin.H{"token": plain, "info": view})
 }
 
+// UpdateMyAgentToken PATCH /api/me/agent-tokens/:id
+func UpdateMyAgentToken(c *gin.Context) {
+	var req struct {
+		Name          *string   `json:"name"`
+		Scopes        *[]string `json:"scopes"`
+		ExpiresInDays *int      `json:"expires_in_days"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "请求数据无效")
+		return
+	}
+	view, err := services.UpdateAgentToken(uid(c), c.Param("id"), services.AgentTokenPatch{Name: req.Name, Scopes: req.Scopes, ExpiresInDays: req.ExpiresInDays})
+	if err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
+	utils.Success(c, view)
+}
+
+// RotateMyAgentToken POST /api/me/agent-tokens/:id/rotate —— 旧令牌立即失效，明文只返回一次。
+func RotateMyAgentToken(c *gin.Context) {
+	var req struct {
+		Name          *string   `json:"name"`
+		Scopes        *[]string `json:"scopes"`
+		ExpiresInDays *int      `json:"expires_in_days"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	plain, view, err := services.RotateAgentToken(uid(c), c.Param("id"), services.AgentTokenPatch{Name: req.Name, Scopes: req.Scopes, ExpiresInDays: req.ExpiresInDays})
+	if err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
+	utils.Success(c, gin.H{"token": plain, "info": view})
+}
+
 // RevokeMyAgentToken DELETE /api/me/agent-tokens/:id
 func RevokeMyAgentToken(c *gin.Context) {
 	if err := services.RevokeAgentToken(uid(c), c.Param("id")); err != nil {

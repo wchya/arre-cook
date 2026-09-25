@@ -55,6 +55,9 @@ func Setup(r *gin.Engine) {
 		app.DELETE("/me", handlers.DeleteMe)
 		app.GET("/me/preferences", handlers.GetPreferences)
 		app.PUT("/me/preferences", handlers.UpdatePreferences)
+		app.GET("/notifications", handlers.ListNotifications)
+		app.POST("/notifications/read-all", handlers.MarkAllNotificationsRead)
+		app.POST("/notifications/:id/read", handlers.MarkNotificationRead)
 
 		app.GET("/family", handlers.GetFamily)
 		app.POST("/family", handlers.CreateFamily)
@@ -82,6 +85,8 @@ func Setup(r *gin.Engine) {
 		// AI 连接：个人访问令牌、嵌入会话、审计日志
 		app.GET("/me/agent-tokens", handlers.ListMyAgentTokens)
 		app.POST("/me/agent-tokens", handlers.CreateMyAgentToken)
+		app.PATCH("/me/agent-tokens/:id", handlers.UpdateMyAgentToken)
+		app.POST("/me/agent-tokens/:id/rotate", handlers.RotateMyAgentToken)
 		app.DELETE("/me/agent-tokens/:id", handlers.RevokeMyAgentToken)
 		app.POST("/me/agent-session", handlers.CreateAgentSession)
 		app.GET("/me/agent-audit", handlers.ListMyAgentAudit)
@@ -159,6 +164,7 @@ func Setup(r *gin.Engine) {
 		admin.GET("/admin/settings", handlers.GetSiteSettings)
 		admin.PUT("/admin/settings", handlers.UpdateSiteSettings)
 		admin.POST("/admin/llm/test", handlers.TestLLM)
+		admin.POST("/admin/notifications", handlers.CreateAdminNotification)
 		admin.POST("/quotes", handlers.CreateQuote)
 		admin.PUT("/quotes/:id", handlers.UpdateQuote)
 		admin.DELETE("/quotes/:id", handlers.DeleteQuote)

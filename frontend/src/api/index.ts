@@ -7,6 +7,7 @@ import type {
   Preferences, UserStats, AgentTokenList, AgentToken, AgentAuditLog, AgentSession, Suggestion, ChatSession, ChatMessage,
   ChatCard, AssistantStatus, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
   FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport,
+  NotificationPage,
 } from "@/types"
 
 export { getUploadErrorMessage, errorMessage, ApiError }
@@ -67,8 +68,20 @@ export const agentConnApi = {
   create: (data: { name: string; scopes: string[]; expires_in_days: number }) =>
     api<{ token: string; info: AgentToken }>("POST", "/me/agent-tokens", data),
   revoke: (id: number) => api<null>("DELETE", `/me/agent-tokens/${id}`),
+  update: (id: number, data: { name?: string; scopes?: string[]; expires_in_days?: number }) => api<AgentToken>("PATCH", `/me/agent-tokens/${id}`, data),
+  rotate: (id: number, data?: { name?: string; scopes?: string[]; expires_in_days?: number }) => api<{ token: string; info: AgentToken }>("POST", `/me/agent-tokens/${id}/rotate`, data || {}),
   session: (data?: { scopes?: string[]; actor?: string }) => api<AgentSession>("POST", "/me/agent-session", data || {}),
   audit: (params?: Record<string, string>) => api<PaginatedData<AgentAuditLog>>("GET", "/me/agent-audit", params),
+}
+
+export const notificationsApi = {
+  list: (params?: { unread?: boolean; page?: number; pageSize?: number }) => api<NotificationPage>("GET", "/notifications", params),
+  markRead: (id: number) => api<null>("POST", `/notifications/${id}/read`),
+  markAllRead: () => api<null>("POST", "/notifications/read-all"),
+}
+
+export const adminNotificationsApi = {
+  publish: (data: { user_id?: number; type: string; title: string; content: string; link?: string }) => api<{ sent: number; type: string }>("POST", "/admin/notifications", data),
 }
 
 export const suggestionsApi = {

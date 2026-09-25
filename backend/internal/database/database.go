@@ -48,6 +48,7 @@ func Init() error {
 		&models.AgentToken{},
 		&models.AgentAuditLog{},
 		&models.AgentSuggestion{},
+		&models.Notification{},
 		&models.ChatSession{},
 		&models.ChatMessage{},
 		&models.Family{},

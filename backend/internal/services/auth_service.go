@@ -191,6 +191,7 @@ func LoginWithEmailCode(rawEmail, code, wechatCode string) (*models.User, bool, 
 		if err := database.DB.Create(&u).Error; err != nil {
 			return nil, false, err
 		}
+		_, _ = CreateNotification(u.ID, "system_update", "欢迎来到 NiniMenu", "你可以记录每天吃的菜、生成健康饮食报告，并在 AI 连接中为 Hermes、DSH 等 Agent 创建独立凭证。", "/")
 		created = true
 	} else if err != nil {
 		return nil, false, err

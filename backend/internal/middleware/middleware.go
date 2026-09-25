@@ -142,14 +142,20 @@ func AdminOnly() gin.HandlerFunc {
 	}
 }
 
-// AgentAuth 智能体开放接口：接受个人访问令牌（nm_…）、嵌入式会话令牌，以及用户本人登录态。
-// 无论哪种凭证，数据都只落在令牌所属用户上。
+// AgentAuth 智能体开放接口：只接受个人访问令牌（nm_…）或短期嵌入会话令牌。
+// 用户登录 JWT 只用于站内 App，避免把长期登录凭证交给 Hermes、DSH 等第三方。
 func AgentAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		p, msg := resolvePrincipal(c, true)
 		if p == nil {
 			c.Header("WWW-Authenticate", `Bearer realm="ninimenu-agent"`)
 			utils.Unauthorized(c, msg)
+			c.Abort()
+			return
+		}
+		if p.Kind == auth.KindUser {
+			c.Header("WWW-Authenticate", `Bearer realm="ninimenu-agent"`)
+			utils.Unauthorized(c, "第三方接口必须使用个人 Agent 令牌或短期 Agent 会话令牌")
 			c.Abort()
 			return
 		}

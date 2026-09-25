@@ -1,14 +1,14 @@
 import { useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { achievementsApi, errorMessage, getUploadErrorMessage, meApi, settingsApi, statsApi, suggestionsApi, uploadApi } from "@/api"
+import { achievementsApi, errorMessage, getUploadErrorMessage, meApi, notificationsApi, settingsApi, statsApi, suggestionsApi, uploadApi } from "@/api"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useAppInfoStore } from "@/store/useAppInfoStore"
 import { asString } from "@/lib/utils"
 import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
 import toast from "react-hot-toast"
 import {
-  Bot, Camera, ChevronRight, Heart, Images, Inbox, LayoutDashboard, LogOut, NotebookPen, Plug, Salad, Shield,
+  Bell, Bot, Camera, ChevronRight, Heart, Images, Inbox, LayoutDashboard, LogOut, NotebookPen, Plug, Salad, Shield,
   ShoppingBasket, Sparkles, Trophy, UserRound, UsersRound, Activity, type LucideIcon,
 } from "lucide-react"
 
@@ -67,6 +67,7 @@ export default function Me() {
 
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: () => statsApi.get() })
   const { data: pending = [] } = useQuery({ queryKey: ["suggestions", "pending"], queryFn: () => suggestionsApi.list("pending") })
+  const { data: notifications } = useQuery({ queryKey: ["notifications"], queryFn: () => notificationsApi.list({ pageSize: 1 }) })
   const { data: achievements = [] } = useQuery({ queryKey: ["achievements"], queryFn: () => achievementsApi.list() })
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: () => settingsApi.get() })
 
@@ -158,6 +159,7 @@ export default function Me() {
 
       <div className="mx-auto max-w-[640px] px-5 pt-4">
         <Group title="AI 与口味">
+          <Row icon={Bell} tone="bg-primary-light text-primary" title="站内信" desc={notifications?.unread ? `${notifications.unread} 条未读消息` : "系统更新、健康与安全提醒"} badge={notifications?.unread} onClick={() => navigate("/notifications")} />
           <Row icon={Inbox} tone="bg-primary-light text-primary" title="AI 建议" desc={pending.length > 0 ? `${pending.length} 条待处理` : "智能体推送给你的菜单建议"} badge={pending.length} onClick={() => navigate("/suggestions")} />
           <Row icon={Sparkles} tone="bg-purple-light text-purple" title="口味画像" desc="看看 AI 眼中的你，按条件挑菜" onClick={() => navigate("/taste-profile")} />
           <Row icon={Salad} tone="bg-mint-light text-mint" title="饮食偏好" desc="忌口、过敏、辣度、做饭时长" onClick={() => navigate("/me/preferences")} />

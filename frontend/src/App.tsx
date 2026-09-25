@@ -29,6 +29,7 @@ const AiConnections = lazy(() => import("@/pages/AiConnections"))
 const Account = lazy(() => import("@/pages/Account"))
 const Family = lazy(() => import("@/pages/Family"))
 const Health = lazy(() => import("@/pages/Health"))
+const Notifications = lazy(() => import("@/pages/Notifications"))
 const AdminLayout = lazy(() => import("@/layouts/AdminLayout"))
 const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"))
 const AdminDishes = lazy(() => import("@/pages/admin/Dishes"))
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="/me/account" element={<Account />} />
               <Route path="/family" element={<Family />} />
               <Route path="/health" element={<Health />} />
+              <Route path="/notifications" element={<Notifications />} />
             </Route>
 
             <Route path="/assistant" element={<RequireAuth><Assistant /></RequireAuth>} />

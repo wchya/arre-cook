@@ -461,3 +461,79 @@ func TestOpenAPIAndHealth(t *testing.T) {
 		t.Fatalf("unknown api = %d %s", w.Code, w.Body.String())
 	}
 }
+
+func TestAgentCredentialsAndNotificationIsolation(t *testing.T) {
+	alice, aliceLogin, err := testutil.NewUser("notice-alice@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, bobLogin, err := testutil.NewUser("notice-bob@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 长期站内登录态不能直接暴露给第三方 Agent。
+	status, response := call(t, "GET", "/api/agent/me", aliceLogin, nil)
+	must(t, status, response, http.StatusUnauthorized)
+	status, response = call(t, "POST", "/api/me/agent-tokens", aliceLogin, map[string]any{"name": "Isolation test", "scopes": []string{"readonly"}})
+	must(t, status, response, http.StatusOK)
+	created := decode[struct {
+		Token string `json:"token"`
+		Info  struct {
+			ID uint `json:"id"`
+		} `json:"info"`
+	}](t, response.Data)
+	status, response = call(t, "POST", fmt.Sprintf("/api/me/agent-tokens/%d/rotate", created.Info.ID), aliceLogin, nil)
+	must(t, status, response, http.StatusOK)
+	rotated := decode[struct {
+		Token string `json:"token"`
+	}](t, response.Data).Token
+	status, response = call(t, "GET", "/api/agent/me", created.Token, nil)
+	must(t, status, response, http.StatusUnauthorized)
+	status, response = call(t, "GET", "/api/agent/me", rotated, nil)
+	must(t, status, response, http.StatusOK)
+	status, response = call(t, "DELETE", fmt.Sprintf("/api/me/agent-tokens/%d", created.Info.ID), bobLogin, nil)
+	must(t, status, response, http.StatusBadRequest)
+
+	if _, err := services.PublishNotification(alice.ID, "feature", "Alice 专属", "只属于 Alice 的消息", "/health"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := services.PublishNotification(bob.ID, "maintenance", "Bob 专属", "只属于 Bob 的消息", ""); err != nil {
+		t.Fatal(err)
+	}
+	status, response = call(t, "GET", "/api/notifications", aliceLogin, nil)
+	must(t, status, response, http.StatusOK)
+	page := decode[struct {
+		Items []struct {
+			ID     uint    `json:"id"`
+			Title  string  `json:"title"`
+			ReadAt *string `json:"read_at"`
+		} `json:"items"`
+		Unread int64 `json:"unread"`
+	}](t, response.Data)
+	if page.Unread == 0 || len(page.Items) == 0 {
+		t.Fatal("alice should have unread notifications")
+	}
+	aliceNoticeID := page.Items[0].ID
+	for _, item := range page.Items {
+		if item.Title == "Bob 专属" {
+			t.Fatal("bob notification leaked to alice")
+		}
+	}
+	status, response = call(t, "GET", "/api/notifications", bobLogin, nil)
+	must(t, status, response, http.StatusOK)
+	bobPage := decode[struct {
+		Items []struct {
+			Title string `json:"title"`
+		} `json:"items"`
+	}](t, response.Data)
+	for _, item := range bobPage.Items {
+		if item.Title == "Alice 专属" {
+			t.Fatal("alice notification leaked to bob")
+		}
+	}
+	// Bob 不能通过 ID 操作 Alice 的通知；接口故意返回 404，避免暴露资源存在性。
+	status, response = call(t, "POST", fmt.Sprintf("/api/notifications/%d/read", aliceNoticeID), bobLogin, nil)
+	if status != http.StatusNotFound && response.Code != 40400 {
+		t.Fatalf("cross-user notification mutation status=%d response=%+v", status, response)
+	}
+}

@@ -8,6 +8,8 @@ import (
 	"ninimenu/internal/models"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // ---------------- 推荐建议收件箱 ----------------
@@ -76,6 +78,7 @@ func CreateSuggestion(uid uint, source string, in SuggestionInput) (*SuggestionV
 	if err := database.DB.Create(&s).Error; err != nil {
 		return nil, err
 	}
+	_, _ = CreateNotification(uid, "health_tip", "收到新的饮食建议", title+"，打开 AI 建议查看详情并决定是否采纳。", "/suggestions")
 	for _, d := range dishes {
 		LogBehavior(uid, "recommend", d.ID, d.Name, source, "", map[string]any{"mode": "suggestion", "suggestion_id": s.ID})
 	}
@@ -306,6 +309,7 @@ func CreateAgentToken(uid uint, name string, scopes []string, expiresInDays int)
 	if err := database.DB.Create(&t).Error; err != nil {
 		return "", nil, err
 	}
+	_, _ = CreateNotification(uid, "agent_security", "新的智能体令牌已创建", "如果这不是你的操作，请立即在 AI 连接中撤销该令牌。", "/me/ai")
 	v := toTokenView(t)
 	return plain, &v, nil
 }
@@ -326,5 +330,106 @@ func RevokeAgentToken(uid uint, id any) error {
 	if res.RowsAffected == 0 {
 		return errors.New("令牌不存在或已撤销")
 	}
+	_, _ = CreateNotification(uid, "agent_security", "智能体令牌已撤销", "该令牌已立即失效，之后的第三方请求将无法访问你的数据。", "/me/ai")
 	return nil
+}
+
+// AgentTokenPatch 用于更新令牌显示名、scope 和有效期。未提供的字段保持不变，
+// expires_in_days=0 表示改为永久有效。
+type AgentTokenPatch struct {
+	Name          *string
+	Scopes        *[]string
+	ExpiresInDays *int
+}
+
+func patchAgentTokenValues(t *models.AgentToken, patch AgentTokenPatch) error {
+	if patch.Name != nil {
+		name := truncateRunes(strings.TrimSpace(*patch.Name), 32)
+		if name == "" {
+			return errors.New("令牌名称不能为空")
+		}
+		t.Name = name
+	}
+	if patch.Scopes != nil {
+		scopes := auth.NormalizeScopes(*patch.Scopes)
+		if len(scopes) == 0 {
+			return errors.New("至少选择一项权限")
+		}
+		b, _ := json.Marshal(scopes)
+		t.Scopes = string(b)
+	}
+	if patch.ExpiresInDays != nil {
+		if *patch.ExpiresInDays < 0 || *patch.ExpiresInDays > 3650 {
+			return errors.New("有效期无效")
+		}
+		if *patch.ExpiresInDays == 0 {
+			t.ExpiresAt = nil
+		} else {
+			exp := time.Now().AddDate(0, 0, *patch.ExpiresInDays)
+			t.ExpiresAt = &exp
+		}
+	}
+	return nil
+}
+
+func UpdateAgentToken(uid uint, id any, patch AgentTokenPatch) (*AgentTokenView, error) {
+	var t models.AgentToken
+	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("revoked_at IS NULL").First(&t, id).Error; err != nil {
+		return nil, errors.New("令牌不存在或已撤销")
+	}
+	if err := patchAgentTokenValues(&t, patch); err != nil {
+		return nil, err
+	}
+	if err := database.DB.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).Where("id = ? AND revoked_at IS NULL", t.ID).Updates(map[string]any{
+		"name": t.Name, "scopes": t.Scopes, "expires_at": t.ExpiresAt,
+	}).Error; err != nil {
+		return nil, err
+	}
+	_, _ = CreateNotification(uid, "agent_security", "智能体令牌权限已更新", "请确认第三方配置仍符合你当前授权范围。", "/me/ai")
+	return &AgentTokenView{AgentToken: t, ScopeList: decodeTokenScopes(t.Scopes), Active: true}, nil
+}
+
+func decodeTokenScopes(raw string) []string {
+	var scopes []string
+	_ = json.Unmarshal([]byte(raw), &scopes)
+	return scopes
+}
+
+// RotateAgentToken 原子地撤销旧令牌并签发新令牌。明文只返回本次响应，旧令牌不会被复活。
+func RotateAgentToken(uid uint, id any, patch AgentTokenPatch) (string, *AgentTokenView, error) {
+	var plain string
+	var view *AgentTokenView
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var old models.AgentToken
+		if err := tx.Scopes(database.OwnedBy(uid)).Where("revoked_at IS NULL").First(&old, id).Error; err != nil {
+			return errors.New("令牌不存在或已撤销")
+		}
+		if err := patchAgentTokenValues(&old, patch); err != nil {
+			return err
+		}
+		var hash, prefix string
+		var err error
+		plain, hash, prefix, err = auth.GeneratePAT()
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		if res := tx.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).Where("id = ? AND revoked_at IS NULL", old.ID).Update("revoked_at", now); res.Error != nil || res.RowsAffected == 0 {
+			if res.Error != nil {
+				return res.Error
+			}
+			return errors.New("令牌已被其他请求撤销")
+		}
+		fresh := models.AgentToken{UserID: uid, Name: old.Name, Prefix: prefix, TokenHash: hash, Scopes: old.Scopes, ExpiresAt: old.ExpiresAt}
+		if err := tx.Create(&fresh).Error; err != nil {
+			return err
+		}
+		view = &AgentTokenView{AgentToken: fresh, ScopeList: decodeTokenScopes(fresh.Scopes), Active: true}
+		return nil
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	_, _ = CreateNotification(uid, "agent_security", "智能体令牌已轮换", "旧令牌已失效，请把新令牌更新到 Hermes、DSH 或其他 Agent 配置中。", "/me/ai")
+	return plain, view, nil
 }

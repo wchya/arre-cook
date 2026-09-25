@@ -231,7 +231,7 @@ var userOwnedModels = []any{
 	&models.MealRecord{}, &models.Favorite{}, &models.DayRating{}, &models.ShoppingCheck{},
 	&models.HomeInventory{}, &models.BehaviorEvent{}, &models.AchievementEvent{}, &models.UserAchievement{},
 	&models.UserPreference{}, &models.UserSetting{}, &models.AgentToken{}, &models.AgentAuditLog{},
-	&models.AgentSuggestion{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{},
+	&models.AgentSuggestion{}, &models.Notification{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{},
 }
 
 // DeleteMe DELETE /api/me —— 注销账号并删除全部个人数据（不可恢复）。
@@ -295,15 +295,16 @@ func ExportMe(c *gin.Context) {
 	uid := auth.UID(c)
 	own := database.OwnedBy(uid)
 	var (
-		records     []models.MealRecord
-		favorites   []models.Favorite
-		ratings     []models.DayRating
-		events      []models.BehaviorEvent
-		dishes      []models.Dish
-		suggestions []models.AgentSuggestion
-		sessions    []models.ChatSession
-		messages    []models.ChatMessage
-		journal     []models.FoodJournalEntry
+		records       []models.MealRecord
+		favorites     []models.Favorite
+		ratings       []models.DayRating
+		events        []models.BehaviorEvent
+		dishes        []models.Dish
+		suggestions   []models.AgentSuggestion
+		sessions      []models.ChatSession
+		messages      []models.ChatMessage
+		journal       []models.FoodJournalEntry
+		notifications []models.Notification
 	)
 	database.DB.Scopes(own).Order("meal_date ASC").Find(&records)
 	database.DB.Scopes(own).Find(&favorites)
@@ -314,6 +315,7 @@ func ExportMe(c *gin.Context) {
 	database.DB.Scopes(own).Find(&sessions)
 	database.DB.Scopes(own).Order("id ASC").Find(&messages)
 	database.DB.Scopes(own).Order("meal_date ASC").Find(&journal)
+	database.DB.Scopes(own).Order("created_at ASC").Find(&notifications)
 	c.Header("Content-Disposition", `attachment; filename="ninimenu-export.json"`)
 	utils.Success(c, gin.H{
 		"exported_at":     time.Now().Format(time.RFC3339),
@@ -328,6 +330,7 @@ func ExportMe(c *gin.Context) {
 		"chat_sessions":   sessions,
 		"chat_messages":   messages,
 		"food_journal":    journal,
+		"notifications":   notifications,
 	})
 }
 

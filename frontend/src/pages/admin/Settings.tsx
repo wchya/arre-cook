@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { settingsApi, shoppingCategoriesApi } from "@/api"
+import { adminNotificationsApi, settingsApi, shoppingCategoriesApi, errorMessage } from "@/api"
 import { asString } from "@/lib/utils"
 import { useAppInfoStore } from "@/store/useAppInfoStore"
 import type { ShoppingCategoryOverride } from "@/types"
@@ -39,6 +39,9 @@ export default function AdminSettings() {
   const [agentEmbedUrl, setAgentEmbedUrl] = useState<string | null>(null)
   const [shoppingItemName, setShoppingItemName] = useState("")
   const [shoppingCategory, setShoppingCategory] = useState("蔬菜")
+  const [noticeType, setNoticeType] = useState("system_update")
+  const [noticeTitle, setNoticeTitle] = useState("")
+  const [noticeContent, setNoticeContent] = useState("")
   const storedAppName = useAppInfoStore((s) => s.appName)
   const updateAppName = useAppInfoStore((s) => s.setAppName)
   const storedAgentEmbedUrl = useAppInfoStore((s) => s.agentEmbedUrl)
@@ -82,6 +85,16 @@ export default function AdminSettings() {
       toast.success("已恢复智能识别")
     },
     onError: () => toast.error("删除失败"),
+  })
+
+  const noticeMut = useMutation({
+    mutationFn: () => adminNotificationsApi.publish({ type: noticeType, title: noticeTitle.trim(), content: noticeContent.trim() }),
+    onSuccess: (result) => {
+      setNoticeTitle("")
+      setNoticeContent("")
+      toast.success(`已发送给 ${result.sent} 位用户`)
+    },
+    onError: (err) => toast.error(errorMessage(err, "发送失败")),
   })
 
   function saveShoppingCategory() {
@@ -158,6 +171,24 @@ export default function AdminSettings() {
             onChange={() => updateMut.mutate({ blind_box_enabled: settings?.blind_box_enabled === "1" ? "0" : "1" })}
           />
         </SettingRow>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="text-[13px] font-semibold text-text2 mb-1">站内信通知</div>
+        <div className="text-[11px] text-text3 mb-3">发布后会按用户分别创建消息和已读状态，适合系统更新、功能上线、维护提醒等。</div>
+        <div className="space-y-2">
+          <select value={noticeType} onChange={(e) => setNoticeType(e.target.value)} className="h-10 w-full rounded-[10px] border border-border bg-bg px-3 text-sm outline-none focus:border-primary">
+            <option value="system_update">系统更新</option>
+            <option value="feature">新功能上线</option>
+            <option value="maintenance">维护提醒</option>
+            <option value="health_tip">健康饮食提示</option>
+            <option value="agent_security">Agent 安全提醒</option>
+            <option value="family">家庭功能提醒</option>
+          </select>
+          <input value={noticeTitle} onChange={(e) => setNoticeTitle(e.target.value)} maxLength={128} placeholder="通知标题" className="h-10 w-full rounded-[10px] border border-border bg-bg px-3 text-sm outline-none focus:border-primary" />
+          <textarea value={noticeContent} onChange={(e) => setNoticeContent(e.target.value)} maxLength={5000} rows={4} placeholder="通知内容" className="w-full resize-y rounded-[10px] border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-primary" />
+          <button onClick={() => noticeMut.mutate()} disabled={!noticeTitle.trim() || !noticeContent.trim() || noticeMut.isPending} className="h-10 rounded-full bg-primary px-4 text-xs font-semibold text-white disabled:opacity-50">{noticeMut.isPending ? "发送中…" : "广播给全部用户"}</button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">

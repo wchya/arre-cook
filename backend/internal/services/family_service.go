@@ -217,6 +217,9 @@ func CreateFamilyInvitation(uid uint, rawEmail string) (*models.FamilyInvitation
 		}
 		return tx.Create(invite).Error
 	})
+	if err == nil && recipient.ID != 0 {
+		_, _ = CreateNotification(recipient.ID, "family", "收到家庭邀请", "有人邀请你加入「"+family.Name+"」，打开家庭页面即可查看邀请。", "/family")
+	}
 	return invite, token, err
 }
 
@@ -282,6 +285,9 @@ func JoinFamily(uid uint, token string) (*models.Family, error) {
 		}
 		return tx.Create(&models.FamilyMember{FamilyID: invite.FamilyID, UserID: uid, JoinedAt: now}).Error
 	})
+	if err == nil && joined.OwnerID != uid {
+		_, _ = CreateNotification(joined.OwnerID, "family", "家庭成员已加入", "新的家庭成员已经接受邀请，家庭菜谱和菜单可以一起管理了。", "/family")
+	}
 	return &joined, err
 }
 
@@ -427,7 +433,7 @@ func SetFamilyPlan(uid uint, rawDate, mealType string, dishID uint) error {
 	}
 	item := models.FamilyPlanItem{FamilyID: family.ID, MealDate: rawDate, MealType: mealType, DishID: dishID, AddedBy: uid}
 	return database.DB.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "family_id"}, {Name: "meal_date"}, {Name: "meal_type"}},
+		Columns:   []clause.Column{{Name: "family_id"}, {Name: "meal_date"}, {Name: "meal_type"}},
 		DoUpdates: clause.AssignmentColumns([]string{"dish_id", "added_by", "updated_at"}),
 	}).Create(&item).Error
 }
@@ -461,7 +467,7 @@ func AddFamilyShopping(uid uint, name, amount string) error {
 	}
 	item := models.FamilyShoppingItem{FamilyID: family.ID, Name: name, Amount: amount, AddedBy: uid}
 	return database.DB.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "family_id"}, {Name: "name"}},
+		Columns:   []clause.Column{{Name: "family_id"}, {Name: "name"}},
 		DoUpdates: clause.Assignments(map[string]any{"amount": amount, "checked": false, "added_by": uid}),
 	}).Create(&item).Error
 }

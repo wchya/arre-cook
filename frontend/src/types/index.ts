@@ -565,6 +565,24 @@ export interface AgentSession {
   mcp_url: string
 }
 
+export interface Notification {
+  id: number
+  type: "system_update" | "feature" | "maintenance" | "health_tip" | "agent_security" | "family" | string
+  title: string
+  content: string
+  link: string
+  read_at: string | null
+  created_at: string
+}
+
+export interface NotificationPage {
+  items: Notification[]
+  total: number
+  unread: number
+  page: number
+  page_size: number
+}
+
 export interface Suggestion {
   id: number
   source: string

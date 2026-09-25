@@ -33,7 +33,9 @@ NiniMenu 为 Hermes、DeepSeek Harness、自建 Agent 和兼容 MCP 的客户端
 Authorization: Bearer nm_个人令牌
 ```
 
-也兼容 `X-Agent-Token: nm_个人令牌`。`/api/agent/*` 和 `/mcp` 还接受用户自己的登录令牌或短期嵌入会话令牌；第三方集成建议使用可撤销、可限权的个人令牌。旧的全站 `AGENT_TOKEN` 已移除。
+也兼容 `X-Agent-Token: nm_个人令牌`。`/api/agent/*` 和 `/mcp` 只接受个人 Agent 令牌或短期嵌入会话令牌；站内登录 JWT 不能作为第三方凭证。旧的全站 `AGENT_TOKEN` 已移除。
+
+每个 Hermes、DSH、DeepSeek Harness 或其他外部 Agent 都应由对应用户在「我的 → AI 连接」单独创建一个令牌。服务端按令牌绑定的 `user_id` 读取全部饮食隐私数据，不根据微信昵称、机器人名称或消息内容判断用户，因此不同机器人不能共享令牌。令牌泄露后应立即撤销或轮换；轮换会让旧令牌立即失效，新明文只显示一次。用户可以修改令牌名称、权限和有效期，也可以随时撤销。
 
 ## MCP
 

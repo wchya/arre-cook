@@ -7,7 +7,7 @@ import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
 import { copyText } from "@/lib/clipboard"
 import type { AgentToken } from "@/types"
 import toast from "react-hot-toast"
-import { Check, Copy, KeyRound, Plug, Plus, ShieldCheck, Trash2 } from "lucide-react"
+import { Check, Copy, KeyRound, Plug, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react"
 
 const PRESETS = [
   { key: "readonly", title: "只读", desc: "读取口味画像、菜谱、记录，适合做分析报告" },
@@ -70,6 +70,17 @@ export default function AiConnections() {
       toast.success("已撤销，该智能体立即失去访问权限")
     },
     onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  const rotateMut = useMutation({
+    mutationFn: (id: number) => agentConnApi.rotate(id),
+    onSuccess: (res) => {
+      setCreated(res)
+      setLastToken(res.token)
+      qc.invalidateQueries({ queryKey: ["agent-tokens"] })
+      toast.success("已轮换，旧令牌立即失效")
+    },
+    onError: (err) => toast.error(errorMessage(err, "轮换失败")),
   })
 
   const mcpURL = data?.mcp_url || `${location.origin}/mcp`
@@ -186,6 +197,14 @@ while True:
                     aria-label="撤销"
                   >
                     <Trash2 size={14} />
+                  </button>
+                  <button
+                    onClick={() => confirm(`轮换「${t.name}」？旧令牌会立即失效。`) && rotateMut.mutate(t.id)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-light text-yellow-dark active:scale-90"
+                    aria-label="轮换令牌"
+                    title="轮换令牌"
+                  >
+                    <RefreshCw size={14} />
                   </button>
                 </div>
               </div>
