@@ -97,7 +97,8 @@ Page({
   async resumeSession() {
     let token = ""
     try { token = wx.getStorageSync(SESSION_KEY) || "" } catch (_) { /* ignore */ }
-    if (!token) return
+    if (!token || app.globalData.sessionRestoreAttempted) return
+    app.globalData.sessionRestoreAttempted = true
     // Do not validate an existing session (and therefore fetch account data)
     // until the user has already granted the current privacy agreement.
     let consented = false
@@ -254,6 +255,7 @@ Page({
   },
 
   openWeb(token) {
+    app.globalData.sessionRestoreAttempted = true
     try { wx.setStorageSync(SESSION_KEY, token) } catch (_) { /* ignore */ }
     app.globalData.pendingToken = token
     wx.reLaunch({ url: "/pages/webview/webview" })
