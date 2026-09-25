@@ -39,6 +39,7 @@ Page({
     code: "",
     account: "",
     password: "",
+    passwordVisible: false,
     agreed: false,
     cooldown: 0,
     loading: false,
@@ -135,8 +136,17 @@ Page({
     this.setData({ agreed: event.detail.value.includes("agreed"), error: "" })
   },
 
+  switchLoginMode(event) {
+    const mode = event.currentTarget.dataset.mode === "password" ? "password" : "email"
+    this.setData({ loginMode: mode, passwordVisible: false, error: "", message: "" })
+  },
+
   togglePasswordMode() {
-    this.setData({ loginMode: this.data.loginMode === "password" ? "email" : "password", error: "", message: "" })
+    this.switchLoginMode({ currentTarget: { dataset: { mode: this.data.loginMode === "password" ? "email" : "password" } } })
+  },
+
+  togglePasswordVisibility() {
+    this.setData({ passwordVisible: !this.data.passwordVisible })
   },
 
   async ensurePrivacyConsent() {
