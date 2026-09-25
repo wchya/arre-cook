@@ -1,1 +1,7 @@
-<web-view wx:if="{{src}}" src="{{src}}" bindmessage="onMessage"></web-view>
+<web-view wx:if="{{src && !error}}" src="{{src}}" bindmessage="onMessage" bindload="onWebViewLoad" binderror="onWebViewError"></web-view>
+<view wx:if="{{error}}" class="webview-error">
+  <view class="webview-error-mark">!</view>
+  <view class="webview-error-title">食谱页面没有打开</view>
+  <view class="webview-error-copy">{{error}}</view>
+  <button class="webview-retry" bindtap="retry">重新打开</button>
+</view>

@@ -7,7 +7,7 @@ function normalizedSharePath(raw) {
 }
 
 Page({
-  data: { src: "" },
+  data: { src: "", error: "" },
 
   onLoad(options) {
     const token = app.globalData.pendingToken || wx.getStorageSync(SESSION_KEY)
@@ -16,15 +16,31 @@ Page({
       wx.reLaunch({ url: "/pages/login/login?reason=expired" })
       return
     }
-    const sharePath = normalizedSharePath(options.path || "/")
-    const target = new URL(sharePath, app.globalData.webBase)
-    if (target.origin !== new URL(app.globalData.webBase).origin) {
-      target.pathname = "/"
-      target.search = ""
+    try {
+      const sharePath = normalizedSharePath(options.path || "/")
+      const base = String(app.globalData.webBase || "").replace(/\/+$/, "")
+      if (!/^https:\/\/[^/]+(?:\/[^/]*)?$/i.test(base)) throw new Error("网页地址配置无效")
+      // Do not use browser-only URL/URLSearchParams here. Android WeChat
+      // runtimes can lack those globals, which previously left src empty.
+      const separator = sharePath.includes("?") ? "&" : "?"
+      const src = `${base}${sharePath}${separator}from=mp#token=${encodeURIComponent(token)}`
+      this.setData({ src, error: "" })
+    } catch (_) {
+      this.setData({ error: "页面地址暂时无法打开，请点击重试" })
     }
-    target.searchParams.set("from", "mp")
-    target.hash = `token=${encodeURIComponent(token)}`
-    this.setData({ src: target.toString() })
+  },
+
+  onWebViewLoad() {
+    this.setData({ error: "" })
+  },
+
+  onWebViewError() {
+    this.setData({ error: "页面地址暂时无法打开，请检查小程序业务域名配置" })
+  },
+
+  retry() {
+    this.setData({ error: "" })
+    this.onLoad({})
   },
 
   onMessage(event) {
