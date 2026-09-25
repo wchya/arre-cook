@@ -14,8 +14,11 @@ import (
 	"net/http"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/goccy/go-yaml"
 )
 
 type Settings struct {
@@ -26,13 +29,136 @@ type Settings struct {
 
 func (s Settings) Enabled() bool { return s.APIKey != "" && s.BaseURL != "" && s.Model != "" }
 
-// Resolve 管理后台设置优先，其次环境变量。
+// Resolve 优先读取 CPA 配置；未挂载 CPA 配置时再使用管理后台或环境变量。
 func Resolve() Settings {
+	if settings, ok := resolveCPA(); ok {
+		return settings
+	}
 	return Settings{
 		BaseURL: strings.TrimRight(database.GetSetting("llm_base_url", config.C.LLMBaseURL), "/"),
 		APIKey:  database.GetSetting("llm_api_key", config.C.LLMAPIKey),
 		Model:   database.GetSetting("llm_model", config.C.LLMModel),
 	}
+}
+
+type cpaModel struct {
+	Name  string `yaml:"name"`
+	Alias string `yaml:"alias"`
+}
+
+type cpaCredential struct {
+	Models []cpaModel `yaml:"models"`
+}
+
+type cpaConfig struct {
+	APIKeys      []string        `yaml:"api-keys"`
+	CodexAPIKey  []cpaCredential `yaml:"codex-api-key"`
+	ClaudeAPIKey []cpaCredential `yaml:"claude-api-key"`
+}
+
+type cpaOverride struct {
+	BaseURL         string `json:"baseUrl"`
+	APIKey          string `json:"apiKey"`
+	Model           string `json:"model"`
+	CompletionsPath string `json:"completionsPath"`
+}
+
+// resolveCPA 读取 CPA 的原始配置，让 CPA 成为唯一的模型凭据来源。
+// 配置文件只读挂载到应用容器；未挂载时继续使用原有 LLM_* 配置。
+func resolveCPA() (Settings, bool) {
+	path := strings.TrimSpace(config.C.CPAConfigPath)
+	baseURL := strings.TrimRight(strings.TrimSpace(config.C.CPABaseURL), "/")
+	if path == "" {
+		return Settings{}, false
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return Settings{}, false
+	}
+	if settings, ok := parseCPAOverride(b, baseURL); ok {
+		return settings, true
+	}
+	var raw cpaConfig
+	if err := yaml.Unmarshal(b, &raw); err != nil {
+		return Settings{}, false
+	}
+	apiKey := ""
+	for _, key := range raw.APIKeys {
+		if strings.TrimSpace(key) != "" {
+			apiKey = strings.TrimSpace(key)
+			break
+		}
+	}
+	model := strings.TrimSpace(config.C.CPAModel)
+	if model == "" {
+		model = preferredCPAModel(raw.CodexAPIKey, raw.ClaudeAPIKey)
+	}
+	if apiKey == "" || model == "" {
+		return Settings{}, false
+	}
+	return Settings{BaseURL: baseURL, APIKey: apiKey, Model: model}, true
+}
+
+func parseCPAOverride(data []byte, fallbackBaseURL string) (Settings, bool) {
+	var overrides map[string]cpaOverride
+	if err := json.Unmarshal(data, &overrides); err != nil {
+		return Settings{}, false
+	}
+	for _, override := range overrides {
+		apiKey := strings.TrimSpace(override.APIKey)
+		model := strings.TrimSpace(override.Model)
+		baseURL := strings.TrimSpace(fallbackBaseURL)
+		if baseURL == "" {
+			baseURL = strings.TrimSpace(override.BaseURL)
+		}
+		baseURL = cpaChatBaseURL(baseURL, override.CompletionsPath)
+		if apiKey != "" && model != "" && baseURL != "" {
+			return Settings{BaseURL: baseURL, APIKey: apiKey, Model: model}, true
+		}
+	}
+	return Settings{}, false
+}
+
+func cpaChatBaseURL(baseURL, completionsPath string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" || strings.HasSuffix(baseURL, "/v1") {
+		return baseURL
+	}
+	path := strings.Trim(strings.TrimSpace(completionsPath), "/")
+	if marker := strings.LastIndex(path, "/chat/completions"); marker >= 0 {
+		if prefix := strings.Trim(path[:marker], "/"); prefix != "" {
+			return baseURL + "/" + prefix
+		}
+	}
+	return baseURL
+}
+
+func preferredCPAModel(groups ...[]cpaCredential) string {
+	preferred := []string{"glm-5.3", "glm-5.3-flash", "gpt-5.5", "gpt-6-sol", "gpt-5.6", "gpt-5.6-sol", "gpt-6-astra"}
+	available := make(map[string]bool)
+	for _, group := range groups {
+		for _, credential := range group {
+			for _, model := range credential.Models {
+				name := strings.TrimSpace(model.Name)
+				if name != "" {
+					available[name] = true
+				}
+				alias := strings.TrimSpace(model.Alias)
+				if alias != "" {
+					available[alias] = true
+				}
+			}
+		}
+	}
+	for _, name := range preferred {
+		if available[name] {
+			return name
+		}
+	}
+	for name := range available {
+		return name
+	}
+	return ""
 }
 
 type ToolCall struct {

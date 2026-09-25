@@ -80,7 +80,15 @@ curl -fsS http://127.0.0.1:9925/healthz
 
 ## AI 与智能体
 
-在管理员设置中配置大模型连接，或在服务端提供 `LLM_BASE_URL`、`LLM_API_KEY` 和 `LLM_MODEL`。密钥只由服务端读取。未配置模型时，站内助手仍使用本地推荐引擎。
+生产环境优先使用线上 Hermes / DSH 已在使用的 CPA 配置。应用容器以只读方式挂载 DSH 的 `llm-override.json`，运行时读取其中的 `baseUrl`、`apiKey`、`model` 和 `completionsPath`，访问同一个 CPA OpenAI 兼容接口；CPA 密钥不会写入菜谱仓库、数据库或日志。服务器 `/home/ubuntu/arre-cook/.env` 应包含：
+
+```sh
+CPA_CONFIG_PATH=/root/ai-agent-scaffold-lite/docs/dev-ops/config/llm-override.json
+LLM_CPA_CONFIG_PATH=/run/cpa/provider-config
+LLM_CPA_BASE_URL=http://host.docker.internal:8317/v1
+```
+
+线上 DSH 文件当前指向 `http://172.22.0.1:8317`、`v1/chat/completions` 和 `glm-5.3`；应用读取其中的密钥和模型，并用 `LLM_CPA_BASE_URL` 将容器内地址映射到宿主机 CPA 端口。若改为 Hermes 的 YAML 配置，可将同一路径挂载到 Hermes 配置文件，并继续提供 `LLM_CPA_BASE_URL` 覆盖容器内不可用的 `127.0.0.1` 地址。只有未配置 CPA 文件或 CPA 配置缺失时，才回退到管理员设置或 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。未配置任何模型时，站内助手仍使用本地推荐引擎。
 
 每位用户在「我的 → AI 连接」创建自己的访问令牌。外部 Agent 和 MCP 客户端必须使用该用户的令牌；不要配置旧的全站 `AGENT_TOKEN`。发给第三方的令牌可以撤销、限范围，并在调用记录中查看。
 

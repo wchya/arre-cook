@@ -56,6 +56,10 @@ type Config struct {
 	LLMBaseURL string
 	LLMAPIKey  string
 	LLMModel   string
+	// CPA 配置文件：生产环境可直接读取线上 CPA 的 api-keys 与模型清单。
+	CPAConfigPath string
+	CPABaseURL    string
+	CPAModel      string
 
 	// 嵌入式智能体会话令牌有效期（父页通过 postMessage 交给 iframe 内的智能体）
 	AgentSessionTTL time.Duration
@@ -110,6 +114,9 @@ func Load() {
 		LLMBaseURL:      strings.TrimRight(getEnv("LLM_BASE_URL", "https://api.deepseek.com"), "/"),
 		LLMAPIKey:       getEnv("LLM_API_KEY", getEnv("DEEPSEEK_API_KEY", "")),
 		LLMModel:        getEnv("LLM_MODEL", "deepseek-chat"),
+		CPAConfigPath:   getEnv("LLM_CPA_CONFIG_PATH", getEnv("CPA_CONFIG_PATH", "")),
+		CPABaseURL:      strings.TrimRight(getEnv("LLM_CPA_BASE_URL", getEnv("CPA_BASE_URL", "")), "/"),
+		CPAModel:        getEnv("LLM_CPA_MODEL", getEnv("CPA_MODEL", "")),
 		AgentSessionTTL: getEnvDuration("AGENT_SESSION_TTL", 2*time.Hour),
 		AgentRateLimit:  getEnvInt("AGENT_RATE_LIMIT", 120),
 		PublicURL:       strings.TrimRight(getEnv("PUBLIC_URL", ""), "/"),

@@ -42,12 +42,18 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      LLM_CPA_CONFIG_PATH: ${LLM_CPA_CONFIG_PATH:-}
+      LLM_CPA_BASE_URL: ${LLM_CPA_BASE_URL:-}
+      LLM_CPA_MODEL: ${LLM_CPA_MODEL:-}
       WECHAT_APPID: ${WECHAT_APPID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
       AGENT_RATE_LIMIT: ${AGENT_RATE_LIMIT:-120}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ninimenu-data:/app/data
       - ninimenu-uploads:/app/uploads
+      - ${CPA_CONFIG_PATH:-/dev/null}:/run/cpa/provider-config:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1 || exit 1"]
       interval: 30s
