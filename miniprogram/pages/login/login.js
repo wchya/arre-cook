@@ -34,8 +34,12 @@ function wxLoginCode() {
 
 Page({
   data: {
+    loginMode: "email",
     email: "",
     code: "",
+    account: "",
+    password: "",
+    agreed: false,
     cooldown: 0,
     loading: false,
     sending: false,
@@ -114,7 +118,39 @@ Page({
     this.setData({ code: event.detail.value.replace(/\D/g, "").slice(0, 6), error: "" })
   },
 
+  onAccountInput(event) {
+    this.setData({ account: event.detail.value.trim(), error: "" })
+  },
+
+  onPasswordInput(event) {
+    this.setData({ password: event.detail.value, error: "" })
+  },
+
+  onConsentChange(event) {
+    this.setData({ agreed: event.detail.value.includes("agreed"), error: "" })
+  },
+
+  togglePasswordMode() {
+    this.setData({ loginMode: this.data.loginMode === "password" ? "email" : "password", error: "", message: "" })
+  },
+
+  async ensurePrivacyConsent() {
+    if (!this.data.agreed) {
+      throw new Error("请先阅读并同意《用户服务协议》和《隐私政策》")
+    }
+    let saved = false
+    try { saved = wx.getStorageSync("ninimenu_privacy_consent_v1") === "1" } catch (_) { /* ignore */ }
+    if (!saved && typeof wx.requirePrivacyAuthorize === "function") {
+      await new Promise((resolve, reject) => wx.requirePrivacyAuthorize({ success: resolve, fail: reject }))
+    }
+    try { wx.setStorageSync("ninimenu_privacy_consent_v1", "1") } catch (_) { /* ignore */ }
+  },
+
   async sendCode() {
+    try { await this.ensurePrivacyConsent() } catch (error) {
+      this.setData({ error: error.message || "请先同意隐私政策" })
+      return
+    }
     const email = this.data.email.trim()
     if (!/^[^\s@]+@(?:qq\.com|foxmail\.com)$/i.test(email)) {
       this.setData({ error: "请输入 QQ 邮箱或 Foxmail 邮箱" })
@@ -134,6 +170,10 @@ Page({
   },
 
   async submitEmail() {
+    try { await this.ensurePrivacyConsent() } catch (error) {
+      this.setData({ error: error.message || "请先同意隐私政策" })
+      return
+    }
     if (!/^[^\s@]+@(?:qq\.com|foxmail\.com)$/i.test(this.data.email.trim())) {
       this.setData({ error: "请输入 QQ 邮箱或 Foxmail 邮箱" })
       return
@@ -154,8 +194,32 @@ Page({
     }
   },
 
+  async submitPassword() {
+    try { await this.ensurePrivacyConsent() } catch (error) {
+      this.setData({ error: error.message || "请先同意隐私政策" })
+      return
+    }
+    if (!this.data.account.trim() || !this.data.password) {
+      this.setData({ error: "请输入账号和密码" })
+      return
+    }
+    this.setData({ loading: true, error: "", message: "" })
+    try {
+      const result = await request("/auth/login", { account: this.data.account.trim(), password: this.data.password })
+      this.openWeb(result.token)
+    } catch (error) {
+      this.setData({ error: error.message || "登录失败" })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
   async loginWithWechat() {
     if (this.data.loading || !this.data.wechatEnabled) return
+    try { await this.ensurePrivacyConsent() } catch (error) {
+      this.setData({ error: error.message || "请先同意隐私政策" })
+      return
+    }
     this.setData({ loading: true, error: "", message: "" })
     try {
       const code = await wxLoginCode()

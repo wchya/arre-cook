@@ -1,0 +1,12 @@
+<scroll-view class="legal-page" scroll-y="true" show-scrollbar="false">
+  <view class="legal-header">
+    <view class="legal-mark">👨‍🍳</view>
+    <view class="legal-title">{{title}}</view>
+    <view class="legal-subtitle">arre 食谱推荐小助手</view>
+  </view>
+  <view wx:for="{{sections}}" wx:key="heading" class="legal-section">
+    <view class="section-heading">{{item.heading}}</view>
+    <view wx:for="{{item.paragraphs}}" wx:key="*this" class="section-paragraph">{{item}}</view>
+  </view>
+  <view class="legal-footer">请在使用登录、饮食记录、图片上传或 AI 功能前阅读并确认本页面内容。</view>
+</scroll-view>

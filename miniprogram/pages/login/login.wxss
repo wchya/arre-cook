@@ -40,4 +40,10 @@
 .message, .error { margin: -10rpx 0 18rpx; padding: 14rpx 16rpx; border-radius: 7rpx; background: #f0f8f4; color: #347455; font-size: 22rpx; line-height: 1.5; }
 .error { background: #fff0ed; color: #b8422b; }
 .footnote, .unavailable { margin-top: 18rpx; color: #858981; font-size: 21rpx; line-height: 1.5; }
-.privacy { margin-top: auto; padding-top: 44rpx; text-align: center; color: #858981; font-size: 20rpx; }
+.mode-link { margin-top: 24rpx; padding: 0; background: transparent; color: #b45a3b; font-size: 22rpx; line-height: 1.5; }
+.mode-link::after { border: 0; }
+.consent-row { margin-top: auto; padding-top: 36rpx; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 5rpx; color: #858981; font-size: 20rpx; line-height: 1.7; }
+.consent-label { display: inline-flex; align-items: center; }
+.consent-label checkbox { transform: scale(.72); margin-right: -5rpx; }
+.legal-link { color: #b45a3b; }
+.privacy { padding-top: 10rpx; text-align: center; color: #858981; font-size: 19rpx; }

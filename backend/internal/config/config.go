@@ -20,7 +20,12 @@ type Config struct {
 	AllowRegister  bool
 	CORSOrigins    []string
 	RepeatDays     int
+	DBDriver       string // mysql or sqlite
 	DBPath         string
+	DBDSN          string
+	DBMaxOpenConns int
+	DBMaxIdleConns int
+	DBConnMaxLife  time.Duration
 	UploadDir      string
 	BackupDir      string
 	MaxUploadSize  int64
@@ -87,7 +92,12 @@ func Load() {
 		AllowRegister:   getEnvBool("ALLOW_REGISTER", true),
 		CORSOrigins:     splitList(getEnv("CORS_ORIGINS", "*")),
 		RepeatDays:      3,
+		DBDriver:        strings.ToLower(getEnv("DB_DRIVER", "sqlite")),
 		DBPath:          getEnv("DB_PATH", "data/ninimenu.db"),
+		DBDSN:           getEnv("MYSQL_DSN", ""),
+		DBMaxOpenConns:  getEnvInt("DB_MAX_OPEN_CONNS", 20),
+		DBMaxIdleConns:  getEnvInt("DB_MAX_IDLE_CONNS", 5),
+		DBConnMaxLife:   getEnvDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
 		UploadDir:       getEnv("UPLOAD_DIR", "uploads"),
 		BackupDir:       getEnv("BACKUP_DIR", "uploads_backup"),
 		MaxUploadSize:   int64(getEnvInt("MAX_UPLOAD_SIZE_MB", 5)) * 1024 * 1024,
@@ -121,6 +131,12 @@ func Load() {
 		AgentRateLimit:  getEnvInt("AGENT_RATE_LIMIT", 120),
 		PublicURL:       strings.TrimRight(getEnv("PUBLIC_URL", ""), "/"),
 	}
+	if C.DBDriver == "mysql" && C.DBDSN == "" {
+		C.DBDSN = mysqlDSNFromEnv()
+	}
+	if C.DBDriver != "mysql" {
+		C.DBDriver = "sqlite"
+	}
 	if d := getEnvInt("REPEAT_DAYS", 0); d > 0 {
 		C.RepeatDays = d
 	}
@@ -140,6 +156,16 @@ func Load() {
 			log.Println("[安全警告] ADMIN_PASSWORD 仍是默认值 nini123，请尽快修改（仅在首次创建管理员时生效，之后请在 App 内改密）")
 		}
 	}
+}
+
+func mysqlDSNFromEnv() string {
+	host := getEnv("MYSQL_HOST", "127.0.0.1")
+	port := getEnv("MYSQL_PORT", "3306")
+	user := getEnv("MYSQL_USER", "ninimenu")
+	password := getEnv("MYSQL_PASSWORD", "")
+	database := getEnv("MYSQL_DATABASE", "ninimenu")
+	// parseTime and utf8mb4 keep time fields and Chinese content consistent across drivers.
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Asia%%2FShanghai", user, password, host, port, database)
 }
 
 func (c Config) IsProduction() bool {

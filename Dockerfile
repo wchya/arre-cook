@@ -26,7 +26,8 @@ COPY backend/ ./
 COPY --from=frontend-build /build/dist ./static
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,sharing=locked,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/ninimenu ./cmd/server
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/ninimenu ./cmd/server && \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/dbmigrate ./cmd/dbmigrate
 
 # ---------- Stage 3: runtime ----------
 FROM alpine:3.20
@@ -36,6 +37,7 @@ RUN sed -i 's#https://dl-cdn.alpinelinux.org#https://mirrors.cloud.tencent.com#g
     && adduser -D -u 1000 ninimenu
 WORKDIR /app
 COPY --from=backend-build /out/ninimenu ./ninimenu
+COPY --from=backend-build /out/dbmigrate ./dbmigrate
 # 前端产物（SPA）
 COPY --from=backend-build /src/static ./static
 # 种子菜品图片；首次挂载空具名卷时由 Docker 自动拷贝进卷

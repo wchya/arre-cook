@@ -538,10 +538,23 @@ export interface AgentToken {
 
 export interface AgentTokenList {
   tokens: AgentToken[]
+  summary: AgentUsageSummary
   scopes: Record<string, string>
   presets: Record<string, string[]>
   mcp_url: string
   api_url: string
+}
+
+export interface AgentUsageSummary {
+  active_tokens: number
+  total_tokens: number
+  calls: number
+  success_calls: number
+  error_calls: number
+  denied_calls: number
+  calls_last_24_hours: number
+  last_used_at: string | null
+  last_call_at: string | null
 }
 
 export interface AgentAuditLog {

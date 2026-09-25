@@ -11,24 +11,41 @@
     <view wx:if="{{message}}" class="message">{{message}}</view>
     <view wx:if="{{error}}" class="error" role="alert">{{error}}</view>
 
-    <button wx:if="{{wechatEnabled}}" class="wechat-button" loading="{{loading}}" disabled="{{loading}}" bindtap="loginWithWechat">微信快捷登录</button>
+    <button wx:if="{{wechatEnabled}}" class="wechat-button" loading="{{loading}}" disabled="{{loading || !agreed}}" bindtap="loginWithWechat">微信快捷登录</button>
     <view wx:if="{{wechatEnabled && emailEnabled}}" class="divider"><text>或使用邮箱</text></view>
 
-    <block wx:if="{{emailEnabled}}">
+    <block wx:if="{{emailEnabled && loginMode === 'email'}}">
       <view class="field-label">QQ 邮箱</view>
       <input class="input" type="text" maxlength="120" value="{{email}}" placeholder="name@qq.com" autocomplete="email" bindinput="onEmailInput" />
       <view class="field-label code-label">邮箱验证码</view>
       <view class="code-row">
         <input class="input code-input" type="number" maxlength="6" value="{{code}}" placeholder="6 位数字" bindinput="onCodeInput" />
-        <button class="send-button" loading="{{sending}}" disabled="{{sending || cooldown > 0}}" bindtap="sendCode">{{cooldown > 0 ? cooldown + ' 秒' : '发送验证码'}}</button>
+        <button class="send-button" loading="{{sending}}" disabled="{{sending || cooldown > 0 || !agreed}}" bindtap="sendCode">{{cooldown > 0 ? cooldown + ' 秒' : '发送验证码'}}</button>
       </view>
-      <button class="submit-button" loading="{{loading}}" disabled="{{loading || code.length !== 6}}" bindtap="submitEmail">登录并继续</button>
+      <button class="submit-button" loading="{{loading}}" disabled="{{loading || code.length !== 6 || !agreed}}" bindtap="submitEmail">登录并继续</button>
       <view wx:if="{{!registerOpen}}" class="footnote">目前暂停新账号注册</view>
       <view wx:elif="{{wechatEnabled}}" class="footnote">首次使用会将微信绑定到这个邮箱账号</view>
       <view wx:else class="footnote">验证邮箱后自动创建账号</view>
     </block>
-    <view wx:else class="unavailable">邮箱登录暂不可用，请稍后再试</view>
+
+    <block wx:elif="{{loginMode === 'password'}}">
+      <view class="field-label">账号（邮箱或用户名）</view>
+      <input class="input" type="text" maxlength="120" value="{{account}}" placeholder="审核账号或已设置密码的账号" bindinput="onAccountInput" />
+      <view class="field-label code-label">密码</view>
+      <input class="input" type="password" maxlength="128" value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
+      <button class="submit-button" loading="{{loading}}" disabled="{{loading || !account || !password || !agreed}}" bindtap="submitPassword">账号密码登录</button>
+      <view class="footnote">提审时可使用服务端配置的审核账号体验完整功能。</view>
+    </block>
+    <view wx:if="{{!emailEnabled && loginMode === 'email'}}" class="unavailable">邮箱登录暂不可用，请使用账号密码登录</view>
+
+    <button class="mode-link" bindtap="togglePasswordMode">{{loginMode === 'password' ? '返回邮箱验证码登录' : '已有密码？使用账号密码登录'}}</button>
   </view>
 
-  <view class="privacy"><text>仅读取你本人授权的数据</text><text> · </text><text>账号数据彼此隔离</text></view>
+  <view class="consent-row">
+    <checkbox-group bindchange="onConsentChange"><label class="consent-label"><checkbox value="agreed" checked="{{agreed}}" color="#e8734a" /> <text>我已阅读并同意</text></label></checkbox-group>
+    <navigator url="/pages/legal/legal?type=terms" class="legal-link">《用户服务协议》</navigator>
+    <text>和</text>
+    <navigator url="/pages/legal/legal?type=privacy" class="legal-link">《隐私政策》</navigator>
+  </view>
+  <view class="privacy"><text>仅在授权后处理登录所需信息，账号数据彼此隔离</text></view>
 </scroll-view>

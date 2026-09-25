@@ -273,6 +273,53 @@ type AgentTokenView struct {
 	Active    bool     `json:"active"`
 }
 
+// AgentUsageSummary is deliberately calculated from the current user's
+// token and audit rows only. It is shown in the account's connection page.
+type AgentUsageSummary struct {
+	ActiveTokens     int64      `json:"active_tokens"`
+	TotalTokens      int64      `json:"total_tokens"`
+	Calls            int64      `json:"calls"`
+	SuccessCalls     int64      `json:"success_calls"`
+	ErrorCalls       int64      `json:"error_calls"`
+	DeniedCalls      int64      `json:"denied_calls"`
+	CallsLast24Hours int64      `json:"calls_last_24_hours"`
+	LastUsedAt       *time.Time `json:"last_used_at"`
+	LastCallAt       *time.Time `json:"last_call_at"`
+}
+
+// AgentUsageSummaryFor returns usage data scoped to uid. Keep this query
+// separate from the admin dashboard so it cannot accidentally aggregate all
+// users when the account page is requested.
+func AgentUsageSummaryFor(uid uint) AgentUsageSummary {
+	var summary AgentUsageSummary
+	var tokens []models.AgentToken
+	database.DB.Scopes(database.OwnedBy(uid)).Find(&tokens)
+	summary.TotalTokens = int64(len(tokens))
+	now := time.Now()
+	for _, token := range tokens {
+		if token.RevokedAt == nil && (token.ExpiresAt == nil || now.Before(*token.ExpiresAt)) {
+			summary.ActiveTokens++
+		}
+		if token.LastUsedAt != nil && (summary.LastUsedAt == nil || token.LastUsedAt.After(*summary.LastUsedAt)) {
+			last := *token.LastUsedAt
+			summary.LastUsedAt = &last
+		}
+	}
+
+	base := func() *gorm.DB { return database.DB.Model(&models.AgentAuditLog{}).Scopes(database.OwnedBy(uid)) }
+	base().Count(&summary.Calls)
+	base().Where("status = ?", "ok").Count(&summary.SuccessCalls)
+	base().Where("status = ?", "error").Count(&summary.ErrorCalls)
+	base().Where("status = ?", "denied").Count(&summary.DeniedCalls)
+	base().Where("created_at >= ?", now.Add(-24*time.Hour)).Count(&summary.CallsLast24Hours)
+	var latest models.AgentAuditLog
+	if err := database.DB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").First(&latest).Error; err == nil {
+		last := latest.CreatedAt
+		summary.LastCallAt = &last
+	}
+	return summary
+}
+
 func toTokenView(t models.AgentToken) AgentTokenView {
 	var scopes []string
 	_ = json.Unmarshal([]byte(t.Scopes), &scopes)

@@ -16,7 +16,15 @@ services:
       GIN_MODE: release
       APP_ENV: production
       PORT: "8080"
-      DB_PATH: /app/data/ninimenu.db
+      DB_DRIVER: ${DB_DRIVER:-mysql}
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ninimenu}
+      MYSQL_USER: ${MYSQL_USER:-ninimenu}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set the NiniMenu MySQL password}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-20}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-5}
+      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-30m}
       UPLOAD_DIR: /app/uploads
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?Set the initial administrator email}

@@ -2,6 +2,43 @@
 
 ## 生产配置
 
+### MySQL 数据库
+
+食谱站使用博客服务器已有的 MySQL 8 实例，但使用独立的 `ninimenu` 数据库和
+`ninimenu` 用户，不读取或写入博客的 `blog` schema。先在博客 MySQL 容器中创建
+数据库和最小权限账号，再把账号写入食谱站 `.env`：
+
+```sql
+CREATE DATABASE ninimenu CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'ninimenu'@'%' IDENTIFIED BY '生成一段随机密码';
+GRANT ALL PRIVILEGES ON ninimenu.* TO 'ninimenu'@'%';
+FLUSH PRIVILEGES;
+```
+
+```dotenv
+DB_DRIVER=mysql
+MYSQL_HOST=mysql
+MYSQL_PORT=3306
+MYSQL_DATABASE=ninimenu
+MYSQL_USER=ninimenu
+MYSQL_PASSWORD=同一段随机密码
+```
+
+切换前先用 SQLite 在线备份，然后停止食谱容器，在共享 Docker 网络中运行迁移：
+
+```sh
+sqlite3 /var/lib/docker/volumes/arre-cook_ninimenu-data/_data/ninimenu.db \
+  ".backup '/home/ubuntu/backups/arre-cook/ninimenu-before-mysql-$(date +%Y%m%d-%H%M%S).db'"
+MYSQL_DSN='ninimenu:密码@tcp(mysql:3306)/ninimenu?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai'
+docker run --rm --network web-arrebyte_default \
+  -v arre-cook_ninimenu-data:/source:ro \
+  -e MYSQL_DSN="$MYSQL_DSN" \
+  --entrypoint /app/dbmigrate arre-cook/ninimenu:latest \
+  -source /source/ninimenu.db -target-dsn "$MYSQL_DSN"
+```
+
+`backend/cmd/dbmigrate` 是独立迁移程序，会先创建目标表，再按外键依赖顺序保留原始主键复制所有用户、家庭、饮食、通知和 Agent 数据。生产切换前应在临时 schema 先演练，并比较源库和目标库各表行数。
+
 生产 `.env` 位于服务器 `/home/ubuntu/arre-cook/.env`，包含管理员、SMTP 和 Garage 配置；当前权限为 `600`。`ADMIN_EMAIL` 是初始管理员账号，也是旧版单用户数据迁移后的归属账号。不要把 `.env` 或小程序私钥提交到 Git，也不要在日志或文档中记录密钥值。
 
 博客服务器 `/home/ubuntu/web-arrebyte/.env` 已有 QQ 邮箱的 `MAIL_HOST`、`MAIL_PORT`、`MAIL_USERNAME` 和 `MAIL_PASSWORD`。在本仓库根目录运行 Compose 时，让它读取博客和应用两份环境文件；博客 SMTP 变量会传给菜谱容器，博客数据库等变量不会传入。菜谱的 Garage 凭据必须填写 `COOK_S3_ACCESS_KEY` / `COOK_S3_SECRET_KEY`，Compose 不会复用博客的 `S3_ACCESS_KEY`。博客当前使用 `smtp.qq.com:587`（STARTTLS），`.env.example` 已对齐：

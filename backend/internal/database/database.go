@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/glebarez/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -22,9 +23,11 @@ var DB *gorm.DB
 var PasswordHasher func(string) (string, error)
 
 func Init() error {
-	dir := filepath.Dir(config.C.DBPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+	if config.C.DBDriver != "mysql" {
+		dir := filepath.Dir(config.C.DBPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
 	}
 
 	logLevel := logger.Warn
@@ -32,12 +35,23 @@ func Init() error {
 		logLevel = logger.Error
 	}
 	var err error
-	DB, err = gorm.Open(sqlite.Open(config.C.DBPath), &gorm.Config{Logger: logger.Default.LogMode(logLevel)})
+	if config.C.DBDriver == "mysql" {
+		DB, err = gorm.Open(mysql.Open(config.C.DBDSN), &gorm.Config{Logger: logger.Default.LogMode(logLevel), TranslateError: true})
+	} else {
+		DB, err = gorm.Open(sqlite.Open(config.C.DBPath), &gorm.Config{Logger: logger.Default.LogMode(logLevel)})
+	}
 	if err != nil {
 		return err
 	}
-	if err := configureSQLite(DB); err != nil {
-		return err
+	if config.C.DBDriver != "mysql" {
+		if err := configureSQLite(DB); err != nil {
+			return err
+		}
+	}
+	if sqlDB, dbErr := DB.DB(); dbErr == nil {
+		sqlDB.SetMaxOpenConns(config.C.DBMaxOpenConns)
+		sqlDB.SetMaxIdleConns(config.C.DBMaxIdleConns)
+		sqlDB.SetConnMaxLifetime(config.C.DBConnMaxLife)
 	}
 
 	if err := DB.AutoMigrate(
@@ -162,20 +176,17 @@ func migrateToMultiUser(adminID uint) error {
 	m := DB.Migrator()
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		if m.HasTable("favorites") {
-			if err := tx.Exec(`INSERT OR IGNORE INTO user_favorites (user_id, dish_id, created_at)
-				SELECT ?, dish_id, created_at FROM favorites`, adminID).Error; err != nil {
+			if err := copyLegacyRows(tx, "user_favorites", "favorites", adminID, "dish_id, created_at"); err != nil {
 				return err
 			}
 		}
 		if m.HasTable("day_ratings") {
-			if err := tx.Exec(`INSERT OR IGNORE INTO user_day_ratings (user_id, meal_date, home_mood, mood, remark, photos, created_at, updated_at)
-				SELECT ?, meal_date, home_mood, mood, remark, photos, created_at, updated_at FROM day_ratings`, adminID).Error; err != nil {
+			if err := copyLegacyRows(tx, "user_day_ratings", "day_ratings", adminID, "meal_date, home_mood, mood, remark, photos, created_at, updated_at"); err != nil {
 				return err
 			}
 		}
 		if m.HasTable("home_inventories") {
-			if err := tx.Exec(`INSERT OR IGNORE INTO user_home_inventories (user_id, item_name, in_stock, created_at, updated_at)
-				SELECT ?, item_name, in_stock, created_at, updated_at FROM home_inventories`, adminID).Error; err != nil {
+			if err := copyLegacyRows(tx, "user_home_inventories", "home_inventories", adminID, "item_name, in_stock, created_at, updated_at"); err != nil {
 				return err
 			}
 		}
@@ -197,6 +208,15 @@ func migrateToMultiUser(adminID uint) error {
 		log.Printf("多用户迁移完成：历史数据已归属到管理员账号 #%d", adminID)
 	}
 	return err
+}
+
+// copyLegacyRows migrates the pre-multi-user tables without SQLite-only INSERT OR IGNORE syntax.
+// It is used during the one-time migration on both supported SQL dialects.
+func copyLegacyRows(tx *gorm.DB, target, source string, adminID uint, columns string) error {
+	if tx.Dialector.Name() == "sqlite" {
+		return tx.Exec("INSERT OR IGNORE INTO "+target+" (user_id, "+columns+") SELECT ?, "+columns+" FROM "+source, adminID).Error
+	}
+	return tx.Exec("INSERT INTO "+target+" (user_id, "+columns+") SELECT ?, "+columns+" FROM "+source+" ON DUPLICATE KEY UPDATE user_id = VALUES(user_id)", adminID).Error
 }
 
 // retireRemovedSeedDishes 把历史数据库里由旧种子写入、如今已从菜单移除的公共菜品下线：

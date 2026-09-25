@@ -621,8 +621,10 @@ func GetAgentExport(c *gin.Context) {
 
 // ListMyAgentTokens GET /api/me/agent-tokens
 func ListMyAgentTokens(c *gin.Context) {
+	userID := uid(c)
 	utils.Success(c, gin.H{
-		"tokens":  services.ListAgentTokens(uid(c)),
+		"tokens":  services.ListAgentTokens(userID),
+		"summary": services.AgentUsageSummaryFor(userID),
 		"scopes":  auth.ScopeLabels,
 		"presets": auth.ScopePresets,
 		"mcp_url": baseURL(c) + "/mcp",
