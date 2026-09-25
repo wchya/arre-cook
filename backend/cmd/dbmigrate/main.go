@@ -81,7 +81,10 @@ func copyModel(source, target *gorm.DB, prototype any, opts options) error {
 
 	sliceType := reflect.SliceOf(reflect.TypeOf(prototype))
 	rows := reflect.New(sliceType).Interface()
-	if err := source.Find(rows).Error; err != nil {
+	// Include soft-deleted dishes and any other historical rows. The live app
+	// still hides them through GORM's normal scope, but dropping them during a
+	// database cutover would break old meal/favorite references.
+	if err := source.Unscoped().Find(rows).Error; err != nil {
 		return err
 	}
 	values := reflect.ValueOf(rows).Elem()
