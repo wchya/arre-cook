@@ -16,8 +16,8 @@
   border-radius: 22rpx;
   background: #e8734a;
   color: #fff;
-  font-size: 44rpx;
-  font-weight: 800;
+  font-size: 42rpx;
+  line-height: 1;
 }
 .eyebrow { margin-top: 28rpx; color: #b45a3b; font-size: 19rpx; font-weight: 800; }
 .title { margin-top: 10rpx; font-size: 52rpx; line-height: 1.2; font-weight: 800; }

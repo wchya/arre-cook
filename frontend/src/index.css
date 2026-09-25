@@ -101,6 +101,10 @@ body {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+@keyframes chef-loading-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-7px) rotate(2deg); }
+}
 @keyframes pop {
   0% { transform: scale(0); opacity: 0; }
   50% { transform: scale(1.12); }
@@ -168,6 +172,17 @@ body {
 .animate-slide-in-up { animation: slide-in-up .3s ease; }
 .animate-glow { animation: glow 1.5s infinite; }
 .animate-countdown-pulse { animation: countdown-pulse .5s ease infinite; }
+
+.chef-loading-mark {
+  width: 84px;
+  height: 84px;
+  animation: chef-loading-bob 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 14px 24px rgba(232,115,74,.22));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chef-loading-mark { animation: none; }
+}
 
 .achievement-unlock-layer {
   position: fixed;

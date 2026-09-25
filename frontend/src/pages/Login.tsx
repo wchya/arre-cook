@@ -113,7 +113,7 @@ export default function Login() {
 
       <div className="relative mx-auto flex min-h-dvh max-w-[420px] flex-col px-6" style={{ paddingTop: "calc(56px + env(safe-area-inset-top))", paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}>
         <div className="mb-8">
-          <img src="/180.png" alt={appName} className="mb-5 h-[68px] w-[68px] rounded-[20px] shadow-[0_14px_36px_rgba(232,115,74,.28)]" />
+          <img src="/chef-mark.svg" alt={appName} className="mb-5 h-[68px] w-[68px] rounded-[20px] shadow-[0_14px_36px_rgba(232,115,74,.28)]" />
           <h1 className="text-[30px] font-black leading-tight tracking-tight text-text">
             今天吃什么，
             <br />

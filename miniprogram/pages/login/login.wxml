@@ -1,6 +1,6 @@
 <view class="page">
   <view class="brand">
-    <view class="mark">N</view>
+    <view class="mark" role="img" aria-label="厨师徽标">👨‍🍳</view>
     <view class="eyebrow">NINIMENU</view>
     <view class="title">今天吃什么</view>
     <view class="subtitle">按你的口味安排每一餐</view>
