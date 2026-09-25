@@ -83,7 +83,7 @@ curl -fsS http://127.0.0.1:9925/healthz
 生产环境优先使用线上 Hermes / DSH 已在使用的 CPA 配置。应用容器以只读方式挂载 DSH 的 `llm-override.json`，运行时读取其中的 `baseUrl`、`apiKey`、`model` 和 `completionsPath`，访问同一个 CPA OpenAI 兼容接口；CPA 密钥不会写入菜谱仓库、数据库或日志。服务器 `/home/ubuntu/arre-cook/.env` 应包含：
 
 ```sh
-CPA_CONFIG_PATH=/root/ai-agent-scaffold-lite/docs/dev-ops/config/llm-override.json
+CPA_CONFIG_PATH=/home/ubuntu/ai-agent-scaffold-lite/docs/dev-ops/config/llm-override.json
 LLM_CPA_CONFIG_PATH=/run/cpa/provider-config
 LLM_CPA_BASE_URL=http://host.docker.internal:8317/v1
 ```
