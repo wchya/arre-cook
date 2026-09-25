@@ -8,10 +8,10 @@ import "time"
 type BehaviorEvent struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	UserID    uint      `json:"-" gorm:"not null;default:0;index:idx_behavior_user_time,priority:1"`
-	EventType string    `json:"event_type" gorm:"not null;index"`
+	EventType string    `json:"event_type" gorm:"not null;size:32;index"`
 	DishID    uint      `json:"dish_id" gorm:"index"`
 	DishName  string    `json:"dish_name"`
-	Source    string    `json:"source" gorm:"index"`
+	Source    string    `json:"source" gorm:"size:64;index"`
 	Actor     string    `json:"actor"`
 	Meta      string    `json:"meta" gorm:"default:'{}'"`
 	CreatedAt time.Time `json:"created_at" gorm:"index;index:idx_behavior_user_time,priority:2"`

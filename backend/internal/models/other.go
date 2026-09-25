@@ -42,8 +42,8 @@ type UserAchievement struct {
 type AchievementEvent struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	UserID    uint      `json:"user_id" gorm:"not null;default:0;index:idx_ach_event_user_type,priority:1"`
-	EventType string    `json:"event_type" gorm:"not null;index;index:idx_ach_event_user_type,priority:2"`
-	RefKey    string    `json:"ref_key" gorm:"index"`
+	EventType string    `json:"event_type" gorm:"not null;size:32;index;index:idx_ach_event_user_type,priority:2"`
+	RefKey    string    `json:"ref_key" gorm:"size:128;index"`
 	CreatedAt time.Time `json:"created_at" gorm:"index"`
 }
 
@@ -79,9 +79,9 @@ type Setting struct {
 type DayRating struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	UserID    uint      `json:"-" gorm:"not null;uniqueIndex:idx_user_day_rating_user_date,priority:1"`
-	MealDate  string    `json:"meal_date" gorm:"not null;uniqueIndex:idx_user_day_rating_user_date,priority:2"`
-	HomeMood  string    `json:"home_mood" gorm:"index"`
-	Mood      string    `json:"mood" gorm:"index"`
+	MealDate  string    `json:"meal_date" gorm:"not null;size:10;uniqueIndex:idx_user_day_rating_user_date,priority:2"`
+	HomeMood  string    `json:"home_mood" gorm:"size:64;index"`
+	Mood      string    `json:"mood" gorm:"size:64;index"`
 	Remark    string    `json:"remark"`
 	Photos    string    `json:"photos" gorm:"default:'[]'"`
 	CreatedAt time.Time `json:"created_at"`
@@ -93,8 +93,8 @@ func (DayRating) TableName() string { return "user_day_ratings" }
 type ShoppingCheck struct {
 	ID         uint      `json:"id" gorm:"primaryKey"`
 	UserID     uint      `json:"-" gorm:"not null;default:0;index:idx_shopping_user_date,priority:1"`
-	MealDate   string    `json:"meal_date" gorm:"not null;index;index:idx_shopping_checks_date_checked,priority:1;index:idx_shopping_user_date,priority:2"`
-	MealType   string    `json:"meal_type" gorm:"not null"`
+	MealDate   string    `json:"meal_date" gorm:"not null;size:10;index;index:idx_shopping_checks_date_checked,priority:1;index:idx_shopping_user_date,priority:2"`
+	MealType   string    `json:"meal_type" gorm:"not null;size:16"`
 	DishID     uint      `json:"dish_id" gorm:"not null"`
 	DishName   string    `json:"dish_name"`
 	ItemName   string    `json:"item_name" gorm:"not null"`
@@ -108,7 +108,7 @@ type ShoppingCheck struct {
 type HomeInventory struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	UserID    uint      `json:"-" gorm:"not null;uniqueIndex:idx_user_inv_user_item,priority:1"`
-	ItemName  string    `json:"item_name" gorm:"not null;uniqueIndex:idx_user_inv_user_item,priority:2"`
+	ItemName  string    `json:"item_name" gorm:"not null;size:80;uniqueIndex:idx_user_inv_user_item,priority:2"`
 	InStock   bool      `json:"in_stock" gorm:"default:true;index"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -118,8 +118,8 @@ func (HomeInventory) TableName() string { return "user_home_inventories" }
 
 type ShoppingItemCategory struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
-	ItemName  string    `json:"item_name" gorm:"not null;uniqueIndex"`
-	Category  string    `json:"category" gorm:"not null"`
+	ItemName  string    `json:"item_name" gorm:"not null;size:80;uniqueIndex"`
+	Category  string    `json:"category" gorm:"not null;size:40"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
