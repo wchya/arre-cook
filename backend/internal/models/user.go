@@ -107,7 +107,7 @@ type AgentAuditLog struct {
 	ID         uint      `json:"id" gorm:"primaryKey"`
 	UserID     uint      `json:"-" gorm:"not null;index:idx_agent_audit_user_time,priority:1"`
 	TokenID    uint      `json:"token_id" gorm:"index"`
-	Actor      string    `json:"actor" gorm:"size:64"` // assistant / token 名 / embed
+	Actor      string    `json:"actor" gorm:"size:64"`   // assistant / token 名 / embed
 	Channel    string    `json:"channel" gorm:"size:16"` // rest / mcp / tools / chat
 	Tool       string    `json:"tool" gorm:"size:64"`
 	Args       string    `json:"args"`
@@ -149,6 +149,6 @@ type ChatMessage struct {
 	UserID    uint      `json:"-" gorm:"not null;index"`
 	Role      string    `json:"role" gorm:"size:16"` // user / assistant
 	Content   string    `json:"content"`
-	Cards     string    `json:"-" gorm:"default:'[]'"` // 助手回复附带的菜品卡片、工具轨迹（JSON）
+	Cards     string    `json:"-" gorm:"type:longtext;default:'[]'"` // 助手回复附带的菜品卡片、工具轨迹（JSON）
 	CreatedAt time.Time `json:"created_at"`
 }
