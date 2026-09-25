@@ -34,6 +34,88 @@ NiniMenu 是一个多用户食谱与饮食管理应用，提供邮箱验证码�
 
 * [Linux Do 社区](https://linux.do/)  
 
+## 当前项目状态
+
+> 状态截至 2026-09-25。当前主线提交为 `baeadb2`，本地仓库、GitHub `origin/main` 与线上服务器已同步。
+
+NiniMenu 当前已经从单纯的菜谱推荐页面，发展为多用户食谱、饮食健康、家庭协作和 Agent 接入平台。H5 食谱站已经部署运行；微信小程序工程和第三方 Agent 接口已经完成代码实现，仍需微信平台配置、真机验收和 Hermes/DSH 实际客户端联调。
+
+### 已完成能力
+
+- **账号与多用户**：QQ/Foxmail 邮箱验证码登录、管理员密码兜底登录、微信小程序登录绑定、用户数据独立管理。
+- **食谱管理**：公共菜谱、私房菜、多图/视频、食材调料、烹饪步骤、难度、烹饪模式、计时、克隆、排序和启用/禁用。
+- **智能推荐**：午餐、晚餐、心情、明日菜单、盲盒、口味画像、偏好过滤、近期去重和推荐理由。
+- **饮食管理**：用餐记录、饮食日记、评分、备注、照片墙、7 天/30 天饮食报告、菜系分布和健康建议。
+- **计划与采购**：一周菜单、买菜清单、食材合并、分类、勾选、库存标记和家庭采购清单。
+- **家庭模式**：邮箱邀请、加入/退出家庭、成员管理、家庭菜谱、家庭菜单和共享买菜清单。个人记录、偏好、饮食日记、AI 对话和 Agent Token 不会因加入家庭而共享。
+- **成就与后台**：80+ 成就自动检测、站点设置、菜谱 CRUD、批量操作、用户管理、仪表盘、语录管理和 AI 配置。
+- **站内信**：系统更新、新功能、维护、健康、家庭和 Agent 安全通知；支持未读数、单条已读、全部已读和管理员广播。
+
+### Agent 与 AI 接入
+
+站内 AI 助手和外部 Agent 共用同一套按用户隔离的工具体系，支持：
+
+- MCP Streamable HTTP
+- OpenAI/DeepSeek Function Calling
+- OpenAPI
+- Hermes、DSH、DeepSeek Harness、Claude、Cursor、Dify、Coze 等兼容客户端
+
+每个用户可以在「我的 → AI 连接」创建自己的 `nm_` Token，并设置名称、权限范围和有效期。Token 支持查看、修改、撤销和轮换，明文只在创建或轮换时返回一次，数据库只保存 SHA-256 摘要。
+
+Agent 请求始终按照 Token 绑定的 `user_id` 读取数据，不能通过请求参数指定其他用户。`/api/agent/*` 和 `/mcp` 拒绝长期站内登录 JWT，只接受个人 Agent Token 或短期 Agent Session。Hermes 与 DSH 必须分别使用不同用户创建的 Token，禁止多个机器人共享一个 Token。
+
+完整接口说明见 [Agent 接口文档](docs/agent-api.md)。
+
+### 微信小程序
+
+小程序采用“原生登录页 + H5 WebView”方案：
+
+1. 小程序使用 `wx.login` 获取登录凭证。
+2. 已绑定用户直接登录。
+3. 未绑定用户使用 QQ/Foxmail 邮箱验证码登录并绑定微信。
+4. 登录凭证通过 URL fragment 交给 H5，读取后立即清除。
+
+小程序代码位于 [miniprogram](miniprogram)。代码、分享桥接、退出登录、Token 交接和安卓滚动适配已经完成。正式发布前仍需在微信后台配置业务域名和 request 合法域名，并使用微信开发者工具完成体验版、Android/iOS 真机验收。
+
+### 生产部署
+
+- **后端**：Go 1.25、Gin、GORM。
+- **前端**：React 19、TypeScript、Vite、Tailwind CSS、React Query、Zustand。
+- **数据库**：SQLite，启动时自动迁移；个人表统一使用 `user_id` 作用域。
+- **图片存储**：单机 Garage S3，使用独立的 `cook-uploads` bucket 和菜谱站专用密钥。
+- **AI 模型**：生产环境读取线上 DSH/CPA 配置，密钥不写入仓库、数据库或日志。
+- **反向代理**：博客 Nginx 通过共享 Docker 网络转发到 NiniMenu 容器。
+
+当前线上验证结果：
+
+```text
+版本：baeadb2
+容器：running / healthy
+健康检查：UP
+图片存储：s3
+```
+
+生产配置、备份和升级流程见 [部署指南](docs/deployment.md)。单机 Garage 没有跨主机副本，生产环境需要持续执行 SQLite、Garage meta/data 和配置备份，并定期进行恢复演练。
+
+### 测试与交付状态
+
+已通过：
+
+```bash
+cd backend && go test ./... && go vet ./...
+cd frontend && npm run build
+```
+
+测试覆盖多用户隔离、数据库迁移、家庭隔离、Agent scope、Token 撤销/轮换、MCP 工具权限、站内信隔离、邮箱验证码、购物清单和 S3 存储。前端 ESLint 当前没有错误，但还有 8 条 React Hook 依赖警告，主 JS chunk 约 542 KB。
+
+当前仍需完成：
+
+1. 微信开发者工具、Android/iOS 真机和正式发布验收。
+2. Hermes、DSH 使用真实用户 Token 的线上端到端联调。
+3. 线上备份恢复演练、监控告警和单机存储故障预案。
+4. 清理前端 Hook 警告并继续拆分主 JS bundle。
+5. 后续补充真实营养数据库、热量/宏量营养素、周计划拖拽和购物清单分享等能力。
+
 ## 未来目标
 
 ### 功能完善
