@@ -45,7 +45,7 @@ export default function AdminLayout() {
           ))}
         </div>
       </nav>
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+      <main className="app-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         <Outlet />
       </main>
     </div>

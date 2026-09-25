@@ -166,7 +166,7 @@ export default function AssistantChat() {
       </div>
     </header>
 
-    <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+    <main ref={scrollRef} className="app-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
       <div className="mx-auto max-w-[640px] space-y-4 px-4 py-5">
         {!status?.llm_enabled && status && <div className="border-l-2 border-primary bg-primary-light/40 px-3 py-2 text-xs leading-relaxed text-text2">当前未连接 AI 模型，可获取基础菜谱推荐和已记录的饮食报告。对话写入暂不可用，请使用饮食记录或菜谱页面填写。</div>}
         {messages.length === 0 && !loadingSession && <div className="pt-5">
@@ -189,7 +189,7 @@ export default function AssistantChat() {
     {showHistory && <div className="fixed inset-0 z-[150] flex justify-end bg-black/40" role="presentation" onClick={() => setShowHistory(false)}>
       <aside role="dialog" aria-modal="true" aria-label="对话记录" onClick={(event) => event.stopPropagation()} className="flex h-full w-[min(86vw,360px)] flex-col bg-card pt-[env(safe-area-inset-top)] shadow-xl">
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4"><h2 className="font-bold">对话记录</h2><button onClick={() => setShowHistory(false)} title="关闭" aria-label="关闭" className="flex h-9 w-9 items-center justify-center"><X size={20} /></button></div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{sessions.length === 0 ? <p className="p-5 text-sm text-text3">还没有对话记录</p> : sessions.map((session) => <div key={session.id} className={`flex items-center gap-1 border-b border-border px-3 ${sessionId === session.id ? "bg-primary-light/50" : ""}`}><button onClick={() => void openSession(session.id)} className="min-w-0 flex-1 py-3 text-left"><span className="block truncate text-sm font-medium">{session.title}</span><span className="mt-1 block text-xs text-text3">{new Date(session.updated_at).toLocaleDateString("zh-CN")}</span></button><button onClick={() => void deleteSession(session.id)} title="删除对话" aria-label={`删除${session.title}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-text3"><Trash2 size={16} /></button></div>)}</div>
+        <div className="app-scroll min-h-0 flex-1 overflow-y-auto">{sessions.length === 0 ? <p className="p-5 text-sm text-text3">还没有对话记录</p> : sessions.map((session) => <div key={session.id} className={`flex items-center gap-1 border-b border-border px-3 ${sessionId === session.id ? "bg-primary-light/50" : ""}`}><button onClick={() => void openSession(session.id)} className="min-w-0 flex-1 py-3 text-left"><span className="block truncate text-sm font-medium">{session.title}</span><span className="mt-1 block text-xs text-text3">{new Date(session.updated_at).toLocaleDateString("zh-CN")}</span></button><button onClick={() => void deleteSession(session.id)} title="删除对话" aria-label={`删除${session.title}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-text3"><Trash2 size={16} /></button></div>)}</div>
         <button onClick={newChat} className="m-4 flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-white"><Plus size={18} />新对话</button>
       </aside>
     </div>}

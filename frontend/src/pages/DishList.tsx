@@ -356,7 +356,7 @@ export default function DishList() {
               </div>
             </div>
 
-            <div ref={listRef} className="flex-1 overflow-y-auto px-3 scrollbar-none overscroll-y-contain">
+            <div ref={listRef} className="app-scroll flex-1 overflow-y-auto px-3 scrollbar-none overscroll-y-contain">
               {isLoading ? (
                 <div className="space-y-3">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -462,7 +462,7 @@ export default function DishList() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-5 py-3 scrollbar-none">
+              <div className="app-scroll flex-1 overflow-y-auto px-5 py-3 scrollbar-none">
                 <div className="mb-4 grid grid-cols-3 gap-2">
                   <div className="rounded-2xl bg-bg px-3 py-2.5">
                     <div className="text-[11px] font-semibold text-text3">菜品</div>

@@ -79,12 +79,7 @@ export default function MainLayout() {
 
     function onTouchMove(e: TouchEvent) {
       const ref = touchRef.current
-      if (!ref) {
-        const x = e.touches[0].clientX
-        if (x < EDGE_ZONE || x > window.innerWidth - EDGE_ZONE) e.preventDefault()
-        return
-      }
-      e.preventDefault()
+      if (!ref) return
       const dx = e.touches[0].clientX - ref.startX
       const dy = e.touches[0].clientY - ref.startY
       if (!ref.directionDecided) {
@@ -95,6 +90,9 @@ export default function MainLayout() {
       if (!ref.isHorizontal) return resetStrip()
       if ((ref.startEdge === "left" && dx < 0) || (ref.startEdge === "right" && dx > 0)) return resetStrip()
 
+      // Only claim a confirmed horizontal edge gesture. Vertical gestures must
+      // remain native scrolling gestures, especially in Android WebView.
+      e.preventDefault()
       const vw = window.innerWidth
       const maxDx = vw * 0.35
       const clampedDx = Math.max(-maxDx, Math.min(maxDx, dx))
@@ -132,10 +130,12 @@ export default function MainLayout() {
     document.addEventListener("touchstart", onTouchStart, { passive: true })
     document.addEventListener("touchmove", onTouchMove, { passive: false })
     document.addEventListener("touchend", onTouchEnd, { passive: true })
+    document.addEventListener("touchcancel", onTouchEnd, { passive: true })
     return () => {
       document.removeEventListener("touchstart", onTouchStart)
       document.removeEventListener("touchmove", onTouchMove)
       document.removeEventListener("touchend", onTouchEnd)
+      document.removeEventListener("touchcancel", onTouchEnd)
     }
   }, [activeIdx, navigate])
 
@@ -173,7 +173,7 @@ export default function MainLayout() {
           {tabs.map((tab) => (
             <div
               key={tab.path}
-              className="h-full overflow-y-auto overscroll-y-contain pb-[calc(68px+env(safe-area-inset-bottom))]"
+              className="app-scroll h-full overflow-y-auto overscroll-y-contain pb-[calc(68px+env(safe-area-inset-bottom))]"
               style={{ width: `${STEP_PCT}%`, flexShrink: 0 }}
             >
               <tab.Component />

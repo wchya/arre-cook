@@ -567,7 +567,7 @@ function DishPickerModal({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
+        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-6">
           {isLoading ? (
             <div className="space-y-2 py-3">
               {Array.from({ length: 6 }).map((_, i) => (

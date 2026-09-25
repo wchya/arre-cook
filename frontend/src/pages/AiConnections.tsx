@@ -244,7 +244,7 @@ while True:
       </div>
 
       {creating && (
-        <AnimatedBottomSheet onClose={() => setCreating(false)} className="max-h-[88dvh] overflow-y-auto rounded-t-3xl p-5 pb-8">
+        <AnimatedBottomSheet onClose={() => setCreating(false)} className="app-scroll max-h-[88dvh] overflow-y-auto rounded-t-3xl p-5 pb-8">
           {({ close }) => (
             <>
               <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border2" />
