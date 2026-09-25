@@ -97,6 +97,11 @@ Page({
     let token = ""
     try { token = wx.getStorageSync(SESSION_KEY) || "" } catch (_) { /* ignore */ }
     if (!token) return
+    // Do not validate an existing session (and therefore fetch account data)
+    // until the user has already granted the current privacy agreement.
+    let consented = false
+    try { consented = wx.getStorageSync("ninimenu_privacy_consent_v1") === "1" } catch (_) { /* ignore */ }
+    if (!consented) return
     try {
       await new Promise((resolve, reject) => wx.request({
         url: `${app.globalData.apiBase}/me`,
