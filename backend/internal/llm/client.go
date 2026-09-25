@@ -63,7 +63,7 @@ type cpaOverride struct {
 	CompletionsPath string `json:"completionsPath"`
 }
 
-// resolveCPA 读取 CPA 的原始配置，让 CPA 成为唯一的模型凭据来源。
+// resolveCPA 读取 DSH 的 CPA provider override，让 CPA 成为唯一的模型凭据来源。
 // 配置文件只读挂载到应用容器；未挂载时继续使用原有 LLM_* 配置。
 func resolveCPA() (Settings, bool) {
 	path := strings.TrimSpace(config.C.CPAConfigPath)

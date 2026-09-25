@@ -56,7 +56,7 @@ type Config struct {
 	LLMBaseURL string
 	LLMAPIKey  string
 	LLMModel   string
-	// CPA 配置文件：生产环境可直接读取线上 CPA 的 api-keys 与模型清单。
+	// CPA 配置文件：生产环境读取线上 DSH 的 provider override。
 	CPAConfigPath string
 	CPABaseURL    string
 	CPAModel      string

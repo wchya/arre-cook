@@ -88,7 +88,7 @@ LLM_CPA_CONFIG_PATH=/run/cpa/provider-config
 LLM_CPA_BASE_URL=http://host.docker.internal:8317/v1
 ```
 
-线上 DSH 文件当前指向 `http://172.22.0.1:8317`、`v1/chat/completions` 和 `glm-5.3`；应用读取其中的密钥和模型，并用 `LLM_CPA_BASE_URL` 将容器内地址映射到宿主机 CPA 端口。若改为 Hermes 的 YAML 配置，可将同一路径挂载到 Hermes 配置文件，并继续提供 `LLM_CPA_BASE_URL` 覆盖容器内不可用的 `127.0.0.1` 地址。只有未配置 CPA 文件或 CPA 配置缺失时，才回退到管理员设置或 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。未配置任何模型时，站内助手仍使用本地推荐引擎。
+线上 DSH 文件当前指向 `http://172.22.0.1:8317`、`v1/chat/completions` 和 `glm-5.3`；应用读取其中的密钥和模型，并用 `LLM_CPA_BASE_URL` 将容器内地址映射到宿主机 CPA 端口。Hermes 的配置用于交叉确认同一 CPA 地址和模型，生产应用当前以 DSH JSON 覆盖文件作为唯一来源。只有未配置 CPA 文件或 CPA 配置缺失时，才回退到管理员设置或 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。未配置任何模型时，站内助手仍使用本地推荐引擎。
 
 每位用户在「我的 → AI 连接」创建自己的访问令牌。外部 Agent 和 MCP 客户端必须使用该用户的令牌；不要配置旧的全站 `AGENT_TOKEN`。发给第三方的令牌可以撤销、限范围，并在调用记录中查看。
 
