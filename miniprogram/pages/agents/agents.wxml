@@ -1,0 +1,53 @@
+<scroll-view class="mp-screen" scroll-y show-scrollbar="false">
+  <view class="mp-content agent-content">
+    <view class="mp-header"><view><view class="mp-title">Agent 接入</view><view class="mp-subtitle">查看连接和调用记录，管理每个 Agent 的独立令牌。</view></view></view>
+    <view wx:if="{{error}}" class="mp-error">{{error}}</view>
+
+    <view class="agent-callout">
+      <view class="callout-mark">A</view>
+      <view class="callout-copy"><view class="callout-title">和饮食助手对话</view><view class="callout-text">让助手结合你的菜谱与饮食记录给出建议。</view></view>
+      <button class="chat-button" bindtap="openChat">打开</button>
+    </view>
+
+    <view wx:if="{{summary}}" class="agent-stats">
+      <view class="agent-stat"><text class="stat-value">{{summary.active_tokens}}</text><text class="stat-label">有效令牌</text></view>
+      <view class="agent-stat"><text class="stat-value">{{summary.calls_last_24_hours}}</text><text class="stat-label">24 小时调用</text></view>
+      <view class="agent-stat"><text class="stat-value">{{summary.calls}}</text><text class="stat-label">累计调用</text></view>
+      <view class="agent-stat"><text class="stat-value">{{summary.error_total}}</text><text class="stat-label">失败 / 拒绝</text></view>
+    </view>
+
+    <view class="mp-section-heading agent-list-heading"><view class="mp-section-title">连接令牌</view><button class="create-button" bindtap="openCreate">＋ 新建</button></view>
+    <view wx:if="{{showCreate}}" class="mp-panel create-panel">
+      <view class="create-title">新建个人令牌</view>
+      <label class="agent-field"><text>连接名称</text><input class="mp-input" value="{{name}}" maxlength="40" placeholder="例如 Hermes、DeepSeek" bindinput="onNameInput" /></label>
+      <label class="agent-field"><text>权限</text><picker mode="selector" range="{{presets}}" range-key="label" value="{{presetIndex}}" bindchange="onPresetChange"><view class="picker-value">{{presets[presetIndex].label}} · {{presets[presetIndex].desc}}</view></picker></label>
+      <label class="agent-field"><text>有效期</text><picker mode="selector" range="{{expires}}" value="{{expiryIndex}}" bindchange="onExpiryChange"><view class="picker-value">{{expires[expiryIndex] === 0 ? '永久' : expires[expiryIndex] + ' 天'}}</view></picker></label>
+      <view wx:if="{{error}}" class="mp-error form-error">{{error}}</view>
+      <view class="form-actions"><button class="cancel-button" bindtap="closeCreate">取消</button><button class="mp-primary create-submit" loading="{{saving}}" disabled="{{saving}}" bindtap="createToken">创建令牌</button></view>
+    </view>
+
+    <view wx:if="{{createdToken}}" class="new-token-panel">
+      <view class="new-token-heading"><view><view class="new-token-title">令牌已创建</view><view class="mp-small">完整令牌只显示这一次，请立即复制保存。</view></view><button class="dismiss-button" bindtap="dismissToken">关闭</button></view>
+      <view class="token-value">{{createdToken}}</view>
+      <button class="copy-button" bindtap="copyToken">复制令牌</button>
+    </view>
+
+    <view wx:if="{{loading}}" class="loading-note">正在读取连接信息…</view>
+    <view wx:elif="{{tokens.length === 0 && !showCreate}}" class="mp-panel agent-empty"><view class="empty-title">还没有连接令牌</view><view class="mp-muted">为 Hermes、DeepSeek Harness 等 Agent 单独创建令牌，并按需授予权限。</view><button class="mp-secondary empty-create" bindtap="openCreate">创建第一个令牌</button></view>
+    <view wx:else class="token-list">
+      <view wx:for="{{tokens}}" wx:key="id" class="token-row">
+        <view class="token-top"><view class="token-name">{{item.name}}</view><text class="token-state {{item.active ? 'token-on' : 'token-off'}}">{{item.active ? '有效' : '已撤销'}}</text></view>
+        <view class="token-prefix">{{item.prefix}}••••••••</view>
+        <view class="token-scopes">{{item.scopeText}}</view>
+        <view class="token-foot"><text>最近调用：{{item.last_used_at || '从未'}}</text><button wx:if="{{item.active}}" class="revoke-button" data-id="{{item.id}}" bindtap="revokeToken">撤销</button></view>
+      </view>
+    </view>
+
+    <view class="mp-section">
+      <view class="mp-section-heading"><view class="mp-section-title">最近调用</view><text class="mp-small">{{audit.length}} 条</text></view>
+      <view wx:if="{{audit.length === 0}}" class="audit-empty">暂无调用记录</view>
+      <view wx:else class="audit-list"><view wx:for="{{audit}}" wx:key="id" class="audit-row"><view class="audit-status {{item.status === 'ok' ? 'audit-ok' : 'audit-fail'}}"></view><view class="audit-main"><view class="audit-tool">{{item.tool || 'Agent 调用'}}</view><view class="audit-meta">{{item.actor || item.channel || 'Agent'}} · {{item.duration_ms}} ms</view></view><text class="audit-result">{{item.status === 'ok' ? '成功' : item.status === 'denied' ? '无权限' : '失败'}}</text></view></view>
+    </view>
+    <view class="agent-note">每个令牌只关联当前账号的数据。发现异常调用时可立即撤销令牌。</view>
+  </view>
+</scroll-view>

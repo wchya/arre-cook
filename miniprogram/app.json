@@ -1,7 +1,11 @@
 {
   "pages": [
     "pages/login/login",
-    "pages/webview/webview",
+    "pages/home/home",
+    "pages/diary/diary",
+    "pages/agents/agents",
+    "pages/chat/chat",
+    "pages/me/me",
     "pages/legal/legal"
   ],
   "window": {
@@ -9,6 +13,18 @@
     "navigationBarBackgroundColor": "#fafaf8",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#fafaf8"
+  },
+  "tabBar": {
+    "color": "#69756d",
+    "selectedColor": "#2b7b53",
+    "backgroundColor": "#fffefa",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/home", "text": "今天" },
+      { "pagePath": "pages/diary/diary", "text": "饮食" },
+      { "pagePath": "pages/agents/agents", "text": "Agent" },
+      { "pagePath": "pages/me/me", "text": "我的" }
+    ]
   },
   "style": "v2",
   "__usePrivacyCheck__": true,

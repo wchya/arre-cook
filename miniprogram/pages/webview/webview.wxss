@@ -1,6 +1,0 @@
-page { background: #f2efe8; }
-.webview-error { box-sizing: border-box; min-height: 100vh; padding: 230rpx 70rpx 100rpx; background: #f2efe8; color: #252a27; text-align: center; }
-.webview-error-mark { width: 58rpx; height: 58rpx; margin: 0 auto 28rpx; border-radius: 50%; background: #c9573d; color: #fff; font-size: 38rpx; font-weight: 800; line-height: 58rpx; }
-.webview-error-title { font-size: 34rpx; font-weight: 800; }
-.webview-error-copy { margin-top: 18rpx; color: #777c73; font-size: 23rpx; line-height: 1.7; }
-.webview-retry { width: 270rpx; height: 82rpx; margin: 44rpx auto 0; border-radius: 8rpx; background: #252a27; color: #fff; font-size: 25rpx; line-height: 82rpx; }

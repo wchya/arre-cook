@@ -1,0 +1,26 @@
+<scroll-view class="mp-screen" scroll-y show-scrollbar="false">
+  <view class="mp-content me-content">
+    <view class="mp-header"><view><view class="mp-title">我的</view><view class="mp-subtitle">账号与个人饮食数据</view></view></view>
+    <view wx:if="{{error}}" class="mp-error">{{error}}</view>
+    <view wx:if="{{user}}" class="profile-panel">
+      <image wx:if="{{user.avatar}}" class="profile-avatar" src="{{user.avatar}}" mode="aspectFill" />
+      <view wx:else class="profile-avatar profile-initial">{{initial}}</view>
+      <view class="profile-details"><view class="profile-name">{{user.nickname || user.username || '食谱用户'}}</view><view class="profile-email">{{user.email || user.username}}</view><view class="profile-state">{{user.wechat_bound ? '已绑定微信' : '微信未绑定'}}</view></view>
+    </view>
+
+    <view wx:if="{{stats}}" class="stats-row">
+      <view class="personal-stat"><text class="personal-value">{{stats.total_records}}</text><text class="personal-label">餐饮记录</text></view>
+      <view class="personal-stat"><text class="personal-value">{{stats.current_streak}}</text><text class="personal-label">连续记录天数</text></view>
+      <view class="personal-stat"><text class="personal-value">{{stats.distinct_dishes}}</text><text class="personal-label">吃过的菜</text></view>
+    </view>
+
+    <view class="mp-section account-section">
+      <view class="account-link" bindtap="goDiary"><view class="link-mark mark-green">食</view><view class="link-copy"><view class="link-title">饮食记录与健康报告</view><view class="link-desc">查看每日记录和饮食趋势</view></view><text class="link-arrow">›</text></view>
+      <view class="account-link" bindtap="goAgents"><view class="link-mark mark-coral">AI</view><view class="link-copy"><view class="link-title">Agent 接入管理</view><view class="link-desc">令牌、调用情况与数据权限</view></view><text class="link-arrow">›</text></view>
+      <view class="account-link" bindtap="goChat"><view class="link-mark mark-gold">聊</view><view class="link-copy"><view class="link-title">饮食助手</view><view class="link-desc">通过对话管理食谱和饮食信息</view></view><text class="link-arrow">›</text></view>
+    </view>
+
+    <view class="account-note">登录后读取和修改的数据均归属于当前账号。Agent 令牌可在接入管理中随时撤销。</view>
+    <button class="logout-button" loading="{{loading}}" bindtap="logout">退出登录</button>
+  </view>
+</scroll-view>

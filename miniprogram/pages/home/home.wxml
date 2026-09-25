@@ -1,0 +1,40 @@
+<scroll-view class="mp-screen" scroll-y refresher-enabled refresher-triggered="{{refreshing}}" bindrefresherrefresh="onPullDownRefresh" show-scrollbar="false">
+  <view class="mp-content home-content">
+    <view class="home-brand"><view class="home-mark">N</view><text>NiniMenu</text><view class="home-privacy">私人餐桌</view></view>
+    <view class="home-greeting">{{greeting}}，{{user.nickname || '今天想吃点什么？'}}</view>
+    <view class="home-date">{{today}} · 今天的餐桌</view>
+
+    <view wx:if="{{error}}" class="mp-error home-error">{{error}}</view>
+
+    <view class="mp-section">
+      <view class="mp-section-heading">
+        <view><view class="mp-section-title">为你挑了几道菜</view><view class="mp-small">结合你的口味与近期记录</view></view>
+        <button class="refresh-button" loading="{{refreshing}}" bindtap="refreshRecommendations" aria-label="换一组推荐">换一组</button>
+      </view>
+      <view wx:if="{{loading}}" class="loading-block"><view class="loading-line"></view><view class="loading-line short"></view></view>
+      <view wx:elif="{{items.length === 0}}" class="mp-panel empty-panel">还没有可推荐的菜谱，稍后再试。</view>
+      <view wx:else class="recommend-list">
+        <view wx:for="{{items}}" wx:key="dish.id" class="recommend-item">
+          <image wx:if="{{item.dish.image_url}}" class="dish-image" src="{{item.dish.image_url}}" mode="aspectFill" lazy-load />
+          <view wx:else class="dish-image dish-placeholder">🍽</view>
+          <view class="dish-info">
+            <view class="dish-name">{{item.dish.name}}</view>
+            <view class="dish-meta">{{item.dish.category || '家常菜'}}<text wx:if="{{item.dish.cook_time}}"> · {{item.dish.cook_time}} 分钟</text></view>
+            <view wx:if="{{item.reasons.length}}" class="dish-reason">{{item.reasons[0]}}</view>
+            <button class="record-button" data-id="{{item.dish.id}}" loading="{{recordingId === item.dish.id}}" disabled="{{recordingId !== 0}}" bindtap="recordDish">记下这餐</button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="mp-section">
+      <view class="mp-section-heading"><view class="mp-section-title">今天已记录</view><navigator class="text-link" url="/pages/diary/diary">饮食报告 ›</navigator></view>
+      <view class="mp-panel">
+        <view wx:if="{{todayRecords.length === 0}}" class="empty-record">今天还没有记录。吃过之后，记一笔就能慢慢看见饮食习惯。</view>
+        <view wx:for="{{todayRecords}}" wx:key="id" class="today-row"><view><view class="today-dish">{{item.dish_name}}</view><view class="mp-small">{{item.meal_type === 'lunch' ? '午餐' : item.meal_type === 'dinner' ? '晚餐' : item.meal_type}}</view></view><text class="record-check">已记录</text></view>
+      </view>
+    </view>
+
+    <view class="home-foot">饮食建议用于日常参考，不替代专业医疗意见。</view>
+  </view>
+</scroll-view>

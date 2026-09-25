@@ -1,37 +1,59 @@
 <scroll-view class="page" scroll-y="true" enable-flex="true" show-scrollbar="false" enhanced="true">
   <view class="page-inner">
     <view class="topbar">
-      <view class="brand-lockup">
-        <view class="brand-kicker">ARRÉ / KITCHEN NOTE</view>
-        <view class="brand-name">arre 食谱</view>
+      <view class="brand">
+        <view class="brand-mark">N</view>
+        <view>
+          <view class="brand-name">NiniMenu</view>
+          <view class="brand-subtitle">你的每日餐桌</view>
+        </view>
       </view>
-      <view class="issue-stamp" aria-label="今日开席">
-        <view class="stamp-mark">👨‍🍳</view>
-        <view class="stamp-copy">今日<br />开席</view>
-      </view>
+      <view class="privacy-badge"><view class="privacy-dot"></view><text>私密保存</text></view>
     </view>
 
-    <view class="hero">
-      <view class="hero-overline">WELCOME TO YOUR TABLE</view>
-      <view class="hero-title">每一餐，<text class="hero-accent">都有安排。</text></view>
-      <view class="hero-meta"><text class="meta-index">01</text><view class="meta-rule"></view><text class="meta-copy">个性菜单 · 饮食记录 · 家庭协作</text></view>
+    <view class="intro">
+      <view class="intro-label">WELCOME HOME</view>
+      <view class="intro-title">今天吃什么，<text>现在就有答案。</text></view>
+      <view class="intro-copy">登录后管理你的菜谱、饮食记录和健康计划。</view>
     </view>
 
-    <view class="login-shell">
-      <view class="shell-head">
-        <view><view class="section-kicker">ACCOUNT ACCESS</view><view class="shell-title">进入你的厨房</view></view>
-        <view class="secure-tag"><view class="secure-dot"></view>私密连接</view>
+    <view class="login-card">
+      <view class="card-heading">
+        <view>
+          <view class="card-eyebrow">ACCOUNT ACCESS</view>
+          <view class="card-title">进入你的厨房</view>
+        </view>
+        <view class="card-index">01 / 01</view>
       </view>
 
-      <view wx:if="{{message}}" class="message" role="status"><text class="message-mark">✓</text><text>{{message}}</text></view>
-      <view wx:if="{{error}}" class="error" role="alert"><text class="error-mark">!</text><text>{{error}}</text></view>
+      <view wx:if="{{message}}" class="message" role="status"><view class="status-icon status-success">✓</view><text>{{message}}</text></view>
+      <view wx:if="{{error}}" class="error" role="alert"><view class="status-icon status-error">!</view><text>{{error}}</text></view>
 
-      <view class="mode-switch" role="tablist">
+      <view class="consent-box">
+        <checkbox-group bindchange="onConsentChange"><label class="consent-label"><checkbox value="agreed" checked="{{agreed}}" color="#2f8a61" /><text>我已阅读并同意</text></label></checkbox-group>
+        <navigator url="/pages/legal/legal?type=terms" class="legal-link">用户服务协议</navigator><text class="consent-and">和</text><navigator url="/pages/legal/legal?type=privacy" class="legal-link">隐私政策</navigator>
+      </view>
+
+      <view wx:if="{{wechatEnabled}}" class="quick-entry">
+        <view class="quick-entry-copy">
+          <view class="quick-entry-title">微信快捷登录</view>
+          <view class="quick-entry-subtitle">已绑定微信账号可直接进入</view>
+        </view>
+        <button class="wechat-button" hover-class="wechat-hover" loading="{{loading}}" disabled="{{loading || !agreed}}" bindtap="loginWithWechat">
+          <view class="wechat-symbol"><view class="wechat-bubble wechat-bubble-main"></view><view class="wechat-bubble wechat-bubble-small"></view></view>
+          <text>微信登录</text>
+          <text class="button-arrow">→</text>
+        </button>
+      </view>
+
+      <view wx:if="{{wechatEnabled}}" class="divider"><view class="divider-line"></view><text>或使用其他方式</text><view class="divider-line"></view></view>
+
+      <view wx:if="{{emailEnabled}}" class="mode-switch" role="tablist">
         <button class="mode-tab {{loginMode === 'email' ? 'mode-tab-active' : ''}}" hover-class="mode-tab-hover" data-mode="email" bindtap="switchLoginMode">邮箱验证码</button>
         <button class="mode-tab {{loginMode === 'password' ? 'mode-tab-active' : ''}}" hover-class="mode-tab-hover" data-mode="password" bindtap="switchLoginMode">账号密码</button>
       </view>
 
-      <block wx:if="{{loginMode === 'email'}}">
+      <block wx:if="{{emailEnabled && loginMode === 'email'}}">
         <view class="field-label">QQ / Foxmail 邮箱</view>
         <view class="input-wrap"><text class="input-prefix">@</text><input class="input input-with-prefix" type="text" maxlength="120" value="{{email}}" placeholder="name@qq.com" autocomplete="email" bindinput="onEmailInput" /></view>
         <view class="field-label code-label">邮箱验证码</view>
@@ -54,13 +76,8 @@
         <view class="helper-note">提审账号也可以从这里进入完整功能。</view>
       </block>
 
-      <button wx:if="{{wechatEnabled}}" class="wechat-button" hover-class="wechat-hover" loading="{{loading}}" disabled="{{loading || !agreed}}" bindtap="loginWithWechat"><text class="wechat-mark">微</text><text>微信快捷登录</text></button>
     </view>
 
-    <view class="consent-strip">
-      <checkbox-group bindchange="onConsentChange"><label class="consent-label"><checkbox value="agreed" checked="{{agreed}}" color="#c9573d" /><text>我已阅读并同意</text></label></checkbox-group>
-      <navigator url="/pages/legal/legal?type=terms" class="legal-link">用户服务协议</navigator><text class="consent-and">和</text><navigator url="/pages/legal/legal?type=privacy" class="legal-link">隐私政策</navigator>
-    </view>
     <view class="footer-note"><view class="footer-rule"></view><text>你的账号数据仅对你可见</text><view class="footer-rule"></view></view>
   </view>
 </scroll-view>

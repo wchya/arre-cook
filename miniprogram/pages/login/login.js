@@ -56,7 +56,6 @@ Page({
   onLoad(options) {
     if (options.reason) {
       try { wx.removeStorageSync(SESSION_KEY) } catch (_) { /* ignore */ }
-      app.globalData.pendingToken = ""
       this.setData({ message: options.reason === "expired" ? "登录已过期，请重新登录" : "已退出登录" })
     }
     this.loadOptions()
@@ -83,8 +82,10 @@ Page({
   async loadOptions() {
     try {
       const options = await request("/auth/options")
+      const emailEnabled = Boolean(options.email)
       this.setData({
-        emailEnabled: Boolean(options.email),
+        emailEnabled,
+        loginMode: emailEnabled ? this.data.loginMode : "password",
         emailDev: Boolean(options.email_dev),
         wechatEnabled: Boolean(options.wechat),
         registerOpen: options.register_open !== false,
@@ -111,7 +112,7 @@ Page({
         success: (response) => response.statusCode === 200 && response.data?.code === 0 ? resolve(response.data.data) : reject(new Error("登录已过期")),
         fail: () => reject(new Error("网络连接失败")),
       }))
-      this.openWeb(token)
+      this.enterApp(token)
     } catch (_) {
       try { wx.removeStorageSync(SESSION_KEY) } catch (_) { /* ignore */ }
     }
@@ -200,9 +201,12 @@ Page({
     }
     this.setData({ loading: true, error: "", message: "" })
     try {
-      const code = this.data.wechatEnabled ? await wxLoginCode() : ""
+      let code = ""
+      if (this.data.wechatEnabled) {
+        try { code = await wxLoginCode() } catch (_) { /* email login does not depend on WeChat login */ }
+      }
       const result = await request("/auth/email/login", { email: this.data.email.trim(), code: this.data.code, wechat_code: code })
-      this.openWeb(result.token)
+      this.enterApp(result.token)
     } catch (error) {
       this.setData({ error: error.message || "登录失败" })
     } finally {
@@ -222,7 +226,7 @@ Page({
     this.setData({ loading: true, error: "", message: "" })
     try {
       const result = await request("/auth/login", { account: this.data.account.trim(), password: this.data.password })
-      this.openWeb(result.token)
+      this.enterApp(result.token)
     } catch (error) {
       this.setData({ error: error.message || "登录失败" })
     } finally {
@@ -243,7 +247,7 @@ Page({
       if (result.need_bind) {
         this.setData({ error: "该微信尚未绑定账号，请使用 QQ 邮箱验证码登录并完成绑定" })
       } else if (result.token) {
-        this.openWeb(result.token)
+        this.enterApp(result.token)
       } else {
         throw new Error("微信登录没有返回有效凭证")
       }
@@ -254,10 +258,9 @@ Page({
     }
   },
 
-  openWeb(token) {
+  enterApp(token) {
     app.globalData.sessionRestoreAttempted = true
     try { wx.setStorageSync(SESSION_KEY, token) } catch (_) { /* ignore */ }
-    app.globalData.pendingToken = token
-    wx.reLaunch({ url: "/pages/webview/webview" })
+    wx.switchTab({ url: "/pages/home/home" })
   },
 })

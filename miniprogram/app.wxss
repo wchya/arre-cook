@@ -8,3 +8,23 @@ page {
 button::after {
   border: 0;
 }
+
+.mp-screen { min-height: 100vh; box-sizing: border-box; background: #f6f4ef; color: #1f2924; }
+.mp-content { box-sizing: border-box; padding: 30rpx 30rpx calc(44rpx + env(safe-area-inset-bottom)); }
+.mp-header { display: flex; align-items: flex-start; justify-content: space-between; margin: 4rpx 0 25rpx; }
+.mp-title { color: #1f2924; font-family: Georgia, "Songti SC", serif; font-size: 40rpx; font-weight: 800; line-height: 1.2; }
+.mp-subtitle { margin-top: 8rpx; color: #68756c; font-size: 21rpx; line-height: 1.5; }
+.mp-section { margin-top: 30rpx; }
+.mp-section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14rpx; }
+.mp-section-title { color: #26342b; font-size: 27rpx; font-weight: 800; }
+.mp-panel { padding: 23rpx; border: 1px solid #e1e3dc; border-radius: 14rpx; background: #fffefa; }
+.mp-row { display: flex; align-items: center; justify-content: space-between; padding: 18rpx 0; border-bottom: 1px solid #e8eae4; }
+.mp-row:last-child { border-bottom: 0; }
+.mp-muted { color: #68756c; font-size: 21rpx; line-height: 1.5; }
+.mp-small { color: #7f8981; font-size: 18rpx; line-height: 1.5; }
+.mp-primary { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 80rpx; padding: 0 24rpx; border-radius: 10rpx; background: #1f2924; color: #fff; font-size: 23rpx; font-weight: 700; }
+.mp-primary[disabled] { opacity: .45; }
+.mp-secondary { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 72rpx; padding: 0 20rpx; border: 1px solid #d6ded7; border-radius: 9rpx; background: #f0f7f1; color: #286b49; font-size: 21rpx; font-weight: 700; }
+.mp-input { box-sizing: border-box; width: 100%; height: 78rpx; padding: 0 18rpx; border: 1px solid #d9ded7; border-radius: 9rpx; background: #fff; color: #1f2924; font-size: 23rpx; }
+.mp-chip { display: inline-flex; align-items: center; padding: 9rpx 15rpx; margin: 0 8rpx 8rpx 0; border: 1px solid #d9ded7; border-radius: 999rpx; color: #546258; font-size: 19rpx; }
+.mp-error { padding: 14rpx 16rpx; border-radius: 9rpx; background: #fff0eb; color: #9a3f2c; font-size: 20rpx; line-height: 1.5; }

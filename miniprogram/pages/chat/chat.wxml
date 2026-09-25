@@ -1,0 +1,9 @@
+<view class="chat-screen">
+  <view class="chat-header"><view><view class="chat-title">饮食助手</view><view class="chat-subtitle">只读取当前账号的数据</view></view><view class="chat-status"><view class="status-dot"></view>在线</view></view>
+  <scroll-view class="message-scroll" scroll-y scroll-with-animation>
+    <view wx:if="{{messages.length === 0}}" class="chat-empty"><view class="assistant-mark">A</view><view class="empty-title">今天想怎么安排？</view><view class="empty-copy">你可以问我吃什么、记录一餐，或者看看最近的饮食趋势。</view><view class="suggestions"><button wx:for="{{suggestions}}" wx:key="*this" class="suggestion" data-text="{{item}}" bindtap="useSuggestion">{{item}}</button></view></view>
+    <view wx:for="{{messages}}" wx:key="index" id="{{'msg-' + index}}" class="message-row {{item.role === 'user' ? 'message-user' : 'message-assistant'}}"><view wx:if="{{item.role !== 'user'}}" class="message-mark">A</view><view class="message-bubble"><text>{{item.content}}</text><view wx:if="{{item.steps.length}}" class="tool-steps"><view wx:for="{{item.steps}}" wx:for-item="step" wx:key="*this" class="tool-step"><view class="step-dot"></view>{{step}}</view></view></view></view>
+    <view wx:if="{{error}}" class="chat-error">{{error}}</view>
+  </scroll-view>
+  <view class="composer"><view wx:if="{{loading}}" class="loading-bar"><view class="loading-pulse"></view><text>助手正在整理你的数据…</text><button bindtap="cancel">停止</button></view><view class="input-row"><textarea class="chat-input" value="{{input}}" maxlength="1000" auto-height placeholder="说说你想吃什么…" bindinput="onInput" confirm-type="send" bindconfirm="send" /><button class="send-button" loading="{{loading}}" disabled="{{loading || !canSend}}" bindtap="send">发送</button></view></view>
+</view>
