@@ -105,13 +105,13 @@ export default function Login() {
   const canSubmit = mode === "code" ? emailValid && /^\d{6}$/.test(code.trim()) : account.trim() !== "" && password !== ""
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-bg">
+    <div className="app-scroll h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain bg-bg" style={{ touchAction: "pan-y" }}>
       {/* 背景：暖色光晕 */}
       <div className="pointer-events-none absolute -left-24 -top-32 h-80 w-80 rounded-full bg-primary/25 blur-3xl" />
       <div className="pointer-events-none absolute -right-20 top-40 h-72 w-72 rounded-full bg-yellow/30 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-mint/20 blur-3xl" />
 
-      <div className="relative mx-auto flex min-h-dvh max-w-[420px] flex-col px-6" style={{ paddingTop: "calc(56px + env(safe-area-inset-top))", paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}>
+      <div className="relative mx-auto flex min-h-full max-w-[420px] flex-col px-6" style={{ paddingTop: "calc(56px + env(safe-area-inset-top))", paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}>
         <div className="mb-8">
           <img src="/chef-mark.svg" alt={appName} className="mb-5 h-[68px] w-[68px] rounded-[20px] shadow-[0_14px_36px_rgba(232,115,74,.28)]" />
           <h1 className="text-[30px] font-black leading-tight tracking-tight text-text">
