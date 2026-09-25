@@ -91,7 +91,7 @@ docker compose --profile garage exec garage /garage bucket allow --read --write 
 
 生产验证已通过：管理员登录后上传图片返回 `storage=s3`；应用 `/uploads/` 回读返回 `200 image/jpeg`；删除后回读返回 `404`。健康检查 `/healthz` 同时报告 `storage=s3`。
 
-升级新版前先用 SQLite 在线备份旧库。线上旧库位于 `arre-cook_ninimenu-data` 卷，使用 WAL，不能只复制 `ninimenu.db` 而漏掉 `-wal` 文件。此次升级前已执行在线备份，并在隔离副本完成迁移演练；后续升级仍应按以下方式先备份：
+升级新版前先备份 MySQL `ninimenu` 数据库。迁移前的旧 SQLite 源库位于 `arre-cook_ninimenu-data` 卷，使用 WAL，不能只复制 `ninimenu.db` 而漏掉 `-wal` 文件。此次升级前已执行在线备份，并在隔离副本完成迁移演练；后续如需回滚或重建仍应先备份：
 
 ```sh
 mkdir -p /home/ubuntu/backups/arre-cook
