@@ -78,7 +78,7 @@
       <view class="de-thumbs">
         <view wx:for="{{imageThumbs}}" wx:key="*this" class="de-thumb">
           <image class="de-thumb__img" src="{{item}}" mode="aspectFill" webp />
-          <view class="de-thumb__del" catchtap="removeImage" data-index="{{index}}"><icon name="x" size="24" stroke="2.6" color="white" /></view>
+          <view class="de-thumb__del" hover-class="tap-active" hover-stay-time="60" catchtap="removeImage" data-index="{{index}}"><icon name="x" size="24" stroke="2.6" color="white" /></view>
         </view>
         <view class="de-add" hover-class="tap-active" bindtap="pickExtra">
           <view wx:if="{{uploadingExtra}}" class="spinner"></view>

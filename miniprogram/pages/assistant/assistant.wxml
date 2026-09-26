@@ -58,11 +58,11 @@
     </view>
 
     <view class="flex gap-16 mb-24">
-      <view wx:for="{{meals}}" wx:key="key" class="opt flex-1 {{meal === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" bindtap="pickMeal">{{item.label}}</view>
+      <view wx:for="{{meals}}" wx:key="key" class="opt flex-1 {{meal === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" hover-class="tap-active" hover-stay-time="60" bindtap="pickMeal">{{item.label}}</view>
     </view>
 
     <scroll-view class="mood-row" scroll-x enhanced show-scrollbar="{{false}}">
-      <view wx:for="{{moods}}" wx:key="key" class="opt opt--inline {{mood === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" bindtap="pickMood">
+      <view wx:for="{{moods}}" wx:key="key" class="opt opt--inline {{mood === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" hover-class="tap-active" hover-stay-time="60" bindtap="pickMood">
         <icon name="{{item.icon}}" size="28" stroke="2.4" color="{{mood === item.key ? 'primary' : 'text2'}}" />
         <text>{{item.label}}</text>
       </view>
@@ -70,12 +70,12 @@
 
     <view class="label">想要的口味（可多选）</view>
     <view class="chips mb-24">
-      <view wx:for="{{tasteOptions}}" wx:key="name" class="pill {{item.on ? 'is-on' : ''}}" data-index="{{index}}" bindtap="toggleTaste">{{item.name}}</view>
+      <view wx:for="{{tasteOptions}}" wx:key="name" class="pill {{item.on ? 'is-on' : ''}}" data-index="{{index}}" hover-class="tap-active" hover-stay-time="60" bindtap="toggleTaste">{{item.name}}</view>
     </view>
 
     <view class="label">烹饪时间</view>
     <view class="flex gap-12 mb-24">
-      <view wx:for="{{cookTimes}}" wx:key="value" class="pill pill--time flex-1 {{maxCookTime === item.value ? 'is-mint' : ''}}" data-value="{{item.value}}" bindtap="pickCookTime">{{item.label}}</view>
+      <view wx:for="{{cookTimes}}" wx:key="value" class="pill pill--time flex-1 {{maxCookTime === item.value ? 'is-mint' : ''}}" data-value="{{item.value}}" hover-class="tap-active" hover-stay-time="60" bindtap="pickCookTime">{{item.label}}</view>
     </view>
 
     <view class="grid-2">

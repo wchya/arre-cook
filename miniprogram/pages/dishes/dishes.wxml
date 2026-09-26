@@ -8,7 +8,7 @@
   <view class="body">
     <!-- 左侧分类栏 -->
     <scroll-view class="side" scroll-y enhanced show-scrollbar="{{false}}">
-      <view wx:for="{{categories}}" wx:key="name" class="side__item {{(category === item.name && !(grouped && highlight && item.name === '全部')) || (grouped && highlight === item.name) ? 'is-active' : ''}}" data-name="{{item.name}}" bindtap="selectCategory">
+      <view wx:for="{{categories}}" wx:key="name" class="side__item {{(category === item.name && !(grouped && highlight && item.name === '全部')) || (grouped && highlight === item.name) ? 'is-active' : ''}}" data-name="{{item.name}}" hover-class="tap-active" hover-stay-time="60" bindtap="selectCategory">
         <text class="side__name">{{item.name}}</text>
         <text class="side__count">{{item.count}}道</text>
       </view>
@@ -21,7 +21,7 @@
         <view class="search {{searchFocus ? 'is-focus' : ''}}">
           <icon name="search" size="28" stroke="2.4" color="text3" />
           <input class="search__input" value="{{keyword}}" placeholder="搜索菜品、配料、标签" placeholder-class="placeholder search__ph" confirm-type="search" bindinput="onSearchInput" bindfocus="onSearchFocus" bindblur="onSearchBlur" />
-          <view wx:if="{{keyword}}" class="search__clear" catchtap="clearSearch" aria-role="button" aria-label="清空搜索"><icon name="x" size="20" stroke="3" color="white" /></view>
+          <view wx:if="{{keyword}}" class="search__clear" hover-class="tap-active" hover-stay-time="60" catchtap="clearSearch" aria-role="button" aria-label="清空搜索"><icon name="x" size="20" stroke="3" color="white" /></view>
         </view>
         <view class="scope-btn {{scope ? 'is-active' : ''}}" hover-class="tap-active" bindtap="chooseScope" aria-role="button" aria-label="选择菜谱范围">
           <text>{{scopeLabel}}</text>
@@ -31,7 +31,7 @@
 
       <!-- 口味筛选 -->
       <scroll-view class="tastes" scroll-x enhanced show-scrollbar="{{false}}">
-        <view wx:for="{{tastes}}" wx:key="*this" class="taste {{taste === item ? 'is-active' : ''}}" data-taste="{{item}}" bindtap="selectTaste">{{item}}</view>
+        <view wx:for="{{tastes}}" wx:key="*this" class="taste {{taste === item ? 'is-active' : ''}}" data-taste="{{item}}" hover-class="tap-active" hover-stay-time="60" bindtap="selectTaste">{{item}}</view>
       </scroll-view>
 
       <!-- 菜品列表 -->
@@ -44,7 +44,8 @@
         scroll-into-view="{{scrollIntoView}}"
         lower-threshold="240"
         refresher-enabled
-        refresher-background="#FAFAF8"
+        refresher-background="{{refresherBg}}"
+        refresher-default-style="{{refresherStyle}}"
         refresher-triggered="{{refreshing}}"
         bindrefresherrefresh="onRefresh"
         bindscrolltolower="loadMore"
@@ -98,7 +99,7 @@
                     <icon name="{{dinnerIds[item.id] ? 'minus' : 'plus'}}" size="18" stroke="3" color="{{dinnerIds[item.id] ? 'white' : 'text2'}}" />
                     <text>🍲 晚餐</text>
                   </view>
-                  <view class="fav {{item.favorite ? 'is-on anim-heartbeat' : ''}}" data-id="{{item.id}}" bindtap="toggleFav" aria-role="button" aria-label="{{item.favorite ? '取消收藏' : '收藏'}}">
+                  <view class="fav {{item.favorite ? 'is-on anim-heartbeat' : ''}}" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation bindtap="toggleFav" aria-role="button" aria-label="{{item.favorite ? '取消收藏' : '收藏'}}">
                     <icon name="heart" size="32" stroke="2.2" color="{{item.favorite ? 'primary' : 'text4'}}" fill="{{item.favorite}}" />
                   </view>
                 </view>
@@ -143,7 +144,7 @@
         <view wx:for="{{todayLunch}}" wx:key="id" class="today__item" hover-class="tap-active" data-id="{{item.dishId}}" bindtap="openTodayDish">
           <view class="today__thumb"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="40" /></view>
           <view class="flex-1"><view class="today__name">{{item.name}}</view><view wx:if="{{item.meta}}" class="today__meta">{{item.meta}}</view></view>
-          <view class="today__del" data-id="{{item.id}}" catchtap="removeToday" aria-role="button" aria-label="移除"><icon name="trash-2" size="28" stroke="2.2" color="red" /></view>
+          <view class="today__del" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="removeToday" aria-role="button" aria-label="移除"><icon name="trash-2" size="28" stroke="2.2" color="red" /></view>
         </view>
       </view>
       <view wx:if="{{todayDinner.length}}" class="today__group">
@@ -151,7 +152,7 @@
         <view wx:for="{{todayDinner}}" wx:key="id" class="today__item" hover-class="tap-active" data-id="{{item.dishId}}" bindtap="openTodayDish">
           <view class="today__thumb"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="40" /></view>
           <view class="flex-1"><view class="today__name">{{item.name}}</view><view wx:if="{{item.meta}}" class="today__meta">{{item.meta}}</view></view>
-          <view class="today__del" data-id="{{item.id}}" catchtap="removeToday" aria-role="button" aria-label="移除"><icon name="trash-2" size="28" stroke="2.2" color="red" /></view>
+          <view class="today__del" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="removeToday" aria-role="button" aria-label="移除"><icon name="trash-2" size="28" stroke="2.2" color="red" /></view>
         </view>
       </view>
     </view>

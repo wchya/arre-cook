@@ -1,8 +1,10 @@
 :host { display: block; }
-.dcard { overflow: hidden; border: 1px solid var(--border); border-radius: 32rpx; background: var(--card); box-shadow: var(--shadow-card); transform: translateZ(0); transition: transform .15s ease, opacity .15s ease; }
+.dcard { overflow: hidden; border: 1px solid var(--border); border-radius: 32rpx; background: var(--card); box-shadow: var(--shadow-card); transform: translateZ(0); transition: transform .2s var(--ease-spring), opacity .15s ease, box-shadow .2s ease; }
 .dcard__media { position: relative; overflow: hidden; }
-.dcard__fav { position: absolute; top: 16rpx; right: 16rpx; display: flex; align-items: center; justify-content: center; width: 56rpx; height: 56rpx; border-radius: 50%; background: rgba(255, 255, 255, .9); box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, .08); }
-.dcard__diff { position: absolute; bottom: 16rpx; left: 16rpx; padding: 2rpx 16rpx; border-radius: 999rpx; background: rgba(255, 255, 255, .9); font-size: 20rpx; font-weight: 600; }
+/* 压在菜品图上的小控件用毛玻璃，深色模式下不再是刺眼的白块 */
+.dcard__fav { position: absolute; top: 16rpx; right: 16rpx; display: flex; align-items: center; justify-content: center; width: 56rpx; height: 56rpx; border: 1px solid var(--glass-border); border-radius: 50%; background: var(--glass-strong); box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, .08); -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); transition: transform .18s var(--ease-spring); }
+.dcard__fav--press { transform: scale(.86); }
+.dcard__diff { position: absolute; bottom: 16rpx; left: 16rpx; padding: 2rpx 16rpx; border: 1px solid var(--glass-border); border-radius: 999rpx; background: var(--glass-strong); font-size: 20rpx; font-weight: 600; -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); }
 .dcard__body { padding: 20rpx 24rpx 22rpx; }
 .dcard__name { overflow: hidden; margin-bottom: 6rpx; color: var(--text); font-size: 28rpx; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
 .dcard__meta { display: flex; align-items: center; gap: 12rpx; overflow: hidden; color: var(--text2); font-size: 22rpx; white-space: nowrap; }

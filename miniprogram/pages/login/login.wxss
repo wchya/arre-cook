@@ -16,7 +16,7 @@ page { background: var(--bg); }
 .brand__desc { margin-top: 18rpx; color: var(--text2); font-size: 27rpx; line-height: 1.65; }
 
 /* 登录卡片（毛玻璃） */
-.panel { margin-top: 44rpx; padding: 32rpx 32rpx 36rpx; border: 1px solid var(--glass-border); border-radius: 56rpx; background: var(--card); box-shadow: 0 48rpx 120rpx rgba(26, 26, 46, .10); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); animation-delay: .06s; }
+.panel { margin-top: 44rpx; padding: 32rpx 32rpx 36rpx; border: 1px solid var(--glass-border); border-radius: 56rpx; background: var(--glass-strong); box-shadow: 0 48rpx 120rpx rgba(26, 26, 46, .10); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); animation-delay: .06s; }
 .modes { margin-bottom: 36rpx; }
 .modes .segmented-item { font-size: 25rpx; }
 .panel__notice { margin: -8rpx 0 28rpx; }
@@ -47,7 +47,7 @@ page { background: var(--bg); }
 
 /* 微信登录 */
 .pane--wechat { display: flex; flex-direction: column; align-items: center; padding-top: 8rpx; text-align: center; }
-.wx-badge { display: flex; align-items: center; justify-content: center; width: 112rpx; height: 112rpx; margin-bottom: 20rpx; border-radius: 36rpx; background: linear-gradient(135deg, #E9FAF1 0%, #D5F5E4 100%); box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, .9), 0 16rpx 40rpx rgba(7, 193, 96, .14); }
+.wx-badge { display: flex; align-items: center; justify-content: center; width: 112rpx; height: 112rpx; margin-bottom: 20rpx; border-radius: 36rpx; background: linear-gradient(135deg, rgba(7, 193, 96, .10) 0%, rgba(7, 193, 96, .18) 100%); box-shadow: inset 0 2rpx 0 var(--highlight), 0 16rpx 40rpx rgba(7, 193, 96, .14); }
 .wx-title { color: var(--text); font-size: 34rpx; font-weight: 800; }
 .wx-desc { margin: 8rpx 0 36rpx; color: var(--text3); font-size: 24rpx; }
 .wx-alt { display: flex; align-items: center; gap: 4rpx; margin-top: 28rpx; color: var(--primary); font-size: 24rpx; font-weight: 600; }

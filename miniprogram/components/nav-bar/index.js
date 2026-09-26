@@ -20,12 +20,14 @@ Component({
     capsuleSpace: 100,
     showBack: false,
     showHome: false,
+    isIOS: false,
   },
 
   lifetimes: {
     attached() {
-      const nav = getApp().navMetrics()
-      this.setData({ statusBarHeight: nav.statusBarHeight, navBarHeight: nav.navBarHeight, capsuleSpace: nav.capsuleSpace })
+      const app = getApp()
+      const nav = app.navMetrics()
+      this.setData({ statusBarHeight: nav.statusBarHeight, navBarHeight: nav.navBarHeight, capsuleSpace: nav.capsuleSpace, isIOS: Boolean(app.globalData.isIOS) })
       this.syncButtons()
     },
     ready() {

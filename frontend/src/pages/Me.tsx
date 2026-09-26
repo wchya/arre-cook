@@ -149,7 +149,7 @@ export default function Me() {
 
         <div className="relative mx-auto mt-5 grid max-w-[640px] grid-cols-4 gap-2">
           {statTiles.map((s) => (
-            <div key={s.label} className="rounded-2xl bg-card/80 px-2 py-2.5 text-center shadow-[0_1px_2px_rgba(0,0,0,.03)] backdrop-blur">
+            <div key={s.label} className="rounded-2xl border border-glass-border glass-strong px-2 py-2.5 text-center shadow-[0_1px_2px_rgba(0,0,0,.03)]">
               <div className="text-[19px] font-black leading-tight text-text">{s.value}</div>
               <div className="text-[10px] font-semibold text-text3">{s.label}</div>
             </div>

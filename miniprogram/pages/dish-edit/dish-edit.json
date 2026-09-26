@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#FAFAF8",
+  "backgroundColor": "@bg",
   "usingComponents": {
     "nav-bar": "/components/nav-bar/index",
     "icon": "/components/icon/index",

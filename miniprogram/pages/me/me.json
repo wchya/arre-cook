@@ -1,7 +1,7 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#FAFAF8",
-  "backgroundColorTop": "#FFE9DE",
+  "backgroundColor": "@bg",
+  "backgroundColorTop": "@bgTopWarm",
   "disableScroll": true,
   "usingComponents": {
     "icon": "/components/icon/index",

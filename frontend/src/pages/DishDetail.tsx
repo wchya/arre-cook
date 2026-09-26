@@ -500,7 +500,7 @@ export default function DishDetail() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-[210] bg-bg/92 backdrop-blur-xl px-5 py-3 flex gap-2.5 border-t border-border" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
+      <div className="fixed bottom-0 left-0 right-0 z-[210] glass px-5 py-3 flex gap-2.5 border-t border-glass-border" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
         <button onClick={() => recordMut.mutate("lunch")} className="flex-1 py-2.5 rounded-full text-sm font-semibold bg-primary text-white transition-all active:scale-96">🍳 中午吃这个</button>
         <button onClick={() => recordMut.mutate("dinner")} className="flex-1 py-2.5 rounded-full text-sm font-semibold bg-mint text-white transition-all active:scale-96">🍲 晚上吃这个</button>
       </div>

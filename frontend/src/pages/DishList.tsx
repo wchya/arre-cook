@@ -378,7 +378,7 @@ export default function DishList() {
               ) : showGrouped ? (
                 Array.from(groupedByCategory.entries()).map(([cat, dishes]) => (
                   <div key={cat} ref={categoryRefCallback(cat)} data-category={cat}>
-                    <div className="sticky top-0 z-10 bg-bg/92 backdrop-blur-sm py-2 px-1 text-[13px] font-bold text-text2 flex items-center gap-2">
+                    <div className="sticky top-0 z-10 glass py-2 px-1 text-[13px] font-bold text-text2 flex items-center gap-2">
                        <span className="w-1 h-4 bg-primary rounded-full" />
                        {cat}
                        <span className="text-[11px] text-text3 font-normal">{categoryCountMap.get(cat) ?? dishes.length}道</span>
@@ -426,7 +426,7 @@ export default function DishList() {
       </div>
 
       {totalPicked > 0 && (
-        <div className="flex-shrink-0 bg-card/95 backdrop-blur-xl border-t border-border px-4 py-2.5 flex items-center gap-3 z-20">
+        <div className="flex-shrink-0 glass-strong border-t border-glass-border px-4 py-2.5 flex items-center gap-3 z-20">
           <div className="flex items-center gap-2">
             <div className="relative">
               <ChefHat size={22} className="text-primary" />

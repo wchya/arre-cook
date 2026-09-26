@@ -12,6 +12,14 @@ Component({
     selected: 0,
     left: TABS.slice(0, 2).map((tab, index) => ({ ...tab, index })),
     right: TABS.slice(2).map((tab, index) => ({ ...tab, index: index + 2 })),
+    isIOS: false,
+  },
+
+  lifetimes: {
+    attached() {
+      const app = getApp()
+      if (app && app.globalData.isIOS) this.setData({ isIOS: true })
+    },
   },
 
   methods: {

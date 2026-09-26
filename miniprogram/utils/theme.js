@@ -1,9 +1,9 @@
 // 系统深浅色主题：CSS 由 app.wxss 的 prefers-color-scheme 媒体查询自动切换；
-// 只能在 JS / WXML 属性里写颜色的地方（图标取色、下拉刷新底色与加载点、透明导航栏渐显底色）
+// 只能在 JS / WXML 属性里写颜色的地方（图标取色、下拉刷新底色与加载点）
 // 从这里取值，并通过 subscribe 在系统切换深浅色时刷新。取值与 app.wxss / theme.json 保持一致。
 const PALETTES = {
-  light: { theme: "light", bg: "#FAFAF8", warm: "#FFE9DE", refresher: "black", navRgb: "250, 250, 248" },
-  dark: { theme: "dark", bg: "#121016", warm: "#45291D", refresher: "white", navRgb: "18, 16, 22" },
+  light: { theme: "light", bg: "#FAFAF8", warm: "#FFE9DE", refresher: "black" },
+  dark: { theme: "dark", bg: "#121016", warm: "#45291D", refresher: "white" },
 }
 
 const listeners = new Set()
@@ -49,4 +49,16 @@ function subscribe(fn) {
   return () => listeners.delete(fn)
 }
 
-module.exports = { name, palette, subscribe }
+// 自定义下拉刷新（scroll-view refresher）的底色与加载点颜色只能写在 WXML 属性里：
+// 页面 onLoad 调 bindRefresher(this) 注入 refresherBg / refresherWarm / refresherStyle，并随系统主题更新；
+// 返回的函数在 onUnload 里调用以取消订阅。
+function refresherData(p) {
+  return { refresherBg: p.bg, refresherWarm: p.warm, refresherStyle: p.refresher }
+}
+
+function bindRefresher(page) {
+  page.setData(refresherData(palette()))
+  return subscribe((p) => page.setData(refresherData(p)))
+}
+
+module.exports = { name, palette, subscribe, bindRefresher }

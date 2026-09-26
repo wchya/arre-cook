@@ -1,7 +1,7 @@
 :host { display: block; }
-.empty { display: flex; flex-direction: column; align-items: center; padding: 96rpx 40rpx; text-align: center; }
+.empty { display: flex; flex-direction: column; align-items: center; padding: 96rpx 40rpx; text-align: center; animation: popSoft .32s ease both; }
 .empty--compact { padding: 48rpx 32rpx; }
-.empty__emoji { margin-bottom: 28rpx; font-size: 112rpx; line-height: 1; }
+.empty__emoji { margin-bottom: 28rpx; font-size: 112rpx; line-height: 1; animation: float 3.2s ease-in-out infinite; }
 .empty--compact .empty__emoji { margin-bottom: 16rpx; font-size: 80rpx; }
 .empty__title { margin-bottom: 10rpx; color: var(--text); font-size: 32rpx; font-weight: 600; }
 .empty__desc { max-width: 560rpx; color: var(--text2); font-size: 26rpx; line-height: 1.6; }

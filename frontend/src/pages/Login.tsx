@@ -122,7 +122,7 @@ export default function Login() {
           <p className="mt-2.5 text-[14px] leading-relaxed text-text2">按你的口味推荐每一餐，AI 助手帮你排菜单、记饮食、列清单。</p>
         </div>
 
-        <div className="rounded-[28px] border border-white/60 bg-card/90 p-5 shadow-[0_24px_60px_rgba(26,26,46,.10)] backdrop-blur-xl">
+        <div className="rounded-[28px] border border-glass-border glass-strong p-5 shadow-[0_24px_60px_rgba(26,26,46,.10)]">
           <div className="mb-5 grid grid-cols-2 gap-1 rounded-full bg-bg p-1">
             {([
               { key: "code", label: "邮箱验证码", Icon: Mail },

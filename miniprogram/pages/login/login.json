@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#FAFAF8",
+  "backgroundColor": "@bg",
   "usingComponents": {
     "icon": "/components/icon/index",
     "sheet": "/components/sheet/index"

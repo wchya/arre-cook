@@ -14,7 +14,8 @@
     scroll-with-animation
     scroll-into-view="{{recScrollId}}"
     refresher-enabled
-    refresher-background="#FAFAF8"
+    refresher-background="{{refresherBg}}"
+    refresher-default-style="{{refresherStyle}}"
     refresher-triggered="{{refreshing}}"
     bindrefresherrefresh="onRefresh"
   >

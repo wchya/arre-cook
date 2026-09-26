@@ -3,6 +3,7 @@ const session = require("../../utils/session")
 const ui = require("../../utils/ui")
 const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
+const theme = require("../../utils/theme")
 
 // 转盘配色与 Web 端 Home.drawWheel 一致
 const WHEEL_COLORS = ["#E8734A", "#6EC6B8", "#F5D76E", "#F4A8A0", "#8B5CF6", "#F0E6FF"]
@@ -63,6 +64,7 @@ Page({
   },
 
   onLoad() {
+    this._offTheme = theme.bindRefresher(this)
     this._today = []
     this._wheelDishes = []
     this._fallback = []
@@ -81,6 +83,7 @@ Page({
 
   onUnload() {
     clearTimeout(this._spinTimer)
+    if (this._offTheme) this._offTheme()
   },
 
   onShareAppMessage() {

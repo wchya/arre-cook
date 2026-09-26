@@ -5,7 +5,7 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .hero__glow { position: absolute; top: -80rpx; right: -80rpx; width: 352rpx; height: 352rpx; border-radius: 50%; background: rgba(232, 115, 74, .15); filter: blur(40rpx); }
 .profile { position: relative; display: flex; align-items: center; gap: 32rpx; }
 .avatar-btn { position: relative; flex-shrink: 0; overflow: visible; }
-.avatar { width: 136rpx; height: 136rpx; border: 8rpx solid rgba(255, 255, 255, .7); border-radius: 48rpx; box-shadow: 0 20rpx 48rpx rgba(232, 115, 74, .25); }
+.avatar { width: 136rpx; height: 136rpx; border: 8rpx solid var(--glass-strong); border-radius: 48rpx; box-shadow: 0 20rpx 48rpx rgba(232, 115, 74, .25); }
 .avatar--initial { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #F59A6B, var(--primary)); color: #fff; font-size: 56rpx; font-weight: 900; }
 .avatar__cam { position: absolute; right: -8rpx; bottom: -8rpx; display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; border-radius: 50%; background: var(--card); box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, .12); }
 .avatar__spin { width: 24rpx; height: 24rpx; }
@@ -17,13 +17,14 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .badge-tag--dark { background: var(--text); color: var(--bg); }
 .badge-tag--mint { background: var(--mint-light); color: var(--mint-ink); }
 .tiles { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16rpx; margin-top: 40rpx; }
-.tile { padding: 20rpx 8rpx; border-radius: 32rpx; background: var(--card); box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, .03); text-align: center; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+/* 统计小块：压在暖色头图上的毛玻璃 */
+.tile { padding: 20rpx 8rpx; border: 1px solid var(--glass-border); border-radius: 32rpx; background: var(--glass-strong); box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, .03); text-align: center; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 .tile__value { color: var(--text); font-size: 38rpx; font-weight: 900; line-height: 1.3; }
 .tile__label { color: var(--text3); font-size: 20rpx; font-weight: 600; }
 
 .me-content { padding-top: 32rpx; }
 
-.logout { display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 96rpx; margin: 8rpx 0 32rpx; border: 1px solid var(--border); border-radius: 36rpx; background: var(--card); color: var(--red); font-size: 28rpx; font-weight: 700; transition: transform .15s ease; }
+.logout { display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 96rpx; margin: 8rpx 0 32rpx; border: 1px solid var(--border); border-radius: 36rpx; background: var(--card); color: var(--red); font-size: 28rpx; font-weight: 700; transition: transform .2s var(--ease-spring), opacity .15s ease; }
 .foot { padding-bottom: 16rpx; color: var(--text4); font-size: 22rpx; text-align: center; }
 
 .sheet-body { padding: 8rpx 40rpx 24rpx; }

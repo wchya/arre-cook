@@ -156,12 +156,14 @@ export default function MainLayout() {
           e.preventDefault()
           goTab(idx)
         }}
-        className={`group relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[13px] text-[10px] font-semibold transition-all active:scale-95 ${isActive ? "text-primary" : "text-text3 hover:text-text2"}`}
+        className={`group relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[13px] text-[10px] font-semibold transition-transform duration-200 ease-[var(--ease-spring)] active:scale-90 ${isActive ? "text-primary" : "text-text3 hover:text-text2"}`}
       >
-        <span className={`flex h-6 w-9 items-center justify-center rounded-full transition-all ${isActive ? "bg-primary-light text-primary" : "text-text3 group-hover:bg-bg"}`}>
-          <Icon size={19} strokeWidth={isActive ? 2.6 : 2.1} />
+        <span className={`relative flex h-6 w-9 items-center justify-center rounded-full ${isActive ? "text-primary" : "text-text3"}`}>
+          {/* 选中胶囊缩放淡入 */}
+          <span className={`absolute inset-0 rounded-full transition-all duration-300 ease-[var(--ease-spring)] ${isActive ? "scale-100 bg-primary-light opacity-100" : "scale-60 opacity-0 group-hover:scale-100 group-hover:bg-bg group-hover:opacity-100"}`} />
+          <Icon size={19} strokeWidth={isActive ? 2.6 : 2.1} className="relative" />
         </span>
-        <span className={`max-w-full truncate leading-none transition-colors ${isActive ? "text-primary" : "text-text3"}`}>{tab.label}</span>
+        <span className={`max-w-full truncate leading-none transition-colors ${isActive ? "font-bold text-primary" : "text-text3"}`}>{tab.label}</span>
       </NavLink>
     )
   }
@@ -183,7 +185,7 @@ export default function MainLayout() {
       </div>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-[100] border-t border-border/70 bg-card/92 shadow-[0_-10px_30px_rgba(26,26,46,.07)] backdrop-blur-2xl"
+        className="fixed bottom-0 left-0 right-0 z-[100] border-t border-glass-border glass shadow-[0_-10px_30px_rgba(26,26,46,.07)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="mx-auto grid h-[60px] max-w-[640px] grid-cols-5 items-center px-2">
@@ -193,7 +195,7 @@ export default function MainLayout() {
             <button
               onClick={() => navigate("/assistant/chat")}
               aria-label="AI 食谱助手"
-              className="relative -mt-7 flex h-[58px] w-[58px] flex-col items-center justify-center rounded-[22px] bg-gradient-to-br from-[#F59A6B] via-primary to-[#D9573A] text-white shadow-[0_12px_28px_rgba(232,115,74,.45)] ring-4 ring-bg transition-all active:scale-95"
+              className="relative -mt-7 flex h-[58px] w-[58px] flex-col items-center justify-center rounded-[22px] bg-gradient-to-br from-[#F59A6B] via-primary to-[#D9573A] text-white shadow-[0_12px_28px_rgba(232,115,74,.45)] ring-4 ring-bg transition-all duration-200 ease-[var(--ease-spring)] active:scale-90 active:-rotate-3"
             >
               <Sparkles size={24} strokeWidth={2.3} />
               <span className="mt-0.5 text-[9px] font-extrabold leading-none tracking-wide">AI 助手</span>

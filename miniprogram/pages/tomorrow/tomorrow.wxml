@@ -59,9 +59,9 @@
         </view>
       </view>
       <view class="stepper">
-        <view class="stepper__btn {{meal.target <= 0 ? 'is-off' : ''}}" data-meal="{{meal.key}}" data-step="-1" bindtap="changeTarget"><icon name="minus" size="26" stroke="2.4" color="text3" /></view>
+        <view class="stepper__btn {{meal.target <= 0 ? 'is-off' : ''}}" data-meal="{{meal.key}}" data-step="-1" hover-class="tap-active" hover-stay-time="60" bindtap="changeTarget"><icon name="minus" size="26" stroke="2.4" color="text3" /></view>
         <view class="stepper__value">{{meal.target}}</view>
-        <view class="stepper__btn {{meal.target >= 5 ? 'is-off' : ''}}" data-meal="{{meal.key}}" data-step="1" bindtap="changeTarget"><icon name="plus" size="26" stroke="2.4" color="text3" /></view>
+        <view class="stepper__btn {{meal.target >= 5 ? 'is-off' : ''}}" data-meal="{{meal.key}}" data-step="1" hover-class="tap-active" hover-stay-time="60" bindtap="changeTarget"><icon name="plus" size="26" stroke="2.4" color="text3" /></view>
       </view>
     </view>
 
@@ -115,7 +115,7 @@
       <input class="field-input picker-input" value="{{pickerSearch}}" placeholder="搜索菜名、分类、配料" placeholder-class="placeholder" bindinput="onPickerSearch" />
     </view>
     <scroll-view class="picker-cats" scroll-x enhanced show-scrollbar="{{false}}">
-      <view wx:for="{{pickerCategories}}" wx:key="*this" class="picker-cat {{pickerCategory === item ? 'is-active' : ''}}" data-name="{{item}}" bindtap="choosePickerCategory">{{item}}</view>
+      <view wx:for="{{pickerCategories}}" wx:key="*this" class="picker-cat {{pickerCategory === item ? 'is-active' : ''}}" data-name="{{item}}" hover-class="tap-active" hover-stay-time="60" bindtap="choosePickerCategory">{{item}}</view>
     </scroll-view>
   </view>
   <view class="picker-list">

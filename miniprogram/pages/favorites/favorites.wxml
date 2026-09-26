@@ -63,7 +63,7 @@
 
     <!-- 分类 + 搜索 + 排序 -->
     <scroll-view class="cats" scroll-x enhanced show-scrollbar="{{false}}">
-      <view wx:for="{{categories}}" wx:key="name" class="cat {{category === item.name ? 'is-active' : ''}}" data-name="{{item.name}}" bindtap="chooseCategory">
+      <view wx:for="{{categories}}" wx:key="name" class="cat {{category === item.name ? 'is-active' : ''}}" data-name="{{item.name}}" hover-class="tap-active" hover-stay-time="60" bindtap="chooseCategory">
         <text class="cat__name">{{item.name}}</text>
         <text class="cat__count">{{item.count}}</text>
       </view>
@@ -72,10 +72,10 @@
       <view class="field input-sm">
         <icon name="search" size="30" stroke="2.4" color="text3" />
         <input class="field-input search-input" value="{{keyword}}" placeholder="搜索收藏菜、口味、标签" placeholder-class="placeholder" bindinput="onSearch" />
-        <view wx:if="{{keyword}}" class="clear" bindtap="clearSearch"><icon name="x" size="24" stroke="2.6" color="text3" /></view>
+        <view wx:if="{{keyword}}" class="clear" hover-class="tap-active" hover-stay-time="60" bindtap="clearSearch"><icon name="x" size="24" stroke="2.6" color="text3" /></view>
       </view>
       <view class="sorts">
-        <view wx:for="{{sorts}}" wx:key="key" class="sort {{sort === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" bindtap="chooseSort">{{item.label}}</view>
+        <view wx:for="{{sorts}}" wx:key="key" class="sort {{sort === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" hover-class="tap-active" hover-stay-time="60" bindtap="chooseSort">{{item.label}}</view>
       </view>
     </view>
 

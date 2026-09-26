@@ -5,7 +5,7 @@
     </view>
   </nav-bar>
 
-  <scroll-view class="screen-scroll" scroll-y enhanced show-scrollbar="{{false}}" refresher-enabled refresher-background="#FAFAF8" refresher-triggered="{{refreshing}}" bindrefresherrefresh="onRefresh" bindtap="closeSwipe">
+  <scroll-view class="screen-scroll" scroll-y enhanced show-scrollbar="{{false}}" refresher-enabled refresher-background="{{refresherBg}}" refresher-default-style="{{refresherStyle}}" refresher-triggered="{{refreshing}}" bindrefresherrefresh="onRefresh" bindtap="closeSwipe">
     <view class="content anim-fade-up">
       <!-- 日历 -->
       <view class="card calendar">
@@ -44,15 +44,15 @@
 
         <view wx:if="{{!dayRecords.length}}" class="day-panel__empty">{{isToday ? '今天还没有记录哦~' : '这天没有记录'}}</view>
         <view wx:for="{{dayRecords}}" wx:key="id" class="swipe {{swipeId === 'd' + item.id ? 'is-open' : ''}}" data-swipe="{{'d' + item.id}}" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
-          <view class="swipe__action" data-id="{{item.id}}" catchtap="deleteRecord"><icon name="trash-2" size="32" stroke="2.2" color="white" /><text>删除</text></view>
+          <view class="swipe__action" hover-class="tap-fade" hover-stay-time="60" data-id="{{item.id}}" catchtap="deleteRecord"><icon name="trash-2" size="32" stroke="2.2" color="white" /><text>删除</text></view>
           <view class="swipe__content day-row" hover-class="tap-bg" data-id="{{item.dishId}}" catchtap="openDish">
             <view class="day-row__thumb {{item.meal === 'lunch' ? 'bg-lunch' : 'bg-dinner'}}"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="40" /></view>
             <view class="flex-1">
               <view class="row-title">{{item.name}}</view>
               <view class="row-desc">{{item.mealLabel}}</view>
             </view>
-            <view wx:if="{{item.mood}}" class="mood-pill" data-id="{{item.id}}" catchtap="openRate"><text class="mood-pill__emoji">{{item.moodEmoji}}</text><text wx:if="{{item.remark}}" class="mood-pill__text truncate">{{item.remark}}</text></view>
-            <view wx:else class="chip chip-primary rate-chip" data-id="{{item.id}}" catchtap="openRate">评价</view>
+            <view wx:if="{{item.mood}}" class="mood-pill" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="openRate"><text class="mood-pill__emoji">{{item.moodEmoji}}</text><text wx:if="{{item.remark}}" class="mood-pill__text truncate">{{item.remark}}</text></view>
+            <view wx:else class="chip chip-primary rate-chip" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="openRate">评价</view>
           </view>
         </view>
 
@@ -67,7 +67,7 @@
           <scroll-view class="photo-strip" scroll-x enhanced show-scrollbar="{{false}}">
             <view wx:for="{{dayPhotos}}" wx:key="raw" class="photo" data-index="{{index}}" catchtap="previewDayPhoto">
               <image class="photo__img" src="{{item.url}}" mode="aspectFill" lazy-load webp />
-              <view class="photo__del" data-index="{{index}}" catchtap="removeDayPhoto" aria-role="button" aria-label="删除照片"><icon name="x" size="18" stroke="3" color="white" /></view>
+              <view class="photo__del" data-index="{{index}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="removeDayPhoto" aria-role="button" aria-label="删除照片"><icon name="x" size="18" stroke="3" color="white" /></view>
             </view>
             <view class="photo photo--add" hover-class="tap-active" catchtap="openDayRate"><icon name="plus" size="32" stroke="2.4" color="text3" /><text>添加</text></view>
           </scroll-view>
@@ -94,15 +94,15 @@
       </view>
       <view wx:else class="recent">
         <view wx:for="{{recent}}" wx:key="id" class="swipe swipe--card {{swipeId === 'r' + item.id ? 'is-open' : ''}}" data-swipe="{{'r' + item.id}}" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
-          <view class="swipe__action" data-id="{{item.id}}" catchtap="deleteRecord"><icon name="trash-2" size="32" stroke="2.2" color="white" /><text>删除</text></view>
+          <view class="swipe__action" hover-class="tap-fade" hover-stay-time="60" data-id="{{item.id}}" catchtap="deleteRecord"><icon name="trash-2" size="32" stroke="2.2" color="white" /><text>删除</text></view>
           <view class="swipe__content recent-row" hover-class="tap-bg" data-id="{{item.dishId}}" catchtap="openDish">
             <view class="recent-row__thumb {{item.meal === 'lunch' ? 'bg-lunch' : 'bg-dinner'}}"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="48" /></view>
             <view class="flex-1">
               <view class="row-title">{{item.name}}</view>
               <view class="row-desc">{{item.dateLabel}}</view>
             </view>
-            <view wx:if="{{item.mood}}" class="mood-pill" data-id="{{item.id}}" catchtap="openRate"><text class="mood-pill__emoji">{{item.moodEmoji}}</text><text wx:if="{{item.remark}}" class="mood-pill__text truncate">{{item.remark}}</text></view>
-            <view wx:else class="chip chip-primary rate-chip" data-id="{{item.id}}" catchtap="openRate">评价</view>
+            <view wx:if="{{item.mood}}" class="mood-pill" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="openRate"><text class="mood-pill__emoji">{{item.moodEmoji}}</text><text wx:if="{{item.remark}}" class="mood-pill__text truncate">{{item.remark}}</text></view>
+            <view wx:else class="chip chip-primary rate-chip" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="openRate">评价</view>
           </view>
         </view>
       </view>
@@ -114,7 +114,7 @@
   <sheet show="{{rateOpen}}" title="{{rateRecord ? rateRecord.name + ' — 这道菜怎么样？' : ''}}" bind:close="closeRate">
     <view class="sheet-body">
       <view class="mood-options">
-        <view wx:for="{{dishMoods}}" wx:key="key" class="mood-option {{rateMood === item.key ? 'is-active' : ''}}" data-mood="{{item.key}}" bindtap="pickRateMood">
+        <view wx:for="{{dishMoods}}" wx:key="key" class="mood-option {{rateMood === item.key ? 'is-active' : ''}}" data-mood="{{item.key}}" hover-class="tap-active" hover-stay-time="60" bindtap="pickRateMood">
           <text class="mood-option__emoji">{{item.emoji}}</text><text class="mood-option__label">{{item.label}}</text>
         </view>
       </view>
@@ -123,7 +123,7 @@
       <view class="field-label mt-32">📷 成品照（可选，限 1 张）</view>
       <view wx:if="{{ratePhoto}}" class="upload-thumb" bindtap="previewRatePhoto">
         <image class="upload-thumb__img" src="{{ratePhoto}}" mode="aspectFill" webp />
-        <view class="photo__del" catchtap="removeRatePhoto"><icon name="x" size="18" stroke="3" color="white" /></view>
+        <view class="photo__del" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="removeRatePhoto"><icon name="x" size="18" stroke="3" color="white" /></view>
       </view>
       <view wx:else class="upload-add" hover-class="tap-active" bindtap="uploadRatePhoto">
         <view wx:if="{{rateUploading}}" class="spinner spinner-dark"></view>
@@ -141,7 +141,7 @@
   <sheet show="{{dayOpen}}" title="🍲 这顿饭怎么样？" subtitle="评价 {{selectedKey}} 的整体用餐感受" bind:close="closeDayRate">
     <view class="sheet-body">
       <view class="mood-options">
-        <view wx:for="{{mealMoods}}" wx:key="key" class="mood-option {{dayMood === item.key ? 'is-active' : ''}}" data-mood="{{item.key}}" bindtap="pickDayMood">
+        <view wx:for="{{mealMoods}}" wx:key="key" class="mood-option {{dayMood === item.key ? 'is-active' : ''}}" data-mood="{{item.key}}" hover-class="tap-active" hover-stay-time="60" bindtap="pickDayMood">
           <text class="mood-option__emoji">{{item.emoji}}</text><text class="mood-option__label">{{item.label}}</text>
         </view>
       </view>
@@ -155,7 +155,7 @@
         </view>
         <view wx:for="{{dayDraftPhotos}}" wx:key="raw" class="upload-thumb" data-index="{{index}}" bindtap="previewDraftPhoto">
           <image class="upload-thumb__img" src="{{item.url}}" mode="aspectFill" webp />
-          <view class="photo__del" data-index="{{index}}" catchtap="removeDraftPhoto"><icon name="x" size="18" stroke="3" color="white" /></view>
+          <view class="photo__del" data-index="{{index}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation catchtap="removeDraftPhoto"><icon name="x" size="18" stroke="3" color="white" /></view>
         </view>
       </view>
     </view>

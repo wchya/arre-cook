@@ -2,6 +2,7 @@ const api = require("../../utils/api")
 const session = require("../../utils/session")
 const ui = require("../../utils/ui")
 const media = require("../../utils/media")
+const theme = require("../../utils/theme")
 
 const REPEAT_OPTIONS = ["1", "2", "3", "5", "7", "10", "14", "0"]
 
@@ -30,8 +31,13 @@ Page({
   },
 
   onLoad() {
+    this._offTheme = theme.bindRefresher(this)
     const nav = getApp().navMetrics()
     this.setData({ topPad: nav.statusBarHeight + 24 })
+  },
+
+  onUnload() {
+    if (this._offTheme) this._offTheme()
   },
 
   onShow() {

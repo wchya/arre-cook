@@ -1,6 +1,6 @@
 page { height: 100%; overflow: hidden; background: var(--bg); }
 
-.nav-bell { position: relative; display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; border: 1px solid var(--border); border-radius: 50%; background: var(--card); box-shadow: 0 2rpx 6rpx rgba(26, 26, 46, .05), 0 12rpx 36rpx rgba(26, 26, 46, .06); }
+.nav-bell { position: relative; display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; border: 1px solid var(--glass-border); border-radius: 50%; background: var(--glass-strong); box-shadow: 0 2rpx 6rpx rgba(26, 26, 46, .05), 0 12rpx 36rpx rgba(26, 26, 46, .06); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); transition: transform .2s var(--ease-spring), opacity .15s ease; }
 .nav-bell__dot { position: absolute; top: -6rpx; right: -8rpx; min-width: 32rpx; height: 32rpx; padding: 0 8rpx; border: 3rpx solid var(--bg); border-radius: 999rpx; background: var(--red); color: #fff; font-size: 18rpx; font-weight: 700; line-height: 26rpx; text-align: center; }
 
 .hello { margin-bottom: 40rpx; }
@@ -22,12 +22,12 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 /* 今日推荐 */
 .rec-head { scroll-margin-top: 24rpx; }
 .rec-change { margin-left: 8rpx; }
-.rec-card { overflow: hidden; transition: transform .15s ease; }
+.rec-card { overflow: hidden; transition: transform .22s var(--ease-spring); }
 .rec-card--press { transform: scale(.985); }
 .rec-card__media { position: relative; height: 400rpx; }
-.rec-card__badge { position: absolute; top: 24rpx; left: 24rpx; z-index: 1; padding: 6rpx 24rpx; border-radius: 999rpx; background: rgba(255, 255, 255, .92); color: var(--primary); font-size: 24rpx; font-weight: 600; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.rec-card__badge { position: absolute; top: 24rpx; left: 24rpx; z-index: 1; padding: 6rpx 24rpx; border: 1px solid var(--glass-border); border-radius: 999rpx; background: var(--glass-strong); color: var(--primary); font-size: 24rpx; font-weight: 600; -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); }
 .rec-card__meals { position: absolute; top: 24rpx; right: 24rpx; z-index: 1; display: flex; gap: 12rpx; }
-.meal-tag { padding: 2rpx 20rpx; border-radius: 999rpx; background: rgba(255, 255, 255, .9); color: var(--primary); font-size: 20rpx; font-weight: 600; }
+.meal-tag { padding: 2rpx 20rpx; border-radius: 999rpx; background: var(--glass-strong); color: var(--primary); font-size: 20rpx; font-weight: 600; -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); transition: background-color .2s ease, color .2s ease; }
 .meal-tag--mint { color: var(--mint-ink); }
 .meal-tag--lunch { background: var(--primary); color: #fff; }
 .meal-tag--dinner { background: var(--mint); color: #fff; }
@@ -53,8 +53,8 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 
 /* 心情 */
 .moods { margin: 0 -40rpx 40rpx; padding: 0 40rpx 8rpx; white-space: nowrap; }
-.mood { display: inline-flex; flex-direction: column; align-items: center; min-width: 160rpx; margin-right: 20rpx; padding: 24rpx 32rpx; border: 4rpx solid var(--border); border-radius: 32rpx; background: var(--card); transition: border-color .2s ease, background-color .2s ease; }
-.mood.is-active { border-color: var(--primary); background: var(--primary-light); }
+.mood { display: inline-flex; flex-direction: column; align-items: center; min-width: 160rpx; margin-right: 20rpx; padding: 24rpx 32rpx; border: 4rpx solid var(--border); border-radius: 32rpx; background: var(--card); transition: border-color .2s ease, background-color .2s ease, transform .22s var(--ease-spring); }
+.mood.is-active { border-color: var(--primary); background: var(--primary-light); transform: translateY(-4rpx); }
 .mood__emoji { margin-bottom: 8rpx; font-size: 56rpx; line-height: 1; }
 .mood__label { color: var(--text2); font-size: 22rpx; font-weight: 500; }
 .mood.is-active .mood__label { color: var(--primary); }

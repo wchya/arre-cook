@@ -18,9 +18,9 @@
   </view>
 
   <view class="filters">
-    <view class="filter {{filter === 'all' ? 'is-active' : ''}}" data-key="all" bindtap="chooseFilter">全部 {{total}}</view>
-    <view class="filter {{filter === 'done' ? 'is-active' : ''}}" data-key="done" bindtap="chooseFilter">已解锁 {{unlocked}}</view>
-    <view class="filter {{filter === 'todo' ? 'is-active' : ''}}" data-key="todo" bindtap="chooseFilter">未解锁 {{total - unlocked}}</view>
+    <view class="filter {{filter === 'all' ? 'is-active' : ''}}" data-key="all" hover-class="tap-active" hover-stay-time="60" bindtap="chooseFilter">全部 {{total}}</view>
+    <view class="filter {{filter === 'done' ? 'is-active' : ''}}" data-key="done" hover-class="tap-active" hover-stay-time="60" bindtap="chooseFilter">已解锁 {{unlocked}}</view>
+    <view class="filter {{filter === 'todo' ? 'is-active' : ''}}" data-key="todo" hover-class="tap-active" hover-stay-time="60" bindtap="chooseFilter">未解锁 {{total - unlocked}}</view>
   </view>
 
   <view wx:if="{{loading}}" class="grid-3"><view wx:for="{{[1, 2, 3, 4, 5, 6]}}" wx:key="*this" class="skeleton sk"></view></view>

@@ -1,7 +1,7 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#FAFAF8",
-  "backgroundColorTop": "#FFF0EB",
+  "backgroundColor": "@bg",
+  "backgroundColorTop": "@bgTop",
   "usingComponents": {
     "empty": "/components/empty/index",
     "nav-bar": "/components/nav-bar/index",

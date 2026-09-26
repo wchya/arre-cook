@@ -175,7 +175,7 @@ export default function Preferences() {
         </div>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-[120] border-t border-border bg-bg/92 px-5 pt-3 backdrop-blur-xl" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
+      <div className="fixed inset-x-0 bottom-0 z-[120] border-t border-glass-border glass px-5 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
         <button
           onClick={() => saveMut.mutate()}
           disabled={!dirty || saveMut.isPending}

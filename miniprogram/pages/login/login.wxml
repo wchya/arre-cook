@@ -51,7 +51,7 @@
         <view class="field {{focus === 'email' ? 'is-focus' : ''}}">
           <icon name="mail" size="34" stroke="2.2" color="{{focus === 'email' ? 'primary' : 'text3'}}" />
           <input class="field-input field-input--icon" type="text" value="{{email}}" maxlength="120" placeholder="你的 QQ 邮箱，如 123456@qq.com" placeholder-class="placeholder" confirm-type="next" cursor-spacing="160" data-field="email" bindinput="onEmailInput" bindfocus="onFocus" bindblur="onBlur" bindconfirm="focusCodeInput" />
-          <view wx:if="{{email && focus === 'email'}}" class="field-clear" catchtap="clearEmail" aria-role="button" aria-label="清空邮箱">
+          <view wx:if="{{email && focus === 'email'}}" class="field-clear" hover-class="tap-active" hover-stay-time="60" catchtap="clearEmail" aria-role="button" aria-label="清空邮箱">
             <icon name="x" size="22" stroke="2.8" color="white" />
           </view>
           <view class="code-btn {{sending || cooldown > 0 || !emailValid ? 'is-disabled' : ''}}" hover-class="tap-active" hover-stay-time="80" catchtap="sendCode" aria-role="button">
@@ -94,7 +94,7 @@
         <view class="field {{focus === 'password' ? 'is-focus' : ''}}">
           <icon name="lock" size="34" stroke="2.2" color="{{focus === 'password' ? 'primary' : 'text3'}}" />
           <input class="field-input field-input--icon" password="{{!passwordVisible}}" type="text" value="{{password}}" maxlength="128" placeholder="输入密码" placeholder-class="placeholder" confirm-type="done" cursor-spacing="140" data-field="password" bindinput="onPasswordInput" bindfocus="onFocus" bindblur="onBlur" bindconfirm="submitPassword" />
-          <view class="eye" catchtap="togglePasswordVisible" aria-role="button" aria-label="{{passwordVisible ? '隐藏密码' : '显示密码'}}">
+          <view class="eye" hover-class="tap-active" hover-stay-time="60" catchtap="togglePasswordVisible" aria-role="button" aria-label="{{passwordVisible ? '隐藏密码' : '显示密码'}}">
             <icon name="{{passwordVisible ? 'eye-off' : 'eye'}}" size="34" stroke="2.2" color="text3" />
           </view>
         </view>

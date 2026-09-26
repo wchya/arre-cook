@@ -1,14 +1,17 @@
 <view wx:if="{{visible}}" class="sheet-root" style="z-index:{{zIndex}};">
-  <view class="sheet-mask {{active ? 'is-active' : ''}}" bindtap="onMask" catchtouchmove="noop"></view>
-  <view class="sheet {{active ? 'is-active' : ''}}" role="dialog" aria-label="{{title}}">
-    <view wx:if="{{handle}}" class="sheet__handle"></view>
-    <view wx:if="{{title || closable}}" class="sheet__head">
-      <view class="sheet__titles">
-        <view class="sheet__title">{{title}}</view>
-        <view wx:if="{{subtitle}}" class="sheet__subtitle">{{subtitle}}</view>
-      </view>
-      <view wx:if="{{closable}}" class="sheet__close" bindtap="onClose" hover-class="tap-active" hover-stay-time="80" aria-role="button" aria-label="关闭">
-        <icon name="x" size="32" stroke="2.4" color="text2" />
+  <view class="sheet-mask {{active ? 'is-active' : ''}}" style="{{dragY ? 'opacity:' + maskOpacity + ';' : ''}}" bindtap="onMask" catchtouchmove="noop"></view>
+  <view class="sheet {{active ? 'is-active' : ''}} {{dragging ? 'is-dragging' : ''}} {{isIOS ? 'sheet--ios' : ''}}" style="{{dragY ? 'transform:translateY(' + dragY + 'px);' : ''}}" role="dialog" aria-label="{{title}}">
+    <!-- 顶部把手 + 标题区可下拉关闭（iOS 风格） -->
+    <view class="sheet__grab" bindtouchstart="onDragStart" catchtouchmove="onDragMove" bindtouchend="onDragEnd" bindtouchcancel="onDragEnd">
+      <view wx:if="{{handle}}" class="sheet__handle"></view>
+      <view wx:if="{{title || closable}}" class="sheet__head">
+        <view class="sheet__titles">
+          <view class="sheet__title">{{title}}</view>
+          <view wx:if="{{subtitle}}" class="sheet__subtitle">{{subtitle}}</view>
+        </view>
+        <view wx:if="{{closable}}" class="sheet__close" catchtap="onClose" hover-class="sheet__close--press" hover-stay-time="80" aria-role="button" aria-label="关闭">
+          <icon name="x" size="32" stroke="2.4" color="text2" />
+        </view>
       </view>
     </view>
     <view class="sheet__body"><slot></slot></view>

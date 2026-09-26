@@ -23,20 +23,20 @@ export default function DishCard({ dish, onClick, showFav, favActive, onToggleFa
   return (
     <button
       onClick={onClick}
-      className={`bg-card rounded-2xl overflow-hidden border border-border ${cardShadow} transition-all active:scale-97 text-left w-full`}
+      className={`bg-card rounded-2xl overflow-hidden border border-border ${cardShadow} transition-transform duration-200 ease-[var(--ease-spring)] active:scale-97 text-left w-full`}
     >
       <div className="h-[120px] bg-gradient-to-br from-primary-light to-pink-light relative">
         <DishImage dish={dish} className="w-full h-full" />
         {showFav && (
           <span
             onClick={(e) => { e.stopPropagation(); onToggleFav?.() }}
-            className={`absolute top-2 right-2 w-7 h-7 rounded-full bg-card/90 backdrop-blur-sm flex items-center justify-center text-sm shadow-sm transition-all active:scale-90 ${favActive ? "text-primary animate-heartbeat" : "text-text3"}`}
+            className={`absolute top-2 right-2 w-7 h-7 rounded-full border border-glass-border glass-strong flex items-center justify-center text-sm shadow-sm transition-transform duration-200 ease-[var(--ease-spring)] active:scale-85 ${favActive ? "text-primary animate-heartbeat" : "text-text3"}`}
           >
             {favActive ? "❤" : "♡"}
           </span>
         )}
         {showDifficulty && (
-          <span className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-card/90 backdrop-blur-sm ${diffColor(dish.difficulty)}`}>
+          <span className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-glass-border glass-strong ${diffColor(dish.difficulty)}`}>
             {diffLabel(dish.difficulty)}
           </span>
         )}

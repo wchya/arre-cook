@@ -1,8 +1,8 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#FAFAF8",
+  "backgroundColor": "@bg",
   "enablePullDownRefresh": true,
-  "backgroundTextStyle": "dark",
+  "backgroundTextStyle": "@bgTxt",
   "usingComponents": {
     "nav-bar": "/components/nav-bar/index",
     "dish-image": "/components/dish-image/index",

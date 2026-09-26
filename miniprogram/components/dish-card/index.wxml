@@ -1,7 +1,7 @@
 <view wx:if="{{dish}}" class="dcard" hover-class="tap-active" hover-stay-time="80" bindtap="onTap" aria-role="link" aria-label="{{dish.name}}">
   <view class="dcard__media" style="height:{{imageHeight}}rpx;">
     <dish-image src="{{dish.cover}}" emoji="{{dish.emoji}}" emoji-size="72" />
-    <view wx:if="{{showFav}}" class="dcard__fav {{dish.favorite ? 'anim-heartbeat' : ''}}" catchtap="onFav" aria-role="button" aria-label="{{dish.favorite ? '取消收藏' : '收藏'}}">
+    <view wx:if="{{showFav}}" class="dcard__fav {{dish.favorite ? 'anim-heartbeat' : ''}}" hover-class="dcard__fav--press" hover-stop-propagation hover-stay-time="60" catchtap="onFav" aria-role="button" aria-label="{{dish.favorite ? '取消收藏' : '收藏'}}">
       <icon name="heart" size="28" stroke="2.4" color="{{dish.favorite ? 'primary' : 'text3'}}" fill="{{dish.favorite}}" />
     </view>
     <view wx:if="{{showDifficulty}}" class="dcard__diff c-{{dish.diffTone}}">{{dish.diffLabel}}</view>

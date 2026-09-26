@@ -21,7 +21,7 @@
 
 .detail { display: flex; flex-direction: column; align-items: center; padding: 0 48rpx 40rpx; text-align: center; }
 .detail__ring { display: flex; align-items: center; justify-content: center; width: 192rpx; height: 192rpx; margin-bottom: 28rpx; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); filter: grayscale(.9); }
-.detail__ring.is-on { border-color: rgba(232, 115, 74, .18); background: linear-gradient(135deg, var(--primary-light), var(--yellow-light)); box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, .9), 0 24rpx 56rpx rgba(232, 115, 74, .18); filter: none; }
+.detail__ring.is-on { border-color: rgba(232, 115, 74, .18); background: linear-gradient(135deg, var(--primary-light), var(--yellow-light)); box-shadow: inset 0 2rpx 0 var(--highlight), 0 24rpx 56rpx rgba(232, 115, 74, .18); filter: none; }
 .detail__icon { font-size: 100rpx; line-height: 1; }
 .detail__kicker { padding: 6rpx 20rpx; border-radius: 999rpx; background: var(--primary-light); color: var(--primary); font-size: 22rpx; font-weight: 800; }
 .detail__kicker.is-off { background: var(--bg); color: var(--text3); }

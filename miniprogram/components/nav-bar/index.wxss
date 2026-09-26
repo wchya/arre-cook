@@ -1,15 +1,22 @@
 :host { position: sticky; top: 0; z-index: 100; display: block; flex-shrink: 0; }
 
-.nav { position: relative; width: 100%; border-bottom: 1px solid var(--glass-border); background-color: var(--glass-bg); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
+.nav { position: relative; width: 100%; border-bottom: 1px solid var(--glass-border); background-color: var(--glass-bg); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+/* iOS：更通透的底色 + 更强的模糊，接近系统导航栏材质 */
+.nav--ios { background-color: var(--glass-ios-bg); -webkit-backdrop-filter: var(--glass-blur-ios); backdrop-filter: var(--glass-blur-ios); }
 .nav--fixed { position: fixed; top: 0; right: 0; left: 0; z-index: 100; }
-.nav--transparent { border-bottom-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.nav--transparent { border-bottom-color: transparent; background-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .nav--plain { border-bottom-color: transparent; box-shadow: none; }
-.nav--dark { border-bottom-color: transparent; background-color: #1A1A2E; box-shadow: none; }
+.nav--dark { border-bottom-color: transparent; background-color: #1A1A2E; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 
-.nav__bar { display: flex; align-items: center; gap: 20rpx; padding-left: 32rpx; }
-.nav__btn { display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; flex-shrink: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--glass-strong); box-shadow: 0 2rpx 6rpx rgba(26, 26, 46, .05), 0 12rpx 36rpx rgba(26, 26, 46, .06); }
+.nav__bg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-bottom: 1px solid var(--glass-border); background-color: var(--glass-bg); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); pointer-events: none; }
+.nav--ios .nav__bg { background-color: var(--glass-ios-bg); -webkit-backdrop-filter: var(--glass-blur-ios); backdrop-filter: var(--glass-blur-ios); }
+
+.nav__bar { position: relative; display: flex; align-items: center; gap: 20rpx; padding-left: 32rpx; }
+.nav__btn { display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; flex-shrink: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--glass-strong); box-shadow: 0 2rpx 6rpx rgba(26, 26, 46, .05), 0 12rpx 36rpx rgba(26, 26, 46, .06); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); transition: transform .18s var(--ease-spring), opacity .18s ease; }
+.nav--ios .nav__btn { background: var(--glass-ios-strong); }
+.nav__btn--press { transform: scale(.9); opacity: .8; }
 .nav--dark .nav__btn { border-color: rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .1); box-shadow: none; }
-.nav__icon { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex-shrink: 0; border: 1px solid rgba(232, 115, 74, .1); border-radius: 26rpx; background: var(--primary-light); box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, .82), 0 14rpx 36rpx rgba(232, 115, 74, .11); }
+.nav__icon { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex-shrink: 0; border: 1px solid rgba(232, 115, 74, .1); border-radius: 26rpx; background: var(--primary-light); box-shadow: inset 0 2rpx 0 var(--highlight), 0 14rpx 36rpx rgba(232, 115, 74, .11); }
 .nav__titles { flex: 1; min-width: 0; }
 .nav__title { overflow: hidden; color: var(--text); font-size: 34rpx; font-weight: 800; line-height: 1.2; letter-spacing: -.5rpx; white-space: nowrap; text-overflow: ellipsis; }
 .nav__accent { color: var(--primary); }

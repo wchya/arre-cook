@@ -395,7 +395,7 @@ export default function Home() {
             <div ref={recCardRef} onClick={() => navigate(`/dishes/${currentRec.id}`)} className={`bg-card rounded-2xl overflow-hidden ${cardShadow} mb-2 cursor-pointer border border-border transition-all active:scale-98 animate-fadeUp`}>
               <div className="relative h-[200px] bg-gradient-to-br from-primary-light to-pink-light">
                 <DishImage dish={currentRec} className="w-full h-full" emojiSize="text-[64px]" />
-                <span className="absolute top-3 left-3 bg-card/92 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-primary z-[1]">
+                <span className="absolute top-3 left-3 border border-glass-border glass-strong px-3 py-1 rounded-full text-xs font-semibold text-primary z-[1]">
                   {currentItem ? "🧠 按你的口味" : "🔥 推荐"}
                 </span>
                 <div className="absolute top-3 right-3 flex gap-1.5">

@@ -128,7 +128,7 @@
       <view class="block-head">
         <view class="block-title">🥬 食材</view>
         <view class="portion">
-          <view wx:for="{{portions}}" wx:key="*this" class="portion__item {{portion === item ? 'is-active' : ''}}" data-value="{{item}}" bindtap="choosePortion">{{item}}人份</view>
+          <view wx:for="{{portions}}" wx:key="*this" class="portion__item {{portion === item ? 'is-active' : ''}}" data-value="{{item}}" hover-class="tap-active" hover-stay-time="60" bindtap="choosePortion">{{item}}人份</view>
         </view>
       </view>
       <view class="prep-hint">点一下食材标记“已备好”<text wx:if="{{preparedCount}}" class="c-mint bold"> · 已备好 {{preparedCount}}/{{ingredients.length + seasonings.length}}</text></view>

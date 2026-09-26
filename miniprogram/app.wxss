@@ -36,6 +36,13 @@ page {
   --glass-strong: rgba(255, 255, 255, .92);
   --glass-border: rgba(255, 255, 255, .7);
   --glass-shadow: 0 20rpx 56rpx rgba(26, 26, 46, .05);
+  /* iOS 专用：真实模糊可用，底色更通透、模糊更强，接近系统材质 */
+  --glass-ios-bg: rgba(250, 250, 248, .66);
+  --glass-ios-strong: rgba(255, 255, 255, .74);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-blur-ios: blur(30px) saturate(190%);
+  --ease-spring: cubic-bezier(.2, .8, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
   /* 图标块顶部内高光、头图暖色起点、遮罩、分段选择滑块：深色模式下各自换值，避免亮边与发白 */
   --highlight: rgba(255, 255, 255, .82);
   --hero-warm: #FFE9DE;
@@ -167,10 +174,14 @@ button::after { border: 0; }
 .tap-active { transform: scale(.97); opacity: .88; }
 .tap-bg { background: var(--bg) !important; }
 .tap-fade { opacity: .6; }
+/* 常见可点元素统一回弹过渡，hover-class 切换时不再“跳变” */
+.card, .chip, .stat-card, .section-action, .segmented-item, .field, .row-icon { transition: transform .2s var(--ease-spring), opacity .15s ease, background-color .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.row { transition: background-color .15s ease; }
+.btn { transition: transform .2s var(--ease-spring), opacity .15s ease, box-shadow .2s ease; }
 
 /* 毛玻璃表面：吸底操作栏、悬浮胶囊、吸顶分组头等浮在内容之上的层（iOS 实时模糊，安卓高不透明度降级） */
-.glass { background: var(--glass-bg); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
-.glass-strong { background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+.glass { background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.glass-strong { background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 
 /* ---------- 表单 ---------- */
 .field-label { display: block; margin-bottom: 12rpx; color: var(--text2); font-size: 24rpx; font-weight: 700; }
@@ -295,6 +306,8 @@ button::after { border: 0; }
     --glass-strong: rgba(42, 38, 52, .92);
     --glass-border: rgba(255, 255, 255, .06);
     --glass-shadow: 0 20rpx 56rpx rgba(0, 0, 0, .45);
+    --glass-ios-bg: rgba(22, 20, 28, .6);
+    --glass-ios-strong: rgba(44, 40, 54, .7);
     --highlight: rgba(255, 255, 255, .06);
     --hero-warm: #45291D;
     --scrim: rgba(0, 0, 0, .6);
@@ -303,4 +316,11 @@ button::after { border: 0; }
   /* 硬编码色的深色修正 */
   .notice-error { color: #F3A99E; }
   .skeleton { background: linear-gradient(90deg, var(--border) 25%, #2A2733 50%, var(--border) 75%); background-size: 200% 100%; }
+}
+
+/* ---------- iOS 毛玻璃增强 ---------- */
+/* -webkit-touch-callout 只有 iOS WebKit 支持：据此让页面级玻璃层（吸底操作栏等）在 iOS 上更通透、模糊更强；
+   安卓保持高不透明度降级。组件内的导航栏 / Tab 栏 / 弹层另外按 globalData.isIOS 加 --ios 修饰。 */
+@supports (-webkit-touch-callout: none) {
+  page { --glass-bg: var(--glass-ios-bg); --glass-strong: var(--glass-ios-strong); --glass-blur: var(--glass-blur-ios); }
 }

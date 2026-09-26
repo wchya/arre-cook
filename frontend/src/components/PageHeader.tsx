@@ -15,7 +15,7 @@ interface PageHeaderProps {
 export function HeaderIconButton({ className = "", children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/90 text-text2 shadow-[0_1px_3px_rgba(26,26,46,.05),0_6px_18px_rgba(26,26,46,.06)] transition-all hover:border-primary/20 hover:bg-primary-light hover:text-primary active:scale-95 ${className}`}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-border glass-strong text-text2 shadow-[0_1px_3px_rgba(26,26,46,.05),0_6px_18px_rgba(26,26,46,.06)] transition-all duration-200 ease-[var(--ease-spring)] hover:border-primary/20 hover:bg-primary-light hover:text-primary active:scale-90 ${className}`}
       {...props}
     >
       {children}
@@ -34,7 +34,7 @@ export default function PageHeader({
   className = "",
 }: PageHeaderProps) {
   return (
-    <header className={`sticky top-0 z-[100] border-b border-white/70 bg-bg/86 backdrop-blur-2xl shadow-[0_10px_28px_rgba(26,26,46,.045)] ${className}`}>
+    <header className={`sticky top-0 z-[100] border-b border-glass-border glass shadow-[0_10px_28px_rgba(26,26,46,.045)] ${className}`}>
       <div className="mx-auto grid min-h-[64px] max-w-[640px] grid-cols-[1fr_auto] items-center gap-3 px-5 py-2">
         <div className="flex min-w-0 items-center gap-3">
           {onBack && (
@@ -43,7 +43,7 @@ export default function PageHeader({
             </HeaderIconButton>
           )}
           {Icon && (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-primary/10 bg-primary-light text-primary shadow-[inset_0_1px_0_rgba(255,255,255,.82),0_7px_18px_rgba(232,115,74,.11)]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-primary/10 bg-primary-light text-primary shadow-[inset_0_1px_0_var(--color-highlight),0_7px_18px_rgba(232,115,74,.11)]">
               <Icon size={23} strokeWidth={2.45} />
             </div>
           )}

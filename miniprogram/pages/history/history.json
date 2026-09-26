@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#FAFAF8",
+  "backgroundColor": "@bg",
   "disableScroll": true,
   "usingComponents": {
     "empty": "/components/empty/index",

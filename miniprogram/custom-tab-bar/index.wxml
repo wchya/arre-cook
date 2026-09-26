@@ -1,4 +1,4 @@
-<view class="tabbar">
+<view class="tabbar {{isIOS ? 'tabbar--ios' : ''}}">
   <view class="tabbar__grid">
     <view wx:for="{{left}}" wx:key="path" class="tab {{selected === item.index ? 'is-active' : ''}}" data-index="{{item.index}}" bindtap="switchTab" hover-class="tab--press" hover-stay-time="60" aria-role="tab" aria-label="{{item.text}}">
       <view class="tab__pill"><icon name="{{item.icon}}" size="38" stroke="{{selected === item.index ? 2.6 : 2.1}}" color="{{selected === item.index ? 'primary' : 'text3'}}" /></view>

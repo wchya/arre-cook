@@ -1,5 +1,5 @@
 <view class="screen">
-  <scroll-view class="screen-scroll" scroll-y enhanced show-scrollbar="{{false}}" refresher-enabled refresher-background="#FFE9DE" refresher-triggered="{{refreshing}}" bindrefresherrefresh="onRefresh">
+  <scroll-view class="screen-scroll" scroll-y enhanced show-scrollbar="{{false}}" refresher-enabled refresher-background="{{refresherWarm}}" refresher-default-style="{{refresherStyle}}" refresher-triggered="{{refreshing}}" bindrefresherrefresh="onRefresh">
     <!-- 头部：渐变背景 + 头像昵称 + 统计 -->
     <view class="hero" style="padding-top:{{topPad}}px;">
       <view class="hero__glow"></view>

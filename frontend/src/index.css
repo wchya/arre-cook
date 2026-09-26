@@ -23,6 +23,37 @@
   --color-text4: #D1D5DB;
   --color-border: #F0F0EC;
   --color-border2: #E5E5E0;
+  /* 毛玻璃层：浮在内容之上的顶栏 / 底栏 / 弹层 / 悬浮操作栏统一用这组令牌（bg-glass、border-glass-border 等） */
+  --color-glass: rgb(250 250 248 / .84);
+  --color-glass-strong: rgb(255 255 255 / .92);
+  --color-glass-border: rgb(255 255 255 / .7);
+  --color-highlight: rgb(255 255 255 / .82);
+  --ease-spring: cubic-bezier(.2, .8, .2, 1);
+}
+
+:root {
+  --glass-blur: blur(20px) saturate(180%);
+}
+
+/* iOS（WebKit 独有的 -webkit-touch-callout）：真实模糊效果好，底色更通透、模糊更强，接近系统材质。 */
+@supports (-webkit-touch-callout: none) {
+  :root {
+    --color-glass: rgb(250 250 248 / .68);
+    --color-glass-strong: rgb(255 255 255 / .76);
+    --glass-blur: blur(30px) saturate(190%);
+  }
+}
+
+@utility glass {
+  background-color: var(--color-glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+@utility glass-strong {
+  background-color: var(--color-glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 /* 深色模式：跟随系统（夜间自动深色）。组件统一用上面的色板变量，这里只换值。
@@ -51,6 +82,10 @@
     --color-text4: #3F3F46;
     --color-border: #26262C;
     --color-border2: #34343C;
+    --color-glass: rgb(19 19 22 / .78);
+    --color-glass-strong: rgb(40 40 47 / .9);
+    --color-glass-border: rgb(255 255 255 / .06);
+    --color-highlight: rgb(255 255 255 / .06);
   }
 
   .achievement-unlock-card {
@@ -60,6 +95,15 @@
 
   .achievement-icon-wrap {
     box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 12px 28px rgba(0,0,0,.35);
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-glass: rgb(19 19 22 / .62);
+      --color-glass-strong: rgb(44 44 52 / .74);
+    }
   }
 }
 

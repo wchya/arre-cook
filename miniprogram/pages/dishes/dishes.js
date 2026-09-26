@@ -4,6 +4,7 @@ const ui = require("../../utils/ui")
 const media = require("../../utils/media")
 const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
+const theme = require("../../utils/theme")
 
 // 与 Web 端 DishList 默认值一致；站点设置里配置了分类 / 口味时以设置为准。
 const DEFAULT_CATEGORIES = ["川菜", "湘菜", "贵州菜", "云南菜", "粤菜"]
@@ -59,10 +60,15 @@ Page({
   },
 
   onLoad() {
+    this._offTheme = theme.bindRefresher(this)
     this._page = 1
     this._items = []
     this._dishMap = {}
     this._requestId = 0
+  },
+
+  onUnload() {
+    if (this._offTheme) this._offTheme()
   },
 
   onShow() {

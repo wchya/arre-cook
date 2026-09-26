@@ -4,6 +4,7 @@ const ui = require("../../utils/ui")
 const media = require("../../utils/media")
 const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
+const theme = require("../../utils/theme")
 
 const WEEK_HEAD = ["日", "一", "二", "三", "四", "五", "六"]
 // 单道菜评价与整餐评价的选项与 Web 端 History 一致
@@ -84,10 +85,15 @@ Page({
   },
 
   onLoad() {
+    this._offTheme = theme.bindRefresher(this)
     const now = new Date()
     this._records = {}
     this._ratings = {}
     this.setData({ year: now.getFullYear(), month: now.getMonth(), selectedKey: fmt.dateKey(now) })
+  },
+
+  onUnload() {
+    if (this._offTheme) this._offTheme()
   },
 
   onShow() {

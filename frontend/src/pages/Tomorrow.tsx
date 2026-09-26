@@ -222,7 +222,7 @@ function ProfileButton({
         active ? "border-primary bg-primary-light text-primary" : "border-border bg-card text-text2 hover:border-primary/30"
       }`}
     >
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? "bg-white text-primary" : "bg-bg text-text3"}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? "bg-card text-primary" : "bg-bg text-text3"}`}>
         <Icon size={17} strokeWidth={2.35} />
       </span>
       <span className="min-w-0">
@@ -990,7 +990,7 @@ export default function Tomorrow() {
 
       {!loading && (
         <div
-          className="fixed bottom-0 left-0 right-0 z-[110] border-t border-white/70 bg-bg/92 px-5 pt-3 backdrop-blur-2xl shadow-[0_-10px_28px_rgba(26,26,46,.07)]"
+          className="fixed bottom-0 left-0 right-0 z-[110] border-t border-glass-border glass px-5 pt-3 shadow-[0_-10px_28px_rgba(26,26,46,.07)]"
           style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}
         >
           <div className="mx-auto flex max-w-[640px] items-center gap-3">

@@ -44,11 +44,11 @@ export default function AnimatedBottomSheet({
 
   return createPortal(
     <div ref={rootRef} className={`fixed inset-0 ${zIndexClass} flex items-end justify-center`} onClick={close}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[3px]" />
       <div
         ref={sheetRef}
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-[640px] bg-card will-change-transform ${className}`}
+        className={`relative w-full max-w-[640px] border-t border-glass-border glass-strong shadow-[0_-12px_40px_rgba(26,26,46,.14)] will-change-transform ${className}`}
       >
         {typeof children === "function" ? children({ close }) : children}
       </div>
