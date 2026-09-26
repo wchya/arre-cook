@@ -29,6 +29,21 @@ function readNavMetrics() {
   }
 }
 
+// 读取系统主题与平台：主题用于图标等 JS 侧取色，平台用于毛玻璃能力判断。
+function detectEnv() {
+  let theme = "light"
+  let platform = ""
+  try {
+    const base = typeof wx.getAppBaseInfo === "function" ? wx.getAppBaseInfo() : readWindowInfo()
+    if (base && base.theme) theme = base.theme
+  } catch (_) {}
+  try {
+    const device = typeof wx.getDeviceInfo === "function" ? wx.getDeviceInfo() : readWindowInfo()
+    if (device && device.platform) platform = device.platform
+  } catch (_) {}
+  return { theme, platform, isIOS: platform === "ios" }
+}
+
 App({
   globalData: {
     apiBase: API_BASE,
@@ -36,10 +51,18 @@ App({
     sessionRestoreAttempted: false,
     nav: null,
     user: null,
+    theme: "light",
+    platform: "",
+    isIOS: false,
   },
 
   onLaunch() {
     this.globalData.nav = readNavMetrics()
+    Object.assign(this.globalData, detectEnv())
+    // 系统主题切换时更新（CSS 走媒体查询自动响应，此处供 JS 侧取色组件订阅）。
+    if (typeof wx.onThemeChange === "function") {
+      wx.onThemeChange((res) => { this.globalData.theme = (res && res.theme) || "light" })
+    }
   },
 
   navMetrics() {

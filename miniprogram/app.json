@@ -28,11 +28,11 @@
   "window": {
     "navigationStyle": "custom",
     "navigationBarTitleText": "NiniMenu",
-    "navigationBarBackgroundColor": "#FAFAF8",
-    "navigationBarTextStyle": "black",
-    "backgroundColor": "#FAFAF8",
-    "backgroundColorTop": "#FAFAF8",
-    "backgroundColorBottom": "#FAFAF8"
+    "navigationBarBackgroundColor": "@bg",
+    "navigationBarTextStyle": "@navTxt",
+    "backgroundColor": "@bg",
+    "backgroundColorTop": "@bg",
+    "backgroundColorBottom": "@bg"
   },
   "tabBar": {
     "custom": true,
@@ -48,6 +48,8 @@
     ]
   },
   "style": "v2",
+  "darkmode": true,
+  "themeLocation": "theme.json",
   "__usePrivacyCheck__": true,
   "sitemapLocation": "sitemap.json"
 }

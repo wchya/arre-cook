@@ -1,4 +1,4 @@
-.tabbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid rgba(240, 240, 236, .7); background: rgba(255, 255, 255, .94); box-shadow: 0 -20rpx 60rpx rgba(26, 26, 46, .07); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.tabbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid var(--glass-border); background: var(--glass-bg); box-shadow: 0 -20rpx 60rpx rgba(26, 26, 46, .07); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
 .tabbar__grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; height: 120rpx; padding: 0 16rpx; }
 
 .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4rpx; height: 96rpx; border-radius: 26rpx; transition: transform .15s ease; }

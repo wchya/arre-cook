@@ -22,6 +22,54 @@ const TOKENS = {
   white: "#FFFFFF",
 }
 
+// 深色模式取色（与 app.wxss 深色令牌一致）；图标颜色在 JS 侧解析，无法走 CSS 变量。
+const TOKENS_DARK = {
+  text: "#F4F2F7",
+  text2: "#A7A2B0",
+  text3: "#6E6979",
+  text4: "#45414D",
+  primary: "#F0805A",
+  "primary-dark": "#F5936F",
+  mint: "#5FBFB0",
+  "mint-ink": "#6FD8C6",
+  pink: "#E89A91",
+  "pink-ink": "#F3A99E",
+  yellow: "#E9C65E",
+  "yellow-dark": "#E7C25C",
+  purple: "#A98BFF",
+  red: "#F26D6D",
+  wechat: "#07C160",
+  bg: "#121016",
+  white: "#FFFFFF",
+}
+
+// 单点订阅系统主题变化，广播给所有已挂载的图标实例重新取色。
+const subscribers = new Set()
+let THEME = null
+function currentTheme() {
+  try {
+    const app = getApp()
+    if (app && app.globalData && app.globalData.theme) return app.globalData.theme
+  } catch (_) {}
+  try {
+    if (typeof wx.getAppBaseInfo === "function") {
+      const base = wx.getAppBaseInfo()
+      if (base && base.theme) return base.theme
+    }
+  } catch (_) {}
+  return "light"
+}
+function ensureThemeWatch() {
+  if (THEME !== null) return
+  THEME = currentTheme()
+  if (typeof wx.onThemeChange === "function") {
+    wx.onThemeChange((res) => {
+      THEME = (res && res.theme) || "light"
+      subscribers.forEach((fn) => fn())
+    })
+  }
+}
+
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 const cache = {}
 
@@ -39,8 +87,9 @@ function base64(input) {
   return output
 }
 
-function build(name, color, stroke, fill) {
-  const hex = TOKENS[color] || color || TOKENS.text2
+function build(name, color, stroke, fill, theme) {
+  const map = theme === "dark" ? TOKENS_DARK : TOKENS
+  const hex = map[color] || color || map.text2
   const width = stroke || 2
   const key = `${name}|${hex}|${width}|${fill ? 1 : 0}`
   if (cache[key]) return cache[key]
@@ -67,18 +116,29 @@ Component({
 
   data: { src: "" },
 
-  observers: {
-    "name, color, stroke, fill": function (name, color, stroke, fill) {
-      const src = build(name, color, stroke, fill)
+  methods: {
+    _paint() {
+      const { name, color, stroke, fill } = this.data
+      const src = build(name, color, stroke, fill, THEME || currentTheme())
       if (src !== this.data.src) this.setData({ src })
+    },
+  },
+
+  observers: {
+    "name, color, stroke, fill": function () {
+      this._paint()
     },
   },
 
   lifetimes: {
     attached() {
-      const { name, color, stroke, fill } = this.data
-      const src = build(name, color, stroke, fill)
-      if (src !== this.data.src) this.setData({ src })
+      ensureThemeWatch()
+      this._onTheme = () => this._paint()
+      subscribers.add(this._onTheme)
+      this._paint()
+    },
+    detached() {
+      if (this._onTheme) subscribers.delete(this._onTheme)
     },
   },
 })
