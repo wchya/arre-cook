@@ -145,7 +145,19 @@ func PickBlindBox(c *gin.Context) {
 	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dish := dishes[r.Intn(len(dishes))]
+	// 自建菜谱被抽中的概率高 30%（与推荐引擎的来源权重一致）
+	total := 0.0
+	for _, d := range dishes {
+		total += services.DishSourceWeight(d)
+	}
+	x, idx := r.Float64()*total, len(dishes)-1
+	for i, d := range dishes {
+		if x -= services.DishSourceWeight(d); x < 0 {
+			idx = i
+			break
+		}
+	}
+	dish := dishes[idx]
 	services.MarkFavorite(uid(c), &dish)
 
 	hint := "点我揭晓今日惊喜~"

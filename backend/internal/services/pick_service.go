@@ -1,6 +1,7 @@
 package services
 
 import (
+	"math"
 	"math/rand"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
@@ -128,14 +129,17 @@ func matchesTomorrowProfile(d models.Dish, profile string) bool {
 	}
 }
 
+// sortTomorrowPool 按档位得分加权随机排序（Efraimidis–Spirakis）：得分平方作权重，高分菜明显靠前
+// 但每次仍有变化；自建菜谱的权重再乘 OwnDishWeight，同分时被排进明日菜单的概率高 30%。
 func sortTomorrowPool(dishes []models.Dish, profile string) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(dishes), func(i, j int) {
-		dishes[i], dishes[j] = dishes[j], dishes[i]
-	})
-
+	keys := make(map[uint]float64, len(dishes))
+	for _, d := range dishes {
+		base := float64(tomorrowDishScore(d, profile) + 10)
+		keys[d.ID] = math.Pow(r.Float64(), 1/(base*base*DishSourceWeight(d)))
+	}
 	sort.SliceStable(dishes, func(i, j int) bool {
-		a, b := tomorrowDishScore(dishes[i], profile), tomorrowDishScore(dishes[j], profile)
+		a, b := keys[dishes[i].ID], keys[dishes[j].ID]
 		if a != b {
 			return a > b
 		}

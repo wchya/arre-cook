@@ -32,6 +32,11 @@ func GetShoppingList(c *gin.Context) {
 	utils.Success(c, services.BuildShoppingList(uid(c), shoppingDates()))
 }
 
+// GetShoppingOverview 个人 + 家庭两份买菜清单（今明两天），供买菜页分区展示。
+func GetShoppingOverview(c *gin.Context) {
+	utils.Success(c, services.ShoppingOverview(uid(c)))
+}
+
 type ToggleShoppingCheckRequest struct {
 	ItemName string `json:"item_name" binding:"required"`
 	MealDate string `json:"meal_date"`

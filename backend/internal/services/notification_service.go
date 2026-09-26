@@ -18,7 +18,11 @@ var notificationTypes = map[string]bool{
 	"health_tip":     true,
 	"agent_security": true,
 	"family":         true,
+	"shopping":       true,
 }
+
+// 合并提醒时最多保留的条目数（按“；”分隔），多出的丢弃最早的。
+const coalescedNoticeMaxParts = 8
 
 func NormalizeNotificationType(raw string) string {
 	t := strings.TrimSpace(raw)
@@ -57,6 +61,34 @@ func CreateNotification(uid uint, kind, title, content, link string) (*models.No
 		return nil, err
 	}
 	return n, nil
+}
+
+// UpsertRecentNotification 合并短时间内的同类提醒：同一用户、同类型、同标题、同链接、仍未读且在 window 内
+// 创建的站内信追加一条内容（用“；”分隔）并置顶，否则新建一条。避免连续确认几餐时刷屏。
+func UpsertRecentNotification(uid uint, kind, title, line, link string, window time.Duration) error {
+	line = strings.TrimSpace(line)
+	if uid == 0 || line == "" {
+		return nil
+	}
+	var n models.Notification
+	err := database.DB.Scopes(database.OwnedBy(uid)).
+		Where("type = ? AND title = ? AND link = ? AND read_at IS NULL AND created_at > ?", NormalizeNotificationType(kind), strings.TrimSpace(title), strings.TrimSpace(link), time.Now().Add(-window)).
+		Order("created_at DESC").First(&n).Error
+	if err != nil {
+		_, err = CreateNotification(uid, kind, title, line, link)
+		return err
+	}
+	parts := strings.Split(n.Content, "；")
+	for _, p := range parts {
+		if p == line {
+			return nil
+		}
+	}
+	parts = append(parts, line)
+	if len(parts) > coalescedNoticeMaxParts {
+		parts = parts[len(parts)-coalescedNoticeMaxParts:]
+	}
+	return database.DB.Model(&n).Updates(map[string]any{"content": strings.Join(parts, "；"), "created_at": time.Now()}).Error
 }
 
 // PublishNotification 发布给指定用户；uid=0 表示向全部正常用户广播。

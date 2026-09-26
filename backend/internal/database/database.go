@@ -70,6 +70,8 @@ func Init() error {
 		&models.FamilyInvitation{},
 		&models.FamilyPlanItem{},
 		&models.FamilyShoppingItem{},
+		&models.FamilyShoppingCheck{},
+		&models.DishDeleteRequest{},
 		&models.FoodJournalEntry{},
 		&models.Dish{},
 		&models.MealRecord{},

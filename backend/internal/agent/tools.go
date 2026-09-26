@@ -396,12 +396,34 @@ func init() {
 	register(&Tool{
 		Name:        "get_shopping_list",
 		Title:       "买菜清单",
-		Description: "获取今明两天已记录菜品汇总出的买菜清单（按蔬菜/肉类/配料/其他分组，含已买、家中有库存标记）。",
+		Description: "获取今明两天的买菜清单：个人清单（按蔬菜/肉类/配料/其他分组，含已买与家中库存标记）与家庭清单（家庭菜单自动展开 + 成员手动添加），并附各自来自哪几餐。",
 		Scope:       auth.ScopeRecordsRead,
 		Handler: func(ctx *Ctx, _ json.RawMessage) (any, error) {
-			today := services.Today()
-			tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-			return services.BuildShoppingList(ctx.UID(), []string{today, tomorrow}), nil
+			return services.ShoppingOverview(ctx.UID()), nil
+		},
+	})
+
+	register(&Tool{
+		Name:        "push_shopping_reminder",
+		Title:       "推送买菜提醒",
+		Description: "给用户或全家推送一条买菜提醒站内信，列出清单里还没买的食材。audience=me 发给本人（个人+家庭清单），audience=family 把家庭清单发给全体成员。每位用户每天最多推送 10 次。",
+		Scope:       auth.ScopeSuggestionsWrite,
+		Write:       true,
+		Schema: object(map[string]any{
+			"audience": str("推送对象：me 本人 / family 全家，默认 me"),
+			"date":     str("买菜日期 YYYY-MM-DD，或 today/tomorrow，默认 tomorrow"),
+			"note":     str("附加备注，最多 100 字"),
+		}),
+		Handler: func(ctx *Ctx, args json.RawMessage) (any, error) {
+			in, err := decode[struct {
+				Audience string `json:"audience"`
+				Date     string `json:"date"`
+				Note     string `json:"note"`
+			}](args)
+			if err != nil {
+				return nil, err
+			}
+			return services.PushShoppingReminder(ctx.UID(), in.Audience, in.Date, in.Note, actorName(ctx))
 		},
 	})
 

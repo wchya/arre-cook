@@ -77,6 +77,11 @@ func Setup(r *gin.Engine) {
 		app.PATCH("/family/shopping/:id", handlers.CheckFamilyShopping)
 		app.DELETE("/family/shopping/:id", handlers.DeleteFamilyShopping)
 		app.POST("/family/shopping/import", handlers.ImportFamilyIngredients)
+		app.POST("/family/shopping/toggle", handlers.ToggleFamilyShoppingCheck)
+		app.GET("/family/dish-requests", handlers.ListDishRequests)
+		app.POST("/family/dish-requests/:id/approve", handlers.ApproveDishRequest)
+		app.POST("/family/dish-requests/:id/reject", handlers.RejectDishRequest)
+		app.DELETE("/family/dish-requests/:id", handlers.CancelDishRequest)
 		app.GET("/food-journal", handlers.GetFoodJournal)
 		app.POST("/food-journal", handlers.CreateFoodJournal)
 		app.DELETE("/food-journal/:id", handlers.DeleteFoodJournal)
@@ -150,8 +155,10 @@ func Setup(r *gin.Engine) {
 		app.GET("/week-plan", handlers.GetWeekPlan)
 		app.POST("/week-plan/regenerate", handlers.RegenerateWeekPlanHandler)
 		app.GET("/shopping-list", handlers.GetShoppingList)
+		app.GET("/shopping/overview", handlers.GetShoppingOverview)
 		app.POST("/shopping-list/toggle", handlers.ToggleShoppingCheckHandler)
 		app.POST("/shopping-list/inventory", handlers.ToggleHomeInventoryHandler)
+		app.GET("/link-preview", handlers.GetLinkPreview)
 		app.GET("/holidays/upcoming", handlers.GetUpcomingHolidays)
 	}
 

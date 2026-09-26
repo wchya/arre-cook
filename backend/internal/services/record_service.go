@@ -79,7 +79,8 @@ func CreateMealRecord(uid uint, in MealInput, source, actor string) (*models.Mea
 	if err := database.DB.Create(&record).Error; err != nil {
 		return nil, err
 	}
-	addShoppingItems(uid, dish, in.MealType, date)
+	entries := addShoppingItems(uid, dish, in.MealType, date)
+	notifyMealShopping(uid, dish, in.MealType, date, entries)
 	if source != "" && source != "app" {
 		LogBehavior(uid, "accept", dish.ID, dish.Name, source, actor, map[string]any{"meal_type": in.MealType, "meal_date": date})
 	}
@@ -138,29 +139,20 @@ type nameAmount struct {
 	Amount string `json:"amount"`
 }
 
-func addShoppingItems(uid uint, dish models.Dish, mealType, mealDate string) {
-	var items []models.ShoppingCheck
-	for _, raw := range []string{dish.Ingredients, dish.Seasonings} {
-		var list []nameAmount
-		if err := json.Unmarshal([]byte(raw), &list); err != nil {
-			// 兼容字符串数组
-			for _, name := range ingredientNames(raw) {
-				list = append(list, nameAmount{Name: name})
-			}
-		}
-		for _, it := range list {
-			if strings.TrimSpace(it.Name) == "" {
-				continue
-			}
-			items = append(items, models.ShoppingCheck{
-				UserID: uid, MealDate: mealDate, MealType: mealType,
-				DishID: dish.ID, DishName: dish.Name, ItemName: it.Name, ItemAmount: it.Amount,
-			})
-		}
+// addShoppingItems 把这一餐的食材与调料写入个人买菜清单，返回写入的条目。
+func addShoppingItems(uid uint, dish models.Dish, mealType, mealDate string) []nameAmount {
+	entries := dishShoppingEntries(dish)
+	items := make([]models.ShoppingCheck, 0, len(entries))
+	for _, it := range entries {
+		items = append(items, models.ShoppingCheck{
+			UserID: uid, MealDate: mealDate, MealType: mealType,
+			DishID: dish.ID, DishName: dish.Name, ItemName: it.Name, ItemAmount: it.Amount,
+		})
 	}
 	if len(items) > 0 {
 		database.DB.Create(&items)
 	}
+	return entries
 }
 
 // SetFavorite 收藏 / 取消收藏（幂等）。

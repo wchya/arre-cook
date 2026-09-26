@@ -20,7 +20,7 @@ import (
 
 func familyError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, services.ErrFamilyRequired):
+	case errors.Is(err, services.ErrFamilyRequired), errors.Is(err, services.ErrDishRequestNotFound):
 		utils.NotFound(c, err.Error())
 	case errors.Is(err, services.ErrFamilyOwnerOnly), errors.Is(err, services.ErrInviteEmail):
 		utils.Forbidden(c, err.Error())
@@ -303,4 +303,75 @@ func ImportFamilyIngredients(c *gin.Context) {
 		return
 	}
 	utils.Success(c, gin.H{"added": count})
+}
+
+// ListDishRequests 家庭菜谱删除申请列表：管理员看全家，成员看自己；?status=all 含已处理。
+func ListDishRequests(c *gin.Context) {
+	requests, err := services.ListDishRequests(uid(c), c.Query("status"))
+	if err != nil {
+		familyError(c, err)
+		return
+	}
+	utils.Success(c, requests)
+}
+
+// ApproveDishRequest 家庭管理员同意删除申请。
+func ApproveDishRequest(c *gin.Context) {
+	id, ok := familyIDParam(c)
+	if !ok {
+		return
+	}
+	view, err := services.ApproveDishRequest(uid(c), id)
+	if err != nil {
+		familyError(c, err)
+		return
+	}
+	utils.Success(c, view)
+}
+
+// RejectDishRequest 家庭管理员拒绝删除申请，可附理由。
+func RejectDishRequest(c *gin.Context) {
+	id, ok := familyIDParam(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	view, err := services.RejectDishRequest(uid(c), id, req.Reason)
+	if err != nil {
+		familyError(c, err)
+		return
+	}
+	utils.Success(c, view)
+}
+// CancelDishRequest 申请人撤回自己仍在等待的删除申请。
+func CancelDishRequest(c *gin.Context) {
+	id, ok := familyIDParam(c)
+	if !ok {
+		return
+	}
+	if err := services.CancelDishRequest(uid(c), id); err != nil {
+		familyError(c, err)
+		return
+	}
+	utils.SuccessMsg(c, "申请已撤回")
+}
+
+// ToggleFamilyShoppingCheck 勾选 / 取消家庭自动清单里的某样食材（按名称，今明两天一起变）。
+func ToggleFamilyShoppingCheck(c *gin.Context) {
+	var req struct {
+		ItemName string `json:"item_name" binding:"required"`
+		Checked  *bool  `json:"checked" binding:"required"`
+	}
+	if c.ShouldBindJSON(&req) != nil || req.Checked == nil {
+		utils.BadRequest(c, "请指定食材与购买状态")
+		return
+	}
+	if err := services.ToggleFamilyShoppingCheck(uid(c), req.ItemName, *req.Checked); err != nil {
+		familyError(c, err)
+		return
+	}
+	utils.SuccessMsg(c, "已更新")
 }

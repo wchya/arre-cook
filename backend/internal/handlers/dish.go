@@ -124,6 +124,8 @@ func GetDish(c *gin.Context) {
 		return
 	}
 	services.MarkFavorite(uid(c), &dish)
+	access := services.DishAccessFor(uid(c), isAdmin(c), &dish)
+	dish.Access = &access
 	utils.Success(c, dish)
 }
 
@@ -215,6 +217,7 @@ func CreateDish(c *gin.Context) {
 			return
 		}
 	}
+	dish.VideoMeta = services.BuildVideoMeta(dish.VideoURL)
 	if err := database.DB.Create(&dish).Error; err != nil {
 		utils.InternalError(c, "创建菜品失败")
 		return
@@ -233,7 +236,11 @@ func UpdateDish(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
+	oldVideoURL := dish.VideoURL
 	req.apply(dish)
+	if dish.VideoURL != oldVideoURL {
+		dish.VideoMeta = services.BuildVideoMeta(dish.VideoURL)
+	}
 	if err := database.DB.Save(dish).Error; err != nil {
 		utils.InternalError(c, "更新菜品失败")
 		return
@@ -244,17 +251,30 @@ func UpdateDish(c *gin.Context) {
 }
 
 func DeleteDish(c *gin.Context) {
-	dish, ok := findEditableDish(c)
-	if !ok {
+	var dish models.Dish
+	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).First(&dish, c.Param("id")).Error; err != nil {
+		utils.NotFound(c, "菜品不存在")
 		return
 	}
-	database.DB.Delete(dish)
-	if dish.FamilyID != 0 {
-		database.DB.Where("family_id = ? AND dish_id = ?", dish.FamilyID, dish.ID).Delete(&models.FamilyPlanItem{})
+	access := services.DishAccessFor(uid(c), isAdmin(c), &dish)
+	switch access.DeleteMode {
+	case services.DeleteModeDirect:
+		if err := services.DeleteDishCascade(&dish, uid(c)); err != nil {
+			utils.InternalError(c, "删除菜品失败")
+			return
+		}
+		services.QueueAutoAchievementSync(uid(c))
+		utils.Success(c, gin.H{"deleted": true, "pending": false})
+	case services.DeleteModeRequest:
+		view, err := services.RequestDishDeletion(uid(c), &dish)
+		if err != nil {
+			utils.BadRequest(c, err.Error())
+			return
+		}
+		utils.Success(c, gin.H{"deleted": false, "pending": true, "request": view})
+	default:
+		utils.Forbidden(c, "无权删除该菜谱")
 	}
-	services.InvalidateWeekPlan(uid(c))
-	services.QueueAutoAchievementSync(uid(c))
-	utils.SuccessMsg(c, "删除成功")
 }
 
 func ToggleDish(c *gin.Context) {
@@ -368,10 +388,25 @@ func BatchDeleteDishes(c *gin.Context) {
 		utils.BadRequest(c, "请选择菜品")
 		return
 	}
-	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
-		database.DB.Where("id IN ?", ids).Delete(&models.Dish{})
+	var dishes []models.Dish
+	database.DB.Scopes(database.VisibleDishes(uid(c))).Where("id IN ?", req.IDs).Find(&dishes)
+	deleted, requested := 0, 0
+	for i := range dishes {
+		switch services.DishAccessFor(uid(c), isAdmin(c), &dishes[i]).DeleteMode {
+		case services.DeleteModeDirect:
+			if err := services.DeleteDishCascade(&dishes[i], uid(c)); err == nil {
+				deleted++
+			}
+		case services.DeleteModeRequest:
+			if _, err := services.RequestDishDeletion(uid(c), &dishes[i]); err == nil {
+				requested++
+			}
+		}
 	}
-	utils.SuccessMsg(c, "批量删除成功")
+	if deleted > 0 {
+		services.QueueAutoAchievementSync(uid(c))
+	}
+	utils.Success(c, gin.H{"deleted": deleted, "requested": requested})
 }
 
 type BatchCategoryRequest struct {

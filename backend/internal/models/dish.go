@@ -31,9 +31,20 @@ type Dish struct {
 	Enabled   bool           `json:"enabled" gorm:"default:true;index;index:idx_dishes_pick,priority:1"`
 	Tags      string         `json:"tags" gorm:"type:longtext"`
 	SortOrder int            `json:"sort_order" gorm:"default:0"`
+	// VideoMeta 视频链接预览（平台、标题、封面、作者、时长等 JSON），保存 video_url 时由服务端抓取填充。
+	VideoMeta string `json:"-" gorm:"type:text"`
+	// Access 当前用户对这道菜的编辑 / 删除权限，仅详情接口按当前用户填充，不落库。
+	Access    *DishAccess    `json:"access,omitempty" gorm:"-"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index;index:idx_dishes_pick,priority:3"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+// DishAccess 菜谱权限视图。DeleteMode: direct 可直接删除；request 需家庭管理员同意；none 无权删除。
+type DishAccess struct {
+	CanEdit          bool   `json:"can_edit"`
+	DeleteMode       string `json:"delete_mode"`
+	PendingRequestID uint   `json:"pending_request_id"`
 }
 
 // jsonField 把数据库里存的 JSON 字符串转成可直接内联的 JSON 片段。
@@ -50,8 +61,13 @@ func jsonField(s string) json.RawMessage {
 
 // MarshalJSON 让 images/ingredients/seasonings/steps/tags 五个字段在 API 响应中
 // 输出为真正的 JSON 数组/对象，而不是被转义的字符串。数据库仍以 TEXT 存储，写入路径不变。
+// video_meta 同理内联为对象，未抓取时为 null。
 func (d Dish) MarshalJSON() ([]byte, error) {
 	type alias Dish // 借助别名避免无限递归
+	videoMeta := json.RawMessage("null")
+	if d.VideoMeta != "" && json.Valid([]byte(d.VideoMeta)) {
+		videoMeta = json.RawMessage(d.VideoMeta)
+	}
 	return json.Marshal(&struct {
 		alias
 		Images      json.RawMessage `json:"images"`
@@ -59,6 +75,7 @@ func (d Dish) MarshalJSON() ([]byte, error) {
 		Seasonings  json.RawMessage `json:"seasonings"`
 		Steps       json.RawMessage `json:"steps"`
 		Tags        json.RawMessage `json:"tags"`
+		VideoMeta   json.RawMessage `json:"video_meta"`
 	}{
 		alias:       alias(d),
 		Images:      jsonField(d.Images),
@@ -66,5 +83,6 @@ func (d Dish) MarshalJSON() ([]byte, error) {
 		Seasonings:  jsonField(d.Seasonings),
 		Steps:       jsonField(d.Steps),
 		Tags:        jsonField(d.Tags),
+		VideoMeta:   videoMeta,
 	})
 }

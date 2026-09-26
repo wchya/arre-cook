@@ -84,11 +84,16 @@ func housekeeping(ctx context.Context) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	run := func() {
+		now := time.Now()
 		services.PurgeExpiredCodes()
 		database.DB.Model(&models.AgentSuggestion{}).
-			Where("status = ? AND expires_at IS NOT NULL AND expires_at < ?", "pending", time.Now()).
+			Where("status = ? AND expires_at IS NOT NULL AND expires_at < ?", "pending", now).
 			Update("status", "expired")
-		database.DB.Where("created_at < ?", time.Now().AddDate(0, 0, -180)).Delete(&models.AgentAuditLog{})
+		database.DB.Where("created_at < ?", now.AddDate(0, 0, -180)).Delete(&models.AgentAuditLog{})
+		// 每晚固定整点给清单里还有没买食材的用户发一条买菜提醒（当天已发过的会跳过）
+		if now.Hour() == services.ShoppingReminderHour() {
+			services.SendShoppingReminders(now)
+		}
 	}
 	run()
 	for {

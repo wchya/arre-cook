@@ -201,7 +201,7 @@ var secretSettingKeys = map[string]bool{"llm_api_key": true}
 // 用户级设置（每个用户自己的偏好开关）。
 var userSettingKeys = map[string]bool{
 	"voice_enabled": true, "blind_box_enabled": true, "repeat_days": true,
-	"lunch_dishes_per_day": true, "dinner_dishes_per_day": true,
+	"lunch_dishes_per_day": true, "dinner_dishes_per_day": true, "shopping_reminder": true,
 }
 
 func GetAppInfo(c *gin.Context) {
@@ -243,6 +243,7 @@ func GetSettings(c *gin.Context) {
 	delete(m, "llm_model")
 	m["voice_enabled"] = "1"
 	m["blind_box_enabled"] = "1"
+	m["shopping_reminder"] = "1"
 	var mine []models.UserSetting
 	database.DB.Scopes(database.OwnedBy(uid(c))).Where("`key` IN ?", keysOf(userSettingKeys)).Find(&mine)
 	for _, s := range mine {

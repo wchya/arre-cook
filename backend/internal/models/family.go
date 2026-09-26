@@ -51,3 +51,35 @@ type FamilyShoppingItem struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// FamilyShoppingCheck 家庭菜单自动展开的买菜条目：每个菜单格（日期 + 餐次）按菜品食材与调料各占一行，
+// 菜单格换菜或清空时整格替换。成员手动添加的条目仍在 FamilyShoppingItem，两者分开展示。
+type FamilyShoppingCheck struct {
+	ID         uint      `json:"id" gorm:"primaryKey"`
+	FamilyID   uint      `json:"family_id" gorm:"not null;index:idx_family_shopping_check_slot,priority:1"`
+	MealDate   string    `json:"meal_date" gorm:"not null;size:10;index:idx_family_shopping_check_slot,priority:2"`
+	MealType   string    `json:"meal_type" gorm:"not null;size:16;index:idx_family_shopping_check_slot,priority:3"`
+	DishID     uint      `json:"dish_id" gorm:"not null;index"`
+	DishName   string    `json:"dish_name"`
+	ItemName   string    `json:"item_name" gorm:"not null;size:80"`
+	ItemAmount string    `json:"item_amount"`
+	Checked    bool      `json:"checked" gorm:"not null;default:false"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// DishDeleteRequest 家庭共享菜谱的删除申请：普通成员提交，家庭创建者（管理员）同意后才真正删除。
+// 每道菜同一时间最多一条 pending 申请。
+type DishDeleteRequest struct {
+	ID          uint       `json:"id" gorm:"primaryKey"`
+	FamilyID    uint       `json:"family_id" gorm:"not null;index:idx_dish_delete_req_family_status,priority:1"`
+	DishID      uint       `json:"dish_id" gorm:"not null;index"`
+	DishName    string     `json:"dish_name" gorm:"size:128"`
+	RequestedBy uint       `json:"requested_by" gorm:"not null;index"`
+	Status      string     `json:"status" gorm:"size:16;not null;default:'pending';index:idx_dish_delete_req_family_status,priority:2"`
+	Reason      string     `json:"reason" gorm:"size:255"`
+	DecidedBy   uint       `json:"decided_by"`
+	DecidedAt   *time.Time `json:"decided_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}

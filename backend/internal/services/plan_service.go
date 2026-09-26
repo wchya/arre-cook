@@ -196,8 +196,7 @@ func pickNDishes(pool []models.Dish, count int, globalUsed map[uint]bool, dayUse
 	var picked []models.Dish
 
 	for len(picked) < count && len(available) > 0 {
-		idx := r.Intn(len(available))
-		d := available[idx]
+		d := available[weightedDishIndex(available, r)]
 		picked = append(picked, d)
 		globalUsed[d.ID] = true
 		dayUsed[d.ID] = true
@@ -207,8 +206,7 @@ func pickNDishes(pool []models.Dish, count int, globalUsed map[uint]bool, dayUse
 	if len(picked) < count {
 		available2 := filterAvailable(pool, dayUsed)
 		for len(picked) < count && len(available2) > 0 {
-			idx := r.Intn(len(available2))
-			d := available2[idx]
+			d := available2[weightedDishIndex(available2, r)]
 			picked = append(picked, d)
 			dayUsed[d.ID] = true
 			available2 = filterAvailable(pool, dayUsed)
@@ -216,6 +214,22 @@ func pickNDishes(pool []models.Dish, count int, globalUsed map[uint]bool, dayUse
 	}
 
 	return picked
+}
+
+// weightedDishIndex 按菜谱来源加权随机：自建菜谱被抽中的概率是系统菜谱的 OwnDishWeight 倍。
+func weightedDishIndex(pool []models.Dish, r *rand.Rand) int {
+	total := 0.0
+	for _, d := range pool {
+		total += DishSourceWeight(d)
+	}
+	x := r.Float64() * total
+	for i, d := range pool {
+		x -= DishSourceWeight(d)
+		if x < 0 {
+			return i
+		}
+	}
+	return len(pool) - 1
 }
 
 func filterAvailableBoth(dishes []models.Dish, globalUsed map[uint]bool, dayUsed map[uint]bool) []models.Dish {
@@ -462,24 +476,9 @@ func BuildShoppingList(uid uint, dates []string) []ShoppingCategory {
 	if len(checks) == 0 {
 		return []ShoppingCategory{}
 	}
-
-	type nameAccum struct {
-		amounts []string
-		checked bool
-	}
-	merged := make(map[string]*nameAccum)
+	rows := make([]shoppingRow, 0, len(checks))
 	for _, ch := range checks {
-		entry, exists := merged[ch.ItemName]
-		if !exists {
-			entry = &nameAccum{}
-			merged[ch.ItemName] = entry
-		}
-		if ch.ItemAmount != "" {
-			entry.amounts = append(entry.amounts, ch.ItemAmount)
-		}
-		if ch.Checked {
-			entry.checked = true
-		}
+		rows = append(rows, shoppingRow{name: ch.ItemName, amount: ch.ItemAmount, checked: ch.Checked})
 	}
 
 	var inventory []models.HomeInventory
@@ -487,6 +486,40 @@ func BuildShoppingList(uid uint, dates []string) []ShoppingCategory {
 	inStockByName := make(map[string]bool, len(inventory))
 	for _, inv := range inventory {
 		inStockByName[inv.ItemName] = true
+	}
+	return groupShoppingRows(rows, inStockByName)
+}
+
+// shoppingRow 一条待合并的买菜条目（个人 ShoppingCheck 或家庭 FamilyShoppingCheck）。
+type shoppingRow struct {
+	name    string
+	amount  string
+	checked bool
+}
+
+// groupShoppingRows 同名食材合并用量（同单位数值相加），任一行已勾选即视为已买，
+// 再按蔬菜 / 肉类 / 配料 / 其他分组排序；inStock 标记家中常备（家庭清单传 nil）。
+func groupShoppingRows(rows []shoppingRow, inStock map[string]bool) []ShoppingCategory {
+	if len(rows) == 0 {
+		return []ShoppingCategory{}
+	}
+	type nameAccum struct {
+		amounts []string
+		checked bool
+	}
+	merged := make(map[string]*nameAccum)
+	for _, row := range rows {
+		entry, exists := merged[row.name]
+		if !exists {
+			entry = &nameAccum{}
+			merged[row.name] = entry
+		}
+		if row.amount != "" {
+			entry.amounts = append(entry.amounts, row.amount)
+		}
+		if row.checked {
+			entry.checked = true
+		}
 	}
 
 	categoryByName := getShoppingCategoryOverrideMap()
@@ -499,7 +532,7 @@ func BuildShoppingList(uid uint, dates []string) []ShoppingCategory {
 	}
 	for name, entry := range merged {
 		amountStr := compactShoppingAmounts(entry.amounts)
-		item := ShoppingItem{Name: name, Amount: amountStr, Checked: entry.checked, InStock: inStockByName[name]}
+		item := ShoppingItem{Name: name, Amount: amountStr, Checked: entry.checked, InStock: inStock[name]}
 		category := classifyShoppingItem(name, categoryByName)
 		if _, ok := grouped[category]; !ok {
 			category = "其他"
@@ -507,7 +540,7 @@ func BuildShoppingList(uid uint, dates []string) []ShoppingCategory {
 		grouped[category] = append(grouped[category], item)
 	}
 
-	var result []ShoppingCategory
+	result := []ShoppingCategory{}
 	categoryNames := []string{"蔬菜", "肉类", "配料", "其他"}
 	for _, category := range categoryNames {
 		items := grouped[category]

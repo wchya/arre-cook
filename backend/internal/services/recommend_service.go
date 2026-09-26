@@ -279,9 +279,9 @@ func scoreDish(d models.Dish, req RecommendRequest, mealType string, p *TastePro
 	}
 
 	if d.FamilyID != 0 {
-		add(6, "家里的共享菜谱")
+		add(0, "家里的共享菜谱")
 	} else if d.OwnerID != 0 {
-		add(6, "你的私房菜")
+		add(0, "你的私房菜")
 	}
 	if p.favoriteSet[d.ID] {
 		add(15, "已收藏的心头好")
@@ -389,10 +389,26 @@ func scoreDish(d models.Dish, req RecommendRequest, mealType string, p *TastePro
 		score += 3
 	}
 
+	// 自建菜谱（私房菜 / 家庭共享）整体权重比系统公共菜谱高 30%；负分不放大
+	if score > 0 {
+		score *= DishSourceWeight(d)
+	}
+
 	if len(reasons) == 0 {
 		reasons = append(reasons, "菜单里的一道好菜")
 	}
 	return score, reasons
+}
+
+// OwnDishWeight 用户自建菜谱（私房菜、家庭共享菜谱）在推荐与随机排菜中的权重倍数。
+const OwnDishWeight = 1.3
+
+// DishSourceWeight 菜谱来源权重：自建为 OwnDishWeight，系统公共菜谱为 1。
+func DishSourceWeight(d models.Dish) float64 {
+	if d.OwnerID != 0 || d.FamilyID != 0 {
+		return OwnDishWeight
+	}
+	return 1
 }
 
 // pickDiverse 按分数贪心挑选，同一菜系最多占一半名额，避免一次推荐全是同一菜系。

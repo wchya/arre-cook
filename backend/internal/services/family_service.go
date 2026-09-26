@@ -42,10 +42,11 @@ type FamilyMemberView struct {
 }
 
 type FamilySnapshot struct {
-	Family      *models.Family            `json:"family"`
-	Role        string                    `json:"role"`
-	Members     []FamilyMemberView        `json:"members"`
-	Invitations []models.FamilyInvitation `json:"invitations"`
+	Family          *models.Family            `json:"family"`
+	Role            string                    `json:"role"`
+	Members         []FamilyMemberView        `json:"members"`
+	Invitations     []models.FamilyInvitation `json:"invitations"`
+	PendingRequests int64                     `json:"pending_requests"`
 }
 
 func FamilyForUser(uid uint) (*models.Family, error) {
@@ -126,6 +127,7 @@ func FamilyInfo(uid uint) (FamilySnapshot, error) {
 		}
 		empty.Members = append(empty.Members, v)
 	}
+	empty.PendingRequests = PendingDishRequestCount(uid, family)
 	if empty.Role == "owner" {
 		err = database.DB.Where("family_id = ? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?", family.ID, time.Now()).
 			Order("created_at DESC").Find(&empty.Invitations).Error
@@ -424,18 +426,27 @@ func SetFamilyPlan(uid uint, rawDate, mealType string, dishID uint) error {
 		return ErrInvalidMealType
 	}
 	if dishID == 0 {
-		return database.DB.Where("family_id = ? AND meal_date = ? AND meal_type = ?", family.ID, rawDate, mealType).
-			Delete(&models.FamilyPlanItem{}).Error
+		if err := database.DB.Where("family_id = ? AND meal_date = ? AND meal_type = ?", family.ID, rawDate, mealType).
+			Delete(&models.FamilyPlanItem{}).Error; err != nil {
+			return err
+		}
+		syncFamilyPlanShopping(family.ID, rawDate, mealType, nil)
+		return nil
 	}
 	var dish models.Dish
 	if err := database.DB.Where("id = ? AND enabled = ? AND ((owner_id = 0 AND family_id = 0) OR family_id = ?)", dishID, true, family.ID).First(&dish).Error; err != nil {
 		return ErrFamilyDish
 	}
 	item := models.FamilyPlanItem{FamilyID: family.ID, MealDate: rawDate, MealType: mealType, DishID: dishID, AddedBy: uid}
-	return database.DB.Clauses(clause.OnConflict{
+	if err := database.DB.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "family_id"}, {Name: "meal_date"}, {Name: "meal_type"}},
 		DoUpdates: clause.AssignmentColumns([]string{"dish_id", "added_by", "updated_at"}),
-	}).Create(&item).Error
+	}).Create(&item).Error; err != nil {
+		return err
+	}
+	items := syncFamilyPlanShopping(family.ID, rawDate, mealType, &dish)
+	notifyFamilyPlanShopping(family.ID, uid, rawDate, mealType, dish, items)
+	return nil
 }
 
 func FamilyShopping(uid uint) ([]models.FamilyShoppingItem, error) {
