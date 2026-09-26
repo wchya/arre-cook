@@ -3,7 +3,7 @@
   "compileType": "miniprogram",
   "libVersion": "3.7.12",
   "miniprogramRoot": "./",
-  "projectname": "nini-menu",
+  "projectname": "ss-menu",
   "setting": {
     "checkSiteMap": false,
     "coverView": true,

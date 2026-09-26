@@ -2,6 +2,7 @@ const api = require("../../utils/api")
 const ui = require("../../utils/ui")
 const session = require("../../utils/session")
 const fmt = require("../../utils/format")
+const media = require("../../utils/media")
 
 Page({
   data: {
@@ -16,6 +17,7 @@ Page({
     shopping: [],
     boughtCount: 0,
     familyDishes: [],
+    requests: [],
     // 表单
     createName: "",
     joinToken: "",
@@ -35,6 +37,7 @@ Page({
   onLoad(options) {
     if (!session.requireLogin("/pages/family/family")) return
     if (options && options.invite) this.setData({ joinToken: decodeURIComponent(options.invite) })
+    this._scrollToRequests = Boolean(options && options.tab === "requests")
     this.load()
   },
 
@@ -69,7 +72,7 @@ Page({
         invitations,
         memberCount: members.length,
       })
-      if (hasFamily) await this.loadShopping()
+      if (hasFamily) await Promise.all([this.loadShopping(), this.loadRequests()])
     } catch (error) {
       ui.toast(error.message || "家庭信息加载失败")
     } finally {
@@ -89,6 +92,86 @@ Page({
       const shopping = (items || []).map((i) => ({ id: i.id, name: i.name, amount: i.amount || "", checked: Boolean(i.checked) }))
       this.setData({ shopping, boughtCount: shopping.filter((i) => i.checked).length })
     } catch (_) { /* 静默 */ }
+  },
+
+  // 家庭共享菜谱的删除申请：管理员看到全家的（可同意/拒绝），普通成员看到自己的（可撤回）。
+  async loadRequests() {
+    try {
+      const items = await api.get("/family/dish-requests")
+      const requests = (items || []).map((r) => ({
+        id: r.id,
+        dishName: r.dish_name,
+        image: media.assetUrl(r.dish_image),
+        by: r.requester_name || "家人",
+        when: fmt.relativeDate(r.created_at),
+      }))
+      this.setData({ requests }, () => {
+        // 从“菜谱删除申请”站内信进来时直接定位到申请列表
+        if (!this._scrollToRequests || !requests.length) return
+        this._scrollToRequests = false
+        wx.pageScrollTo({ selector: "#requests", offsetTop: -120, duration: 300 })
+      })
+    } catch (_) { /* 静默 */ }
+  },
+
+  onReqCoverError(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    const requests = this.data.requests.map((r) => (r.id === id ? { ...r, image: "" } : r))
+    this.setData({ requests })
+  },
+
+  async approveRequest(e) {
+    const { id, name } = e.currentTarget.dataset
+    if (this.data.busy) return
+    const ok = await ui.confirm({ title: `同意删除「${name}」？`, content: "删除后无法恢复，家庭菜单与买菜清单里的这道菜也会移除。", confirmText: "同意删除", danger: true })
+    if (!ok) return
+    this.setData({ busy: true })
+    try {
+      await api.post(`/family/dish-requests/${Number(id)}/approve`)
+      ui.toast("已删除", "success")
+      await this.load()
+    } catch (error) {
+      ui.toast(error.message || "操作失败")
+    } finally {
+      this.setData({ busy: false })
+    }
+  },
+
+  rejectRequest(e) {
+    const { id, name } = e.currentTarget.dataset
+    if (this.data.busy) return
+    wx.showModal({
+      title: `拒绝删除「${name}」`,
+      editable: true,
+      placeholderText: "填写拒绝理由（可选）",
+      confirmText: "拒绝",
+      success: async (res) => {
+        if (!res.confirm) return
+        this.setData({ busy: true })
+        try {
+          await api.post(`/family/dish-requests/${Number(id)}/reject`, { reason: (res.content || "").trim() })
+          ui.toast("已拒绝申请")
+          await this.loadRequests()
+        } catch (error) {
+          ui.toast(error.message || "操作失败")
+        } finally {
+          this.setData({ busy: false })
+        }
+      },
+    })
+  },
+
+  async cancelRequest(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    const ok = await ui.confirm({ title: "撤回删除申请？", confirmText: "撤回" })
+    if (!ok) return
+    try {
+      await api.delete(`/family/dish-requests/${id}`)
+      ui.toast("已撤回")
+      await this.loadRequests()
+    } catch (error) {
+      ui.toast(error.message || "撤回失败")
+    }
   },
 
   onFieldFocus(e) { this.setData({ [e.currentTarget.dataset.k]: true }) },

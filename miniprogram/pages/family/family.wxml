@@ -75,6 +75,30 @@
       </view>
     </view>
 
+    <block wx:if="{{requests.length}}">
+      <view id="requests" class="section-head mt-8">
+        <view class="section-title">菜谱删除申请</view>
+        <view class="section-sub">{{isOwner ? '家人申请删除家庭菜谱，需你确认' : '等待家庭管理员处理'}}</view>
+      </view>
+      <view class="group">
+        <view class="group-body">
+          <view wx:for="{{requests}}" wx:key="id" class="req">
+            <image wx:if="{{item.image}}" class="req__cover" src="{{item.image}}" mode="aspectFill" webp data-id="{{item.id}}" binderror="onReqCoverError" />
+            <view wx:else class="req__cover req__cover--ph">🍽</view>
+            <view class="req__main">
+              <view class="req__name truncate">{{item.dishName}}</view>
+              <view class="req__meta">{{item.by}} 申请删除 · {{item.when}}</view>
+            </view>
+            <view wx:if="{{isOwner}}" class="req__actions">
+              <view class="req__btn req__btn--reject" hover-class="tap-active" data-id="{{item.id}}" data-name="{{item.dishName}}" bindtap="rejectRequest">拒绝</view>
+              <view class="req__btn req__btn--approve" hover-class="tap-active" data-id="{{item.id}}" data-name="{{item.dishName}}" bindtap="approveRequest">同意删除</view>
+            </view>
+            <view wx:else class="req__btn req__btn--cancel" hover-class="tap-active" data-id="{{item.id}}" bindtap="cancelRequest">撤回</view>
+          </view>
+        </view>
+      </view>
+    </block>
+
     <block wx:if="{{isOwner}}">
       <view class="section-head mt-8"><view class="section-title">邀请成员</view></view>
       <view class="card card-pad">

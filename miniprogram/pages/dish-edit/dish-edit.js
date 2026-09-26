@@ -57,6 +57,8 @@ Page({
     stepsText: "",
     remark: "",
     videoUrl: "",
+    videoMeta: null,
+    videoChecking: false,
     tags: [],
     imageUrl: "",
     cover: "",
@@ -65,6 +67,10 @@ Page({
     focusKey: "",
     uploadingCover: false,
     uploadingExtra: false,
+    canShareFamily: false,
+    shareFamily: false,
+    familyName: "",
+    alreadyFamily: false,
   },
 
   onLoad(options) {
@@ -75,7 +81,19 @@ Page({
     if (id) {
       this.setData({ id, isNew: false })
       this.loadDish(id)
+    } else {
+      this.checkFamily()
     }
+  },
+
+  // 新建私房菜时，若用户已加入家庭则可选择直接共享给全家。
+  async checkFamily() {
+    try {
+      const info = await api.get("/family")
+      if (info && info.family) {
+        this.setData({ canShareFamily: true, familyName: info.family.name || "家庭" })
+      }
+    } catch (_) { /* 无家庭或加载失败时不显示共享开关 */ }
   },
 
   syncSeg() {
@@ -107,12 +125,15 @@ Page({
         stepsText: steps,
         remark: dish.remark || "",
         videoUrl: dish.video_url || "",
+        videoMeta: this.decorateMeta(dish.video_meta),
+        alreadyFamily: Boolean(dish.family_id),
         tags: media.asArray(dish.tags).filter((x) => typeof x === "string"),
         imageUrl: dish.image_url || "",
         cover: media.assetUrl(dish.image_url),
         images,
         imageThumbs: images.map((x) => media.assetUrl(x)),
       })
+      this._lastPreviewUrl = dish.video_url || ""
       this.syncSeg()
     } catch (error) {
       ui.toast(error.message || "菜品加载失败")
@@ -122,12 +143,80 @@ Page({
   },
   onName(e) { this.setData({ name: e.detail.value }) },
   onRemark(e) { this.setData({ remark: e.detail.value }) },
-  onVideo(e) { this.setData({ videoUrl: e.detail.value }) },
+  onVideo(e) {
+    const value = e.detail.value
+    this.setData({ videoUrl: value })
+    if (this._videoTimer) clearTimeout(this._videoTimer)
+    if (!value.trim()) {
+      this._lastPreviewUrl = ""
+      this.setData({ videoMeta: null, videoChecking: false })
+      return
+    }
+    this._videoTimer = setTimeout(() => this.fetchVideoPreview(), 700)
+  },
+
+  // 把服务端 link-preview / video_meta 转成视图模型；封面转成可加载的绝对地址。
+  decorateMeta(meta) {
+    if (!meta || typeof meta !== "object") return null
+    return {
+      url: meta.url || "",
+      platform: meta.platform || "web",
+      platformName: meta.platform_name || "链接",
+      title: meta.title || "",
+      cover: media.assetUrl(meta.cover),
+      author: meta.author || "",
+      duration: meta.duration || "",
+      playable: Boolean(meta.playable),
+    }
+  },
+
+  // 拉取链接预览：仅当输入框仍是同一链接时才回填，避免快速改动时旧结果覆盖。
+  async fetchVideoPreview() {
+    const url = this.data.videoUrl.trim()
+    if (!url || !/^https?:\/\//i.test(url)) {
+      this.setData({ videoMeta: null, videoChecking: false })
+      return
+    }
+    if (url === this._lastPreviewUrl && this.data.videoMeta) return
+    this._lastPreviewUrl = url
+    this.setData({ videoChecking: true })
+    try {
+      const meta = await api.get("/link-preview", { url })
+      if (this.data.videoUrl.trim() === url) this.setData({ videoMeta: this.decorateMeta(meta) })
+    } catch (_) {
+      if (this.data.videoUrl.trim() === url) this.setData({ videoMeta: null })
+    } finally {
+      this.setData({ videoChecking: false })
+    }
+  },
+
+  onCoverError() {
+    if (this.data.videoMeta) this.setData({ "videoMeta.cover": "" })
+  },
+
+  copyVideoLink() {
+    const url = this.data.videoUrl.trim()
+    if (!url) return
+    wx.setClipboardData({ data: url, success: () => ui.toast("链接已复制") })
+  },
+
+  toggleShareFamily() {
+    ui.haptic()
+    this.setData({ shareFamily: !this.data.shareFamily })
+  },
+
   onIngredients(e) { this.setData({ ingredientsText: e.detail.value }) },
   onSeasonings(e) { this.setData({ seasoningsText: e.detail.value }) },
   onSteps(e) { this.setData({ stepsText: e.detail.value }) },
   onFocus(e) { this.setData({ focusKey: e.currentTarget.dataset.key }) },
-  onBlur() { this.setData({ focusKey: "" }) },
+  onBlur(e) {
+    const key = e && e.currentTarget && e.currentTarget.dataset.key
+    this.setData({ focusKey: "" })
+    if (key === "video") {
+      if (this._videoTimer) clearTimeout(this._videoTimer)
+      this.fetchVideoPreview()
+    }
+  },
 
   chooseCategory(e) { ui.haptic(); this.setData({ category: e.currentTarget.dataset.value }) },
   chooseMeal(e) { ui.haptic(); this.setData({ mealType: e.currentTarget.dataset.value }, () => this.syncSeg()) },
@@ -204,6 +293,7 @@ Page({
       tags: JSON.stringify(this.data.tags),
       sort_order: this.data.sortOrder,
     }
+    if (this.data.isNew && this.data.canShareFamily && this.data.shareFamily) payload.family = true
     try {
       if (this.data.isNew) await api.post("/dishes", payload)
       else await api.put(`/dishes/${this.data.id}`, payload)

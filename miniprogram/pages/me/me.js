@@ -18,6 +18,7 @@ Page({
     pending: 0,
     voiceOn: true,
     blindOn: true,
+    remindOn: true,
     repeatDays: "",
     repeatOptions: REPEAT_OPTIONS,
     nameOpen: false,
@@ -80,6 +81,7 @@ Page({
     this.setData({
       voiceOn: String(settings.voice_enabled || "1") !== "0",
       blindOn: String(settings.blind_box_enabled || "1") !== "0",
+      remindOn: String(settings.shopping_reminder || "1") !== "0",
       repeatDays: settings.repeat_days ? String(settings.repeat_days) : "",
     })
   },
@@ -155,6 +157,13 @@ Page({
     ui.haptic()
     this.setData({ blindOn: next })
     this.updateSetting({ blind_box_enabled: next ? "1" : "0" }, { blindOn: !next })
+  },
+
+  toggleRemind() {
+    const next = !this.data.remindOn
+    ui.haptic()
+    this.setData({ remindOn: next })
+    this.updateSetting({ shopping_reminder: next ? "1" : "0" }, { remindOn: !next })
   },
 
   openRepeat() { this.setData({ repeatOpen: true }) },

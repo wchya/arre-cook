@@ -11,6 +11,7 @@ const META = {
   health_tip: { icon: "heart-pulse", tone: "mint", color: "mint-ink", label: "健康" },
   agent_security: { icon: "shield-check", tone: "red", color: "red", label: "安全" },
   family: { icon: "users-round", tone: "yellow", color: "yellow-dark", label: "家庭" },
+  shopping: { icon: "shopping-cart", tone: "mint", color: "mint-ink", label: "买菜" },
 }
 
 function timeLabel(raw) {

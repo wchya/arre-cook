@@ -91,6 +91,41 @@
       <view class="field {{focusKey === 'video' ? 'is-focus' : ''}}">
         <input class="field-input" value="{{videoUrl}}" placeholder="B站 / 抖音 / YouTube 链接" placeholder-class="placeholder" data-key="video" bindfocus="onFocus" bindblur="onBlur" bindinput="onVideo" />
       </view>
+      <view wx:if="{{videoChecking}}" class="de-vp de-vp--loading">
+        <view class="spinner"></view><text>正在获取链接预览…</text>
+      </view>
+      <view wx:elif="{{videoMeta}}" class="de-vp" hover-class="tap-fade" bindtap="copyVideoLink">
+        <image wx:if="{{videoMeta.cover}}" class="de-vp__cover" src="{{videoMeta.cover}}" mode="aspectFill" binderror="onCoverError" webp />
+        <view wx:else class="de-vp__cover de-vp__cover--ph"><icon name="video" size="44" stroke="2" color="text3" /></view>
+        <view class="de-vp__body">
+          <view class="de-vp__badges">
+            <text class="chip chip-sm chip-primary">{{videoMeta.platformName}}</text>
+            <text wx:if="{{videoMeta.playable}}" class="chip chip-sm chip-mint">可播放</text>
+            <text wx:if="{{videoMeta.duration}}" class="de-vp__dur">{{videoMeta.duration}}</text>
+          </view>
+          <view class="de-vp__title">{{videoMeta.title || '已识别链接'}}</view>
+          <view wx:if="{{videoMeta.author}}" class="de-vp__author">{{videoMeta.author}}</view>
+          <view class="de-vp__hint"><icon name="copy" size="22" stroke="2.4" color="text3" /><text>点击复制链接</text></view>
+        </view>
+      </view>
+      <view class="field-hint">粘贴链接后自动识别平台、标题与封面</view>
+    </view>
+  </view>
+
+  <view wx:if="{{canShareFamily}}" class="card de-sec">
+    <view class="de-sec__title"><icon name="users-round" size="26" stroke="2.4" color="primary" /><text>共享范围</text></view>
+    <view class="de-share {{shareFamily ? 'is-on' : ''}}" hover-class="tap-active" bindtap="toggleShareFamily">
+      <view class="de-share__main">
+        <view class="de-share__name">分享到「{{familyName}}」</view>
+        <view class="de-share__desc">{{shareFamily ? '家庭成员都能看到并一起管理这道菜' : '默认仅自己可见的私房菜'}}</view>
+      </view>
+      <view class="de-switch {{shareFamily ? 'is-on' : ''}}"><view class="de-switch__dot"></view></view>
+    </view>
+  </view>
+  <view wx:elif="{{alreadyFamily}}" class="card de-sec">
+    <view class="de-share is-note">
+      <icon name="users-round" size="30" stroke="2.4" color="primary" />
+      <view class="de-share__main"><view class="de-share__name">已共享给家庭</view><view class="de-share__desc">家庭成员都能看到这道菜</view></view>
     </view>
   </view>
 

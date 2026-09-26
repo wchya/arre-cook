@@ -60,44 +60,96 @@
 
   <!-- 买菜清单 -->
   <block wx:else>
-    <view class="section-head">
-      <view>
-        <view class="section-title">🛒 买菜清单</view>
-        <view wx:if="{{totalItems}}" class="section-sub c-mint">待买 {{needBuy}} · 已买 {{checkedCount}} · 家中 {{stockCount}}</view>
-        <view wx:else class="section-sub">根据今日和明日菜单自动合并食材</view>
+    <view wx:if="{{hasFamily}}" class="scope-seg">
+      <view class="scope-item {{scope === 'personal' ? 'is-on' : ''}}" hover-class="tap-active" data-scope="personal" bindtap="switchScope">
+        <icon name="user-round" size="26" stroke="2.4" color="{{scope === 'personal' ? 'primary' : 'text3'}}" /><text>我的清单</text>
       </view>
-      <view wx:if="{{totalItems}}" class="section-action" hover-class="tap-active" bindtap="copyList"><icon name="copy" size="26" stroke="2.4" color="text2" /><text class="ml-8">复制</text></view>
+      <view class="scope-item {{scope === 'family' ? 'is-on' : ''}}" hover-class="tap-active" data-scope="family" bindtap="switchScope">
+        <icon name="users-round" size="26" stroke="2.4" color="{{scope === 'family' ? 'primary' : 'text3'}}" /><text>{{familyName}}</text>
+      </view>
     </view>
 
-    <view wx:if="{{totalItems}}" class="progress-card card">
+    <view class="section-head">
+      <view>
+        <view class="section-title">🛒 {{scope === 'family' ? '家庭买菜清单' : '买菜清单'}}</view>
+        <view wx:if="{{curTotal}}" class="section-sub c-mint">待买 {{curNeed}} · 已买 {{curChecked}}<text wx:if="{{scope === 'personal'}}"> · 家中 {{curStock}}</text></view>
+        <view wx:else class="section-sub">{{scope === 'family' ? '家庭菜单点菜后自动合并食材' : '根据今日和明日菜单自动合并食材'}}</view>
+      </view>
+      <view wx:if="{{curTotal}}" class="section-action" hover-class="tap-active" bindtap="copyList"><icon name="copy" size="26" stroke="2.4" color="text2" /><text class="ml-8">复制</text></view>
+    </view>
+
+    <scroll-view wx:if="{{curMeals.length}}" class="meal-src" scroll-x enhanced show-scrollbar="{{false}}">
+      <view wx:for="{{curMeals}}" wx:key="key" class="meal-src__chip {{item.lunch ? 'is-lunch' : 'is-dinner'}}">
+        <text class="meal-src__label">{{item.label}}</text>
+        <text class="meal-src__dish">{{item.dish}}</text>
+        <text wx:if="{{item.by}}" class="meal-src__by"> · {{item.by}}</text>
+      </view>
+    </scroll-view>
+
+    <view wx:if="{{curTotal}}" class="progress-card card">
       <view class="flex items-center justify-between mb-16">
         <text class="t-sm bold">采购进度</text>
-        <text class="t-xs c-text3">{{checkedCount + stockCount}}/{{totalItems}}</text>
+        <text class="t-xs c-text3">{{curChecked + curStock}}/{{curTotal}}</text>
       </view>
-      <view class="progress"><view class="progress__bar" style="width:{{totalItems ? (checkedCount + stockCount) * 100 / totalItems : 0}}%;"></view></view>
+      <view class="progress"><view class="progress__bar" style="width:{{curTotal ? (curChecked + curStock) * 100 / curTotal : 0}}%;"></view></view>
     </view>
 
     <view wx:if="{{shoppingLoading}}" class="skeleton day-sk"></view>
-    <view wx:elif="{{!categories.length}}" class="card">
-      <empty emoji="🧺" title="暂无买菜清单" desc="点菜后自动生成今日 + 明日食材" compact>
-        <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="goDishes">去选菜</view>
-      </empty>
-    </view>
-    <view wx:else class="card shop">
-      <view wx:for="{{categories}}" wx:for-item="cat" wx:key="name" class="shop__cat">
-        <view class="shop__cat-name">{{cat.name}}<icon wx:if="{{cat.done}}" name="circle-check" size="26" stroke="2.4" color="mint-ink" /></view>
-        <view wx:for="{{cat.items}}" wx:key="key" class="shop__item {{item.stock ? 'is-stock' : ''}}">
-          <view class="check {{item.checked ? 'is-checked' : ''}} {{item.stock ? 'is-home' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" data-stock="{{item.stock}}" bindtap="toggleCheck">
-            <text wx:if="{{item.stock}}" class="check__home">家</text>
-            <icon wx:elif="{{item.checked}}" name="check" size="24" stroke="3.4" color="white" />
+
+    <block wx:if="{{!shoppingLoading && scope === 'personal'}}">
+      <view wx:if="{{!personalCats.length}}" class="card">
+        <empty emoji="🧺" title="暂无买菜清单" desc="点菜后自动生成今日 + 明日食材" compact>
+          <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="goDishes">去选菜</view>
+        </empty>
+      </view>
+      <view wx:else class="card shop">
+        <view wx:for="{{personalCats}}" wx:for-item="cat" wx:key="name" class="shop__cat">
+          <view class="shop__cat-name">{{cat.name}}<icon wx:if="{{cat.done}}" name="circle-check" size="26" stroke="2.4" color="mint-ink" /></view>
+          <view wx:for="{{cat.items}}" wx:key="key" class="shop__item {{item.stock ? 'is-stock' : ''}}">
+            <view class="check {{item.checked ? 'is-checked' : ''}} {{item.stock ? 'is-home' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" data-stock="{{item.stock}}" bindtap="toggleCheck">
+              <text wx:if="{{item.stock}}" class="check__home">家</text>
+              <icon wx:elif="{{item.checked}}" name="check" size="24" stroke="3.4" color="white" />
+            </view>
+            <view class="shop__name {{item.checked || item.stock ? 'is-done' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" data-stock="{{item.stock}}" bindtap="toggleCheck">{{item.name}}</view>
+            <text class="shop__amount">{{item.amount}}</text>
+            <view class="stock-btn {{item.stock ? 'is-on' : ''}}" hover-class="tap-active" data-name="{{item.name}}" data-stock="{{item.stock}}" bindtap="toggleStock">{{item.stock ? '家中有' : '库存'}}</view>
           </view>
-          <view class="shop__name {{item.checked || item.stock ? 'is-done' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" data-stock="{{item.stock}}" bindtap="toggleCheck">{{item.name}}</view>
-          <text class="shop__amount">{{item.amount}}</text>
-          <view class="stock-btn {{item.stock ? 'is-on' : ''}}" hover-class="tap-active" data-name="{{item.name}}" data-stock="{{item.stock}}" bindtap="toggleStock">{{item.stock ? '家中有' : '库存'}}</view>
         </view>
       </view>
-    </view>
-    <view wx:if="{{categories.length}}" class="tip-line">勾选表示已买；家里已有的食材点“库存”，之后生成的清单会自动跳过</view>
+      <view wx:if="{{personalCats.length}}" class="tip-line">勾选表示已买；家里已有的食材点“库存”，之后生成的清单会自动跳过</view>
+    </block>
+    <block wx:if="{{!shoppingLoading && scope === 'family'}}">
+      <view wx:if="{{!familyCats.length && !familyManual.length}}" class="card">
+        <empty emoji="🧺" title="家庭清单是空的" desc="在家庭菜单里点菜，食材会自动出现在这里" compact>
+          <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="addFamilyItem">手动添加食材</view>
+        </empty>
+      </view>
+      <view wx:else class="card shop">
+        <view wx:for="{{familyCats}}" wx:for-item="cat" wx:key="name" class="shop__cat">
+          <view class="shop__cat-name">{{cat.name}}<icon wx:if="{{cat.done}}" name="circle-check" size="26" stroke="2.4" color="mint-ink" /></view>
+          <view wx:for="{{cat.items}}" wx:key="key" class="shop__item">
+            <view class="check {{item.checked ? 'is-checked' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" bindtap="toggleFamilyAuto">
+              <icon wx:if="{{item.checked}}" name="check" size="24" stroke="3.4" color="white" />
+            </view>
+            <view class="shop__name {{item.checked ? 'is-done' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" bindtap="toggleFamilyAuto">{{item.name}}</view>
+            <text class="shop__amount">{{item.amount}}</text>
+          </view>
+        </view>
+        <view class="shop__cat">
+          <view class="shop__cat-name">手动添加</view>
+          <view wx:for="{{familyManual}}" wx:key="id" class="shop__item">
+            <view class="check {{item.checked ? 'is-checked' : ''}}" data-id="{{item.id}}" data-checked="{{item.checked}}" bindtap="toggleFamilyManual">
+              <icon wx:if="{{item.checked}}" name="check" size="24" stroke="3.4" color="white" />
+            </view>
+            <view class="shop__name {{item.checked ? 'is-done' : ''}}" data-id="{{item.id}}" data-checked="{{item.checked}}" bindtap="toggleFamilyManual">{{item.name}}</view>
+            <text class="shop__amount">{{item.amount}}</text>
+            <view class="del-btn" hover-class="tap-active" data-id="{{item.id}}" catchtap="deleteFamilyManual"><icon name="x" size="24" stroke="2.6" color="text3" /></view>
+          </view>
+          <view class="fam-add" hover-class="tap-active" bindtap="addFamilyItem"><icon name="plus" size="26" stroke="2.6" color="primary" /><text>添加食材</text></view>
+        </view>
+      </view>
+      <view wx:if="{{familyCats.length || familyManual.length}}" class="tip-line">家庭清单对所有成员可见，勾选后其他家人也能看到已买</view>
+    </block>
   </block>
   <view class="safe-space"></view>
 </view>

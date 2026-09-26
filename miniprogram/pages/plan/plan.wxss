@@ -45,6 +45,20 @@
 .stock-btn.is-on { border-color: rgba(245, 215, 110, .4); background: var(--yellow-light); color: var(--yellow-dark); }
 .tip-line { margin-top: 20rpx; padding: 0 8rpx; color: var(--text3); font-size: 22rpx; line-height: 1.6; }
 
+.scope-seg { display: flex; gap: 12rpx; margin-bottom: 24rpx; }
+.scope-item { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10rpx; height: 76rpx; border: 1px solid var(--border); border-radius: 20rpx; background: var(--card); color: var(--text3); font-size: 26rpx; font-weight: 600; transition: all .2s ease; }
+.scope-item.is-on { border-color: rgba(232, 115, 74, .3); background: var(--primary-light); color: var(--primary); }
+.scope-item text { max-width: 220rpx; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.meal-src { white-space: nowrap; margin-bottom: 20rpx; }
+.meal-src__chip { display: inline-flex; align-items: baseline; gap: 6rpx; margin-right: 12rpx; padding: 10rpx 20rpx; border-radius: 16rpx; background: var(--card); border: 1px solid var(--border); }
+.meal-src__chip.is-lunch { border-color: rgba(232, 115, 74, .2); }
+.meal-src__chip.is-dinner { border-color: rgba(110, 198, 184, .25); }
+.meal-src__label { color: var(--text3); font-size: 20rpx; font-weight: 600; }
+.meal-src__dish { color: var(--text); font-size: 24rpx; font-weight: 600; }
+.meal-src__by { color: var(--text3); font-size: 20rpx; }
+.del-btn { display: flex; align-items: center; justify-content: center; width: 44rpx; height: 44rpx; flex-shrink: 0; border-radius: 12rpx; background: var(--bg); }
+.fam-add { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 12rpx; padding: 16rpx; border: 2rpx dashed var(--border2); border-radius: 16rpx; color: var(--primary); font-size: 24rpx; font-weight: 600; }
+
 .quick { padding: 8rpx 40rpx 24rpx; }
 .quick__label { margin-bottom: 12rpx; font-size: 24rpx; font-weight: 700; }
 .safe-space { height: calc(48rpx + env(safe-area-inset-bottom)); }

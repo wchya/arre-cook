@@ -57,7 +57,18 @@ function chooseImages(count) {
     const done = (paths) => resolve(paths || [])
     const onFail = (err) => {
       const msg = (err && err.errMsg) || ""
-      if (!/cancel/i.test(msg)) toast(msg ? "选择图片失败：" + msg.replace(/^choose\w+:fail\s*/i, "") : "选择图片失败")
+      if (/cancel/i.test(msg)) return done([])
+      if (/scope is not declared|privacy/i.test(msg)) {
+        // 小程序后台「用户隐私保护指引」未声明相册/相机：代码无法绕过，只能在 mp 后台补充声明
+        wx.showModal({
+          title: "暂时无法选择图片",
+          content: "小程序后台「用户隐私保护指引」尚未声明相册与相机权限（选中的照片或视频信息、摄像头），完善并审核通过后即可使用。",
+          showCancel: false,
+          confirmColor: "#E8734A",
+        })
+        return done([])
+      }
+      toast(msg ? "选择图片失败：" + msg.replace(/^choose\w+:fail\s*/i, "") : "选择图片失败")
       done([])
     }
     ensurePrivacyAuthorized().then((ok) => {

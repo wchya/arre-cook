@@ -49,6 +49,10 @@ Page({
     favorite: false,
     favAnim: false,
     canEdit: false,
+    deleteMode: "none",
+    pendingRequestId: 0,
+    deleting: false,
+    videoMeta: null,
 
     portions: PORTIONS,
     portion: 1,
@@ -104,7 +108,7 @@ Page({
   onShareAppMessage() {
     const dish = this.data.dish
     return {
-      title: dish ? `${dish.name} · 今天就做这道` : "NiniMenu · 今天吃什么",
+      title: dish ? `${dish.name} · 今天就做这道` : "ss-menu · 今天吃什么",
       path: `/pages/dish/dish?id=${this.data.id}`,
       imageUrl: dish && dish.cover ? dish.cover : undefined,
     }
@@ -120,7 +124,6 @@ Page({
       this.loadRecords()
       this.loadToday()
       this.loadSimilar(raw)
-      this.loadPermission(raw)
     } catch (error) {
       this.setData({ notFound: error.status === 404, loading: false })
       if (error.status !== 404) ui.toast(error.message || "菜品加载失败")
@@ -151,11 +154,16 @@ Page({
     this._seasoningsRaw = dishUtil.normalizeIngredients(raw.seasonings)
     this._prepared = {}
 
+    const access = raw.access || {}
     wx.setNavigationBarTitle({ title: raw.name || "菜品详情" })
     this.setData({
       loading: false,
       dish: { ...card, remark: raw.remark || "", videoUrl: raw.video_url || "" },
       favorite: Boolean(raw.favorite),
+      canEdit: Boolean(access.can_edit),
+      deleteMode: access.delete_mode || "none",
+      pendingRequestId: access.pending_request_id || 0,
+      videoMeta: this.decorateMeta(raw.video_meta),
       gallery,
       galleryIndex: 0,
       chips,
@@ -163,6 +171,23 @@ Page({
       steps,
     })
     this.renderIngredients()
+  },
+
+  // video_meta（服务端抓取的链接预览）转视图模型；封面转成可加载地址。
+  decorateMeta(meta) {
+    if (!meta || typeof meta !== "object") return null
+    return {
+      platformName: meta.platform_name || "链接",
+      title: meta.title || "",
+      cover: media.assetUrl(meta.cover),
+      author: meta.author || "",
+      duration: meta.duration || "",
+      playable: Boolean(meta.playable),
+    }
+  },
+
+  onVideoCoverError() {
+    if (this.data.videoMeta) this.setData({ "videoMeta.cover": "" })
   },
 
   // ---------- 食材 ----------
@@ -256,12 +281,36 @@ Page({
     } catch (_) { /* ignore */ }
   },
 
-  async loadPermission(raw) {
-    if (!raw.owner_id) return
+  // 删除 / 申请删除：direct 本人或家庭管理员直接删；request 家庭成员提交申请，管理员同意后才删。
+  async deleteDish() {
+    if (this.data.deleting || this.data.deleteMode === "none") return
+    if (this.data.deleteMode === "request" && this.data.pendingRequestId) {
+      ui.toast("删除申请审核中，请等家庭管理员处理")
+      return
+    }
+    const direct = this.data.deleteMode === "direct"
+    const ok = await ui.confirm({
+      title: direct ? "删除这道菜？" : "申请删除这道菜？",
+      content: direct ? "删除后无法恢复，已有的用餐记录不受影响。" : "这是家庭共享菜谱，需要家庭管理员同意后才会删除。",
+      confirmText: direct ? "删除" : "提交申请",
+      danger: direct,
+    })
+    if (!ok) return
+    this.setData({ deleting: true })
     try {
-      const user = await session.currentUser()
-      this.setData({ canEdit: Boolean(user && user.id === raw.owner_id) })
-    } catch (_) { /* ignore */ }
+      const res = await api.delete(`/dishes/${this.data.id}`)
+      if (res && res.deleted) {
+        ui.toast("已删除", "success")
+        setTimeout(() => wx.navigateBack(), 600)
+      } else if (res && res.pending) {
+        this.setData({ pendingRequestId: (res.request && res.request.id) || 1 })
+        ui.toast("删除申请已提交，等家庭管理员处理")
+      }
+    } catch (error) {
+      ui.toast(error.message || "操作失败")
+    } finally {
+      this.setData({ deleting: false })
+    }
   },
 
   // ---------- 交互 ----------

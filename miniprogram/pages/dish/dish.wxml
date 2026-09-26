@@ -5,6 +5,9 @@
   <view wx:if="{{canEdit}}" class="nav-action" hover-class="tap-active" bindtap="editDish" aria-role="button" aria-label="编辑菜品">
     <icon name="pencil" size="32" stroke="2.3" color="text2" />
   </view>
+  <view wx:if="{{deleteMode !== 'none'}}" class="nav-action" hover-class="tap-active" bindtap="deleteDish" aria-role="button" aria-label="删除菜品">
+    <icon name="{{pendingRequestId ? 'clock-3' : 'trash-2'}}" size="32" stroke="2.3" color="{{pendingRequestId ? 'text3' : 'text2'}}" />
+  </view>
 </nav-bar>
 
 <!-- 加载中骨架 -->
@@ -53,6 +56,11 @@
       <text wx:for="{{tags}}" wx:key="*this" class="chip chip-sm chip-ghost">#{{item}}</text>
     </view>
 
+    <view wx:if="{{pendingRequestId}}" class="pending-note">
+      <icon name="clock-3" size="26" stroke="2.4" color="text3" />
+      <text>删除申请审核中，家庭管理员同意后会移除这道菜</text>
+    </view>
+
     <!-- 小贴士 -->
     <view wx:if="{{dish.remark}}" class="tip">
       <view class="tip__title">💡 小贴士</view>
@@ -93,7 +101,23 @@
     </view>
 
     <!-- 教程视频 -->
-    <view wx:if="{{dish.videoUrl}}" class="video-btn" hover-class="tap-active" bindtap="copyVideo">
+    <view wx:if="{{videoMeta}}" class="video-card" hover-class="tap-active" bindtap="copyVideo">
+      <view class="video-card__media">
+        <image wx:if="{{videoMeta.cover}}" class="video-card__cover" src="{{videoMeta.cover}}" mode="aspectFill" binderror="onVideoCoverError" webp />
+        <view wx:else class="video-card__cover video-card__cover--ph"><icon name="video" size="52" stroke="2" color="pink-ink" /></view>
+        <view wx:if="{{videoMeta.playable}}" class="video-card__play"><icon name="play" size="36" stroke="2" color="white" fill /></view>
+      </view>
+      <view class="video-card__body">
+        <view class="video-card__badges">
+          <text class="chip chip-sm chip-primary">{{videoMeta.platformName}}</text>
+          <text wx:if="{{videoMeta.duration}}" class="video-card__dur">{{videoMeta.duration}}</text>
+        </view>
+        <view class="video-card__title">{{videoMeta.title || '教程视频'}}</view>
+        <view wx:if="{{videoMeta.author}}" class="video-card__author">{{videoMeta.author}}</view>
+        <view class="video-card__hint"><icon name="copy" size="22" stroke="2.4" color="text3" /><text>复制链接，在浏览器打开观看</text></view>
+      </view>
+    </view>
+    <view wx:elif="{{dish.videoUrl}}" class="video-btn" hover-class="tap-active" bindtap="copyVideo">
       <icon name="video" size="32" stroke="2.3" color="pink-ink" />
       <text>观看教程视频</text>
       <text class="video-btn__hint">复制链接</text>

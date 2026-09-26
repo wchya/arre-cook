@@ -73,6 +73,6 @@ Page({
   closeDetail() { this.setData({ detailOpen: false }) },
 
   onShareAppMessage() {
-    return { title: `我在 NiniMenu 解锁了 ${this.data.unlocked} 个美食成就 🏆`, path: "/pages/home/home" }
+    return { title: `我在 ss-menu 解锁了 ${this.data.unlocked} 个美食成就 🏆`, path: "/pages/home/home" }
   },
 })

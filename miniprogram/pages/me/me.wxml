@@ -126,6 +126,11 @@
             <view class="row-main"><view class="row-title">惊喜盲盒</view><view class="row-desc">首页显示盲盒</view></view>
             <view class="switch {{blindOn ? 'is-on' : ''}}"></view>
           </view>
+          <view class="row" hover-class="tap-bg" bindtap="toggleRemind">
+            <view class="row-icon tone-muted"><icon name="shopping-cart" size="34" stroke="2.3" color="text2" /></view>
+            <view class="row-main"><view class="row-title">买菜提醒</view><view class="row-desc">晚上提醒明天要买的菜，含家庭清单</view></view>
+            <view class="switch {{remindOn ? 'is-on' : ''}}"></view>
+          </view>
         </view>
       </view>
 
@@ -148,7 +153,7 @@
         <icon name="log-out" size="32" stroke="2.4" color="red" />
         <text>退出登录</text>
       </view>
-      <view class="foot">NiniMenu · 你的数据只属于你</view>
+      <view class="foot">ss-menu · 你的数据只属于你</view>
     </view>
     <view class="tabbar-spacer"></view>
   </scroll-view>

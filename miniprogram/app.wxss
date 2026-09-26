@@ -1,5 +1,5 @@
 /*
- * NiniMenu 小程序设计系统：色板、圆角、阴影与 Web 端 frontend/src/index.css 保持一致。
+ * ss-menu 小程序设计系统：色板、圆角、阴影与 Web 端 frontend/src/index.css 保持一致。
  * 尺寸换算：Web 端 1px ≈ 小程序 2rpx（以 375 宽屏为基准）。
  */
 page {
@@ -36,6 +36,11 @@ page {
   --glass-strong: rgba(255, 255, 255, .92);
   --glass-border: rgba(255, 255, 255, .7);
   --glass-shadow: 0 20rpx 56rpx rgba(26, 26, 46, .05);
+  /* 图标块顶部内高光、头图暖色起点、遮罩、分段选择滑块：深色模式下各自换值，避免亮边与发白 */
+  --highlight: rgba(255, 255, 255, .82);
+  --hero-warm: #FFE9DE;
+  --scrim: rgba(26, 26, 46, .42);
+  --thumb: #FFFFFF;
 
   min-height: 100%;
   background: var(--bg);
@@ -156,12 +161,16 @@ button::after { border: 0; }
 .btn-soft { background: var(--primary-light); color: var(--primary); }
 .btn-ghost { border: 3rpx solid var(--border2); background: var(--card); color: var(--text); }
 .btn-danger { background: var(--red-light); color: var(--red); }
-.btn-dark { background: var(--text); color: #fff; }
+.btn-dark { background: var(--text); color: var(--bg); }
 .btn-wechat { background: var(--wechat); color: #fff; box-shadow: 0 20rpx 44rpx rgba(7, 193, 96, .26); }
 .btn.is-disabled { opacity: .45; box-shadow: none; }
 .tap-active { transform: scale(.97); opacity: .88; }
 .tap-bg { background: var(--bg) !important; }
 .tap-fade { opacity: .6; }
+
+/* 毛玻璃表面：吸底操作栏、悬浮胶囊、吸顶分组头等浮在内容之上的层（iOS 实时模糊，安卓高不透明度降级） */
+.glass { background: var(--glass-bg); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+.glass-strong { background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
 
 /* ---------- 表单 ---------- */
 .field-label { display: block; margin-bottom: 12rpx; color: var(--text2); font-size: 24rpx; font-weight: 700; }
@@ -180,7 +189,7 @@ button::after { border: 0; }
 .segmented { position: relative; display: flex; padding: 8rpx; border-radius: 999rpx; background: var(--bg); }
 .segmented-item { position: relative; z-index: 1; display: flex; flex: 1; align-items: center; justify-content: center; gap: 10rpx; height: 72rpx; border-radius: 999rpx; color: var(--text3); font-size: 26rpx; font-weight: 700; transition: color .2s ease; }
 .segmented-item.is-active { color: var(--text); }
-.segmented-thumb { position: absolute; top: 8rpx; bottom: 8rpx; left: 8rpx; border-radius: 999rpx; background: var(--card); box-shadow: 0 2rpx 8rpx rgba(26, 26, 46, .08); transition: transform .28s cubic-bezier(.2, .8, .2, 1); }
+.segmented-thumb { position: absolute; top: 8rpx; bottom: 8rpx; left: 8rpx; border-radius: 999rpx; background: var(--thumb); box-shadow: 0 2rpx 8rpx rgba(26, 26, 46, .08); transition: transform .28s cubic-bezier(.2, .8, .2, 1); }
 
 /* 开关（对应 Web Switch） */
 .switch { position: relative; width: 88rpx; height: 48rpx; flex-shrink: 0; border-radius: 999rpx; background: var(--border2); transition: background-color .2s ease; }
@@ -286,6 +295,10 @@ button::after { border: 0; }
     --glass-strong: rgba(42, 38, 52, .92);
     --glass-border: rgba(255, 255, 255, .06);
     --glass-shadow: 0 20rpx 56rpx rgba(0, 0, 0, .45);
+    --highlight: rgba(255, 255, 255, .06);
+    --hero-warm: #45291D;
+    --scrim: rgba(0, 0, 0, .6);
+    --thumb: #2C2835;
   }
   /* 硬编码色的深色修正 */
   .notice-error { color: #F3A99E; }

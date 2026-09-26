@@ -1,10 +1,16 @@
 {
   "light": {
     "bg": "#FAFAF8",
-    "navTxt": "black"
+    "navTxt": "black",
+    "bgTxt": "dark",
+    "bgTop": "#FFF0EB",
+    "bgTopWarm": "#FFE9DE"
   },
   "dark": {
     "bg": "#121016",
-    "navTxt": "white"
+    "navTxt": "white",
+    "bgTxt": "light",
+    "bgTop": "#38241C",
+    "bgTopWarm": "#45291D"
   }
 }

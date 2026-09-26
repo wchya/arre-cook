@@ -27,10 +27,11 @@
   ],
   "window": {
     "navigationStyle": "custom",
-    "navigationBarTitleText": "NiniMenu",
+    "navigationBarTitleText": "ss-menu",
     "navigationBarBackgroundColor": "@bg",
     "navigationBarTextStyle": "@navTxt",
     "backgroundColor": "@bg",
+    "backgroundTextStyle": "@bgTxt",
     "backgroundColorTop": "@bg",
     "backgroundColorBottom": "@bg"
   },

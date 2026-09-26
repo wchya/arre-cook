@@ -8,7 +8,7 @@
     <view class="brand anim-fade-up">
       <image class="brand__logo" src="/assets/chef-mark.svg" mode="aspectFit" />
       <view class="brand__title">今天吃什么，</view>
-      <view class="brand__title">交给 <text class="accent">NiniMenu</text></view>
+      <view class="brand__title">交给 <text class="accent">ss-menu</text></view>
       <view class="brand__desc">按你的口味推荐每一餐，AI 助手帮你排菜单、记饮食、列清单。</view>
     </view>
 

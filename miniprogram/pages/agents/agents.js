@@ -118,10 +118,10 @@ Page({
     const mcp = this.data.mcpUrl
     const apiUrl = this.data.apiUrl
     const tk = token || this.data.lastToken || "nm_你的令牌"
-    const mcpJson = JSON.stringify({ mcpServers: { ninimenu: { type: "http", url: mcp, headers: { Authorization: `Bearer ${tk}` } } } }, null, 2)
+    const mcpJson = JSON.stringify({ mcpServers: { "ss-menu": { type: "http", url: mcp, headers: { Authorization: `Bearer ${tk}` } } } }, null, 2)
     return [
       { key: "mcp", label: "MCP 通用", note: "Claude Desktop / Cursor / Cherry Studio 等支持远程 MCP 的客户端", code: mcpJson },
-      { key: "hermes", label: "Hermes", note: "写入 ~/.hermes/config.yaml 的 mcp_servers（以所用版本文档为准）", code: `mcp_servers:\n  ninimenu:\n    url: "${mcp}"\n    headers:\n      Authorization: "Bearer ${tk}"` },
+      { key: "hermes", label: "Hermes", note: "写入 ~/.hermes/config.yaml 的 mcp_servers（以所用版本文档为准）", code: `mcp_servers:\n  ss-menu:\n    url: "${mcp}"\n    headers:\n      Authorization: "Bearer ${tk}"` },
       { key: "openapi", label: "OpenAPI", note: "Dify / Coze / GPTs Actions 导入此地址，鉴权选 Bearer 填入令牌", code: `${apiUrl}/openapi.json` },
       { key: "curl", label: "curl", note: "直接调用工具，请求体即工具参数", code: `curl -s -X POST "${apiUrl}/tools/recommend_dishes" \\\n  -H "Authorization: Bearer ${tk}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"meal_type":"dinner","mood":"spicy","count":3}'` },
     ]

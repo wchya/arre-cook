@@ -12,7 +12,11 @@ Component({
   data: { failed: false, loaded: false },
 
   observers: {
-    src() {
+    // 父页面 setData 整个列表（如下拉加载更多）会把同一 src 重新赋值并触发观察器；
+    // 只有地址真正变化才重置加载态，否则图片不会再触发 load 事件而一直停在透明状态。
+    src(src) {
+      if (src === this._src) return
+      this._src = src
       if (this.data.failed || this.data.loaded) this.setData({ failed: false, loaded: false })
     },
   },

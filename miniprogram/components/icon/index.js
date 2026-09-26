@@ -1,6 +1,7 @@
 // 图标组件：渲染 lucide 图标（与 Web 端同一套），颜色可用色板名或十六进制。
 // <icon name="heart" size="36" color="primary" stroke="2.4" fill />
 const ICONS = require("../../utils/icons")
+const theme = require("../../utils/theme")
 
 const TOKENS = {
   text: "#1A1A2E",
@@ -41,33 +42,6 @@ const TOKENS_DARK = {
   wechat: "#07C160",
   bg: "#121016",
   white: "#FFFFFF",
-}
-
-// 单点订阅系统主题变化，广播给所有已挂载的图标实例重新取色。
-const subscribers = new Set()
-let THEME = null
-function currentTheme() {
-  try {
-    const app = getApp()
-    if (app && app.globalData && app.globalData.theme) return app.globalData.theme
-  } catch (_) {}
-  try {
-    if (typeof wx.getAppBaseInfo === "function") {
-      const base = wx.getAppBaseInfo()
-      if (base && base.theme) return base.theme
-    }
-  } catch (_) {}
-  return "light"
-}
-function ensureThemeWatch() {
-  if (THEME !== null) return
-  THEME = currentTheme()
-  if (typeof wx.onThemeChange === "function") {
-    wx.onThemeChange((res) => {
-      THEME = (res && res.theme) || "light"
-      subscribers.forEach((fn) => fn())
-    })
-  }
 }
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -119,7 +93,7 @@ Component({
   methods: {
     _paint() {
       const { name, color, stroke, fill } = this.data
-      const src = build(name, color, stroke, fill, THEME || currentTheme())
+      const src = build(name, color, stroke, fill, theme.name())
       if (src !== this.data.src) this.setData({ src })
     },
   },
@@ -132,13 +106,12 @@ Component({
 
   lifetimes: {
     attached() {
-      ensureThemeWatch()
-      this._onTheme = () => this._paint()
-      subscribers.add(this._onTheme)
+      // 系统切换深浅色时按新色板重新取色
+      this._offTheme = theme.subscribe(() => this._paint())
       this._paint()
     },
     detached() {
-      if (this._onTheme) subscribers.delete(this._onTheme)
+      if (this._offTheme) this._offTheme()
     },
   },
 })

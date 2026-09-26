@@ -78,7 +78,7 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: "NiniMenu · 选菜加餐，一键搞定", path: "/pages/dishes/dishes" }
+    return { title: "ss-menu · 选菜加餐，一键搞定", path: "/pages/dishes/dishes" }
   },
 
   // ---------- 数据 ----------

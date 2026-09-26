@@ -422,7 +422,7 @@ Page({
     try { wx.setStorageSync(api.SESSION_KEY, result.token) } catch (_) { /* ignore */ }
     session.setUser(result.user || null)
     const name = result.user && result.user.nickname
-    ui.toast(result.created ? "欢迎加入 NiniMenu 🎉" : name ? `欢迎回来，${name}` : "登录成功")
+    ui.toast(result.created ? "欢迎加入 ss-menu 🎉" : name ? `欢迎回来，${name}` : "登录成功")
     session.enterAfterLogin(this._redirect)
   },
 })

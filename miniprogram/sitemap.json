@@ -1,4 +1,4 @@
 {
-  "desc": "NiniMenu mini program pages",
+  "desc": "ss-menu mini program pages",
   "rules": [{ "action": "allow", "page": "*" }]
 }

@@ -1,5 +1,5 @@
 <view class="screen">
-  <nav-bar icon="house" title="Nini" accent="Menu" subtitle="今天也好好吃饭" theme="plain">
+  <nav-bar icon="house" title="ss-" accent="menu" subtitle="今天也好好吃饭" theme="plain">
     <view class="nav-bell" hover-class="tap-active" bindtap="goNotifications" aria-role="button" aria-label="站内信">
       <icon name="bell" size="34" stroke="2.3" color="text2" />
       <view wx:if="{{unread}}" class="nav-bell__dot">{{unread > 99 ? '99+' : unread}}</view>
