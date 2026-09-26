@@ -1,7 +1,7 @@
 .mark-all { display: flex; align-items: center; gap: 6rpx; padding: 10rpx 20rpx; border-radius: 999rpx; background: var(--primary-light); color: var(--primary); font-size: 22rpx; font-weight: 700; }
 .sk { height: 180rpx; margin-bottom: 16rpx; border-radius: 32rpx; }
 .note { display: flex; align-items: flex-start; gap: 24rpx; margin-bottom: 16rpx; padding: 32rpx; border: 1px solid var(--border); border-radius: 32rpx; background: var(--card); box-shadow: var(--shadow-card); transition: transform .15s ease; }
-.note.is-unread { border-color: rgba(232, 115, 74, .25); background: linear-gradient(135deg, rgba(255, 240, 235, .55), var(--card)); }
+.note.is-unread { border-color: rgba(232, 115, 74, .25); background: linear-gradient(135deg, var(--primary-light), var(--card)); }
 .note__icon { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex-shrink: 0; border-radius: 24rpx; }
 .tone-red { background: var(--red-light); }
 .note__title { color: var(--text); font-size: 28rpx; font-weight: 700; }

@@ -1,6 +1,6 @@
 page { background: var(--bg); }
 
-.nav-action { display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; border: 1px solid var(--border); border-radius: 50%; background: rgba(255, 255, 255, .92); box-shadow: 0 2rpx 6rpx rgba(26, 26, 46, .05), 0 12rpx 36rpx rgba(26, 26, 46, .06); }
+.nav-action { display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; border: 1px solid var(--border); border-radius: 50%; background: var(--card); box-shadow: 0 2rpx 6rpx rgba(26, 26, 46, .05), 0 12rpx 36rpx rgba(26, 26, 46, .06); }
 
 /* 头图 */
 .hero { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--primary-light), var(--pink-light)); }
@@ -42,7 +42,7 @@ page { background: var(--bg); }
 .rating { display: flex; align-items: center; gap: 10rpx; margin-top: 16rpx; }
 
 .video-btn { display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 88rpx; margin-top: 32rpx; border: 1px solid rgba(244, 168, 160, .35); border-radius: 999rpx; background: var(--pink-light); color: var(--pink-ink); font-size: 28rpx; font-weight: 600; }
-.video-btn__hint { padding: 2rpx 12rpx; border-radius: 999rpx; background: rgba(255, 255, 255, .7); font-size: 20rpx; font-weight: 500; }
+.video-btn__hint { padding: 2rpx 12rpx; border-radius: 999rpx; background: var(--card); font-size: 20rpx; font-weight: 500; }
 
 /* 分块 */
 .block { margin-top: 48rpx; }
@@ -97,7 +97,7 @@ page { background: var(--bg); }
 .bottom-space { height: calc(200rpx + env(safe-area-inset-bottom)); }
 
 /* 底部操作栏 */
-.action-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 90; display: flex; gap: 20rpx; padding: 24rpx 40rpx calc(24rpx + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: rgba(250, 250, 248, .92); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.action-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 90; display: flex; gap: 20rpx; padding: 24rpx 40rpx calc(24rpx + env(safe-area-inset-bottom)); border-top: 1px solid var(--glass-border); background: var(--glass-bg); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
 .btn-done { border: 1px solid var(--border2); background: var(--card); color: var(--text3); }
 
 /* 骨架屏 */

@@ -20,4 +20,4 @@
 .de-num__val { min-width: 88rpx; text-align: center; color: var(--text); font-size: 30rpx; font-weight: 700; font-variant-numeric: tabular-nums; }
 .de-num__unit { padding-right: 20rpx; color: var(--text3); font-size: 24rpx; }
 
-.de-save { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 16rpx; padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: rgba(255, 255, 255, .94); backdrop-filter: blur(14rpx); }
+.de-save { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 16rpx; padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--card); backdrop-filter: blur(14rpx); }

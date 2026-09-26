@@ -39,7 +39,7 @@
 .result__chips { margin-top: 10rpx; gap: 10rpx; }
 .result__reasons { display: flex; flex-wrap: wrap; gap: 4rpx 16rpx; margin-top: 12rpx; }
 .reason { color: var(--text3); font-size: 22rpx; }
-.result__actions { display: flex; align-items: center; gap: 16rpx; padding: 20rpx 24rpx; border-top: 1px solid var(--border); background: rgba(250, 250, 248, .55); }
+.result__actions { display: flex; align-items: center; gap: 16rpx; padding: 20rpx 24rpx; border-top: 1px solid var(--border); background: var(--bg); }
 .dislike { display: flex; align-items: center; justify-content: center; width: 88rpx; height: 60rpx; border-radius: 32rpx; background: var(--card); }
 
 .chat-entry { display: flex; align-items: center; gap: 24rpx; padding: 32rpx; }
