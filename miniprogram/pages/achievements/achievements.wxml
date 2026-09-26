@@ -1,0 +1,48 @@
+<nav-bar icon="trophy" title="成就墙" subtitle="记录你一起解锁的小目标">
+  <text class="nav-meta">{{unlocked}}/{{total}}</text>
+</nav-bar>
+
+<view class="content anim-fade-up">
+  <view class="card card-pad progress-card">
+    <view class="flex items-end justify-between mb-16">
+      <view>
+        <view class="t-sm c-text2">成就进度</view>
+        <view class="progress-value">{{progress}}%</view>
+      </view>
+      <view class="progress-meta">
+        <view>自动 {{autoCount}}</view>
+        <view>手动 {{manualCount}}</view>
+      </view>
+    </view>
+    <view class="bar"><view class="bar__fill" style="width:{{progress}}%;"></view></view>
+  </view>
+
+  <view class="filters">
+    <view class="filter {{filter === 'all' ? 'is-active' : ''}}" data-key="all" bindtap="chooseFilter">全部 {{total}}</view>
+    <view class="filter {{filter === 'done' ? 'is-active' : ''}}" data-key="done" bindtap="chooseFilter">已解锁 {{unlocked}}</view>
+    <view class="filter {{filter === 'todo' ? 'is-active' : ''}}" data-key="todo" bindtap="chooseFilter">未解锁 {{total - unlocked}}</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="grid-3"><view wx:for="{{[1, 2, 3, 4, 5, 6]}}" wx:key="*this" class="skeleton sk"></view></view>
+  <empty wx:elif="{{!list.length}}" emoji="🏆" title="{{total ? '这里还空着' : '还没有成就'}}" desc="{{total ? '换个筛选看看' : '多记录几餐，成就会自动解锁'}}" compact />
+  <view wx:else class="grid-3">
+    <view wx:for="{{list}}" wx:key="id" class="ach {{item.unlocked ? 'is-on' : ''}}" hover-class="tap-active" data-id="{{item.id}}" bindtap="openDetail">
+      <text class="ach__icon">{{item.icon}}</text>
+      <view class="ach__name truncate">{{item.name}}</view>
+      <view class="ach__desc clamp-2">{{item.desc}}</view>
+      <view class="ach__badge">{{item.badge}}</view>
+    </view>
+  </view>
+  <view class="safe-space"></view>
+</view>
+
+<sheet show="{{detailOpen}}" title="" closable="{{true}}" bind:close="closeDetail">
+  <view wx:if="{{detail}}" class="detail">
+    <view class="detail__ring {{detail.unlocked ? 'is-on' : ''}}"><text class="detail__icon anim-pop">{{detail.icon}}</text></view>
+    <view class="detail__kicker {{detail.unlocked ? '' : 'is-off'}}">{{detail.unlocked ? '已解锁' : '未解锁'}}</view>
+    <view class="detail__name">{{detail.name}}</view>
+    <view class="detail__desc">{{detail.desc}}</view>
+    <view class="detail__meta">{{detail.unlocked ? (detail.date ? detail.date + ' 解锁' : '已解锁') : (detail.auto ? '满足条件后会自动解锁' : '手动成就')}}</view>
+    <button wx:if="{{detail.unlocked}}" class="btn-reset detail__share" open-type="share" hover-class="tap-active"><icon name="share-2" size="30" stroke="2.4" color="primary" /><text>分享给朋友</text></button>
+  </view>
+</sheet>

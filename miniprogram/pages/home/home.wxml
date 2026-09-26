@@ -1,40 +1,186 @@
-<scroll-view class="mp-screen" scroll-y refresher-enabled refresher-triggered="{{refreshing}}" bindrefresherrefresh="onPullDownRefresh" show-scrollbar="false">
-  <view class="mp-content home-content">
-    <view class="home-brand"><view class="home-mark">N</view><text>NiniMenu</text><view class="home-privacy">私人餐桌</view></view>
-    <view class="home-greeting">{{greeting}}，{{user.nickname || '今天想吃点什么？'}}</view>
-    <view class="home-date">{{today}} · 今天的餐桌</view>
+<view class="screen">
+  <nav-bar icon="house" title="Nini" accent="Menu" subtitle="今天也好好吃饭" theme="plain">
+    <view class="nav-bell" hover-class="tap-active" bindtap="goNotifications" aria-role="button" aria-label="站内信">
+      <icon name="bell" size="34" stroke="2.3" color="text2" />
+      <view wx:if="{{unread}}" class="nav-bell__dot">{{unread > 99 ? '99+' : unread}}</view>
+    </view>
+  </nav-bar>
 
-    <view wx:if="{{error}}" class="mp-error home-error">{{error}}</view>
-
-    <view class="mp-section">
-      <view class="mp-section-heading">
-        <view><view class="mp-section-title">为你挑了几道菜</view><view class="mp-small">结合你的口味与近期记录</view></view>
-        <button class="refresh-button" loading="{{refreshing}}" bindtap="refreshRecommendations" aria-label="换一组推荐">换一组</button>
+  <scroll-view
+    class="screen-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    scroll-with-animation
+    scroll-into-view="{{recScrollId}}"
+    refresher-enabled
+    refresher-background="#FAFAF8"
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
+    <view class="content anim-fade-up">
+      <view class="hello">
+        <view class="hello__greet">{{greeting}}</view>
+        <view class="hello__title">今天<text class="accent">想吃什么</text>？</view>
       </view>
-      <view wx:if="{{loading}}" class="loading-block"><view class="loading-line"></view><view class="loading-line short"></view></view>
-      <view wx:elif="{{items.length === 0}}" class="mp-panel empty-panel">还没有可推荐的菜谱，稍后再试。</view>
-      <view wx:else class="recommend-list">
-        <view wx:for="{{items}}" wx:key="dish.id" class="recommend-item">
-          <image wx:if="{{item.dish.image_url}}" class="dish-image" src="{{item.dish.image_url}}" mode="aspectFill" lazy-load />
-          <view wx:else class="dish-image dish-placeholder">🍽</view>
-          <view class="dish-info">
-            <view class="dish-name">{{item.dish.name}}</view>
-            <view class="dish-meta">{{item.dish.category || '家常菜'}}<text wx:if="{{item.dish.cook_time}}"> · {{item.dish.cook_time}} 分钟</text></view>
-            <view wx:if="{{item.reasons.length}}" class="dish-reason">{{item.reasons[0]}}</view>
-            <button class="record-button" data-id="{{item.dish.id}}" loading="{{recordingId === item.dish.id}}" disabled="{{recordingId !== 0}}" bindtap="recordDish">记下这餐</button>
+
+      <view wx:if="{{error}}" class="notice notice-error mb-24"><icon name="circle-alert" size="30" color="red" /><text class="flex-1">{{error}}</text></view>
+
+      <!-- 午 / 晚餐入口 -->
+      <view class="grid-2 meal-entries">
+        <view class="meal-entry meal-entry--lunch {{recMeal === 'lunch' ? 'is-active' : ''}} {{pickingMeal ? 'is-busy' : ''}}" hover-class="tap-active" hover-stay-time="80" data-meal="lunch" bindtap="pickMeal">
+          <text class="meal-entry__emoji">🍳</text>
+          <view class="meal-entry__title">中午吃点好的</view>
+          <view class="meal-entry__desc">{{pickingMeal === 'lunch' ? '推荐中…' : '午餐推荐 →'}}</view>
+        </view>
+        <view class="meal-entry meal-entry--dinner {{recMeal === 'dinner' ? 'is-active' : ''}} {{pickingMeal ? 'is-busy' : ''}}" hover-class="tap-active" hover-stay-time="80" data-meal="dinner" bindtap="pickMeal">
+          <text class="meal-entry__emoji">🍲</text>
+          <view class="meal-entry__title">晚上吃点温暖的</view>
+          <view class="meal-entry__desc">{{pickingMeal === 'dinner' ? '推荐中…' : '晚餐推荐 →'}}</view>
+        </view>
+      </view>
+
+      <!-- 今日推荐 -->
+      <view id="rec-anchor" class="section-head rec-head">
+        <view class="section-title">✨ 今日推荐</view>
+        <view class="section-action {{changing ? 'tap-fade' : ''}}" hover-class="tap-active" bindtap="changeRecommend">
+          <icon name="refresh-cw" size="26" stroke="2.4" color="text2" />
+          <text class="rec-change">{{changing ? '挑选中…' : '换一个'}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{loadingRec && !current}}" class="card rec-card">
+        <view class="skeleton rec-sk-img"></view>
+        <view class="card-pad"><view class="skeleton rec-sk-line"></view><view class="skeleton rec-sk-line short"></view></view>
+      </view>
+
+      <view wx:elif="{{current}}" class="card rec-card anim-pop-soft" hover-class="rec-card--press" hover-stay-time="80" bindtap="openCurrent">
+        <view class="rec-card__media">
+          <dish-image src="{{current.cover}}" emoji="{{current.emoji}}" emoji-size="128" lazy="{{false}}" />
+          <view class="rec-card__badge">{{isSmart ? '🧠 按你的口味' : '🔥 推荐'}}</view>
+          <view class="rec-card__meals">
+            <text class="meal-tag {{recMeal === 'lunch' ? 'meal-tag--lunch' : ''}}">🍳 午餐</text>
+            <text class="meal-tag meal-tag--mint {{recMeal === 'dinner' ? 'meal-tag--dinner' : ''}}">🍲 晚餐</text>
+          </view>
+        </view>
+        <view class="card-pad">
+          <view class="rec-card__name">{{current.name}}</view>
+          <view class="chips">
+            <text class="chip chip-primary">{{current.category}}</text>
+            <text wx:if="{{current.cookTime}}" class="chip chip-mint">{{current.cookTime}}分钟</text>
+            <text class="chip chip-primary">{{current.diffLabel}}</text>
+            <text wx:if="{{current.taste}}" class="chip chip-pink">{{current.taste}}</text>
+          </view>
+          <view wx:if="{{currentReasons.length}}" class="chips rec-card__reasons">
+            <text wx:for="{{currentReasons}}" wx:key="*this" class="chip chip-sm chip-yellow">💡 {{item}}</text>
+          </view>
+          <view class="rec-card__actions">
+            <view class="btn flex-1 btn-primary" hover-class="tap-active" hover-stop-propagation data-meal="lunch" catchtap="recordCurrent">
+              <view wx:if="{{recordingMeal === 'lunch'}}" class="spinner"></view><text wx:else>🍳 中午吃这个</text>
+            </view>
+            <view class="btn flex-1 btn-mint" hover-class="tap-active" hover-stop-propagation data-meal="dinner" catchtap="recordCurrent">
+              <view wx:if="{{recordingMeal === 'dinner'}}" class="spinner"></view><text wx:else>🍲 晚上吃这个</text>
+            </view>
           </view>
         </view>
       </view>
-    </view>
 
-    <view class="mp-section">
-      <view class="mp-section-heading"><view class="mp-section-title">今天已记录</view><navigator class="text-link" url="/pages/diary/diary">饮食报告 ›</navigator></view>
-      <view class="mp-panel">
-        <view wx:if="{{todayRecords.length === 0}}" class="empty-record">今天还没有记录。吃过之后，记一笔就能慢慢看见饮食习惯。</view>
-        <view wx:for="{{todayRecords}}" wx:key="id" class="today-row"><view><view class="today-dish">{{item.dish_name}}</view><view class="mp-small">{{item.meal_type === 'lunch' ? '午餐' : item.meal_type === 'dinner' ? '晚餐' : item.meal_type}}</view></view><text class="record-check">已记录</text></view>
+      <view wx:elif="{{!loadingRec}}" class="card">
+        <empty emoji="🍽" title="暂时没有推荐" desc="下拉刷新，或者去菜谱里挑一道" compact />
+      </view>
+
+      <view wx:if="{{isSmart && recItems.length > 1}}" class="rec-progress">第 {{recIndex + 1}} / {{recItems.length}} 道 · 换一个会从下一道开始</view>
+      <view wx:if="{{recQuote}}" class="rec-quote">“{{recQuote}}”</view>
+      <view class="rec-gap"></view>
+
+      <!-- AI 推荐官 -->
+      <view class="card entry entry--ai" hover-class="tap-active" hover-stay-time="80" bindtap="goAssistant">
+        <view class="entry__icon entry__icon--ai"><icon name="sparkles" size="46" stroke="2.4" color="primary" /></view>
+        <view class="flex-1">
+          <view class="entry__title">🤖 AI 推荐官</view>
+          <view class="entry__desc truncate">{{profileSummary || '根据你的口味画像推荐，还能聊着点菜'}}</view>
+        </view>
+        <icon name="chevron-right" size="30" stroke="2.4" color="text3" />
+      </view>
+
+      <view class="divider-label more-label">更多玩法</view>
+
+      <!-- 心情 -->
+      <view class="section-head"><view class="section-title">😃 今天的心情</view></view>
+      <scroll-view class="moods" scroll-x enhanced show-scrollbar="{{false}}">
+        <view wx:for="{{moods}}" wx:key="key" class="mood {{mood === item.key ? 'is-active' : ''}}" hover-class="tap-active" hover-stay-time="60" data-mood="{{item.key}}" bindtap="chooseMood">
+          <text class="mood__emoji">{{item.emoji}}</text>
+          <text class="mood__label">{{item.label}}</text>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{moodDishes.length}}" class="section">
+        <view class="mood-title">心情推荐</view>
+        <view class="grid-2">
+          <dish-card wx:for="{{moodDishes}}" wx:key="id" dish="{{item}}" />
+        </view>
+      </view>
+      <view wx:elif="{{moodLoading}}" class="grid-2 section">
+        <view class="skeleton mood-sk"></view><view class="skeleton mood-sk"></view>
+      </view>
+
+      <!-- 转一转 -->
+      <view wx:if="{{wheelLabels.length}}" class="section">
+        <view class="section-head"><view class="section-title">🎰 转一转</view><text class="t-xs c-text3">转到哪道吃哪道</text></view>
+        <view class="wheel-wrap">
+          <view class="wheel-pointer"></view>
+          <view class="wheel {{spinning ? 'is-spinning' : ''}}" style="background:{{wheelBg}};transform:rotate({{wheelDeg}}deg);">
+            <view wx:for="{{wheelLabels}}" wx:key="id" class="wheel__label" style="transform:rotate({{item.angle}}deg);">
+              <text class="wheel__text" style="color:{{item.color}};">{{item.name}}</text>
+            </view>
+          </view>
+          <view class="wheel-hub {{spinning ? 'is-spinning' : ''}}" hover-class="tap-active" bindtap="spinWheel" aria-role="button" aria-label="转动转盘">{{spinning ? '🎰' : '转'}}</view>
+        </view>
+      </view>
+
+      <!-- 惊喜盲盒 -->
+      <view wx:if="{{blindEnabled}}" class="section">
+        <view class="section-head"><view class="section-title">🎁 惊喜盲盒</view></view>
+        <view class="blind">
+          <view class="blind__inner {{blindFlipped ? 'is-flipped' : ''}}">
+            <view class="blind__face blind__front card" hover-class="tap-active" bindtap="openBlindBox">
+              <view class="blind__shine"></view>
+              <text class="blind__gift anim-float">🎁</text>
+              <view class="blind__title">今日惊喜</view>
+              <view class="blind__tip">{{blindLoading ? '拆盒中…' : '“点我揭晓~”'}}</view>
+            </view>
+            <view class="blind__face blind__back card">
+              <block wx:if="{{blindDish}}">
+                <view class="blind__media" bindtap="openBlindDish"><dish-image src="{{blindDish.cover}}" emoji="{{blindDish.emoji}}" emoji-size="96" lazy="{{false}}" /></view>
+                <view class="blind__body">
+                  <view class="flex-1" bindtap="openBlindDish">
+                    <view class="blind__name truncate">{{blindDish.name}}</view>
+                    <view class="blind__meta truncate">{{blindDish.category}} · {{blindDish.cookTime}}分钟 · {{blindDish.diffLabel}}</view>
+                    <view wx:if="{{blindHint}}" class="blind__hint truncate">{{blindHint}}</view>
+                  </view>
+                  <view class="blind__actions">
+                    <view class="btn btn-xs btn-primary" hover-class="tap-active" bindtap="eatBlindDish">🍲 今晚吃这个</view>
+                    <view class="btn btn-xs btn-ghost" hover-class="tap-active" bindtap="resetBlindBox">换一个</view>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 明天吃什么 -->
+      <view class="card entry" hover-class="tap-active" hover-stay-time="80" bindtap="goTomorrow">
+        <view class="entry__icon entry__icon--moon">🌙</view>
+        <view class="flex-1">
+          <view class="entry__title">🌙 明天吃什么？</view>
+          <view class="entry__desc">提前规划明天的菜单，不用再临时纠结</view>
+        </view>
+        <icon name="chevron-right" size="30" stroke="2.4" color="text3" />
       </view>
     </view>
+    <view class="tabbar-spacer"></view>
+  </scroll-view>
+</view>
 
-    <view class="home-foot">饮食建议用于日常参考，不替代专业医疗意见。</view>
-  </view>
-</scroll-view>
+<confetti id="confetti" />

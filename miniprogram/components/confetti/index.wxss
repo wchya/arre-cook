@@ -1,0 +1,11 @@
+.confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 900; overflow: hidden; pointer-events: none; }
+.piece { position: absolute; top: 0; border-radius: 4rpx; opacity: 0; box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, .12); animation-timing-function: cubic-bezier(.25, .6, .45, 1); animation-fill-mode: both; }
+.piece.is-round { border-radius: 50%; }
+.fall-0 { animation-name: fall0; }
+.fall-1 { animation-name: fall1; }
+.fall-2 { animation-name: fall2; }
+.fall-3 { animation-name: fall3; }
+@keyframes fall0 { 0% { opacity: 0; transform: translate3d(0, -10vh, 0) rotate(0deg); } 12% { opacity: 1; } 100% { opacity: .9; transform: translate3d(-120rpx, 110vh, 0) rotate(540deg); } }
+@keyframes fall1 { 0% { opacity: 0; transform: translate3d(0, -10vh, 0) rotate(0deg); } 12% { opacity: 1; } 100% { opacity: .9; transform: translate3d(90rpx, 110vh, 0) rotate(-420deg); } }
+@keyframes fall2 { 0% { opacity: 0; transform: translate3d(0, -10vh, 0) rotate(0deg); } 12% { opacity: 1; } 100% { opacity: .9; transform: translate3d(-40rpx, 110vh, 0) rotate(680deg); } }
+@keyframes fall3 { 0% { opacity: 0; transform: translate3d(0, -10vh, 0) rotate(0deg); } 12% { opacity: 1; } 100% { opacity: .9; transform: translate3d(160rpx, 110vh, 0) rotate(-600deg); } }

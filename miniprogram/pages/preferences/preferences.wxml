@@ -1,0 +1,74 @@
+<nav-bar icon="salad" title="饮食偏好" subtitle="推荐引擎和 AI 助手都会遵守" />
+
+<view wx:if="{{loading}}" class="content">
+  <view wx:for="{{[1, 2, 3, 4]}}" wx:key="*this" class="skeleton sk"></view>
+</view>
+
+<view wx:else class="content anim-fade-up">
+  <view class="card sec">
+    <view class="sec__title">🚫 过敏原</view>
+    <view class="sec__hint">含有这些食材的菜一律不推荐（任何情况下都不会放宽）</view>
+    <tag-input value="{{form.allergies}}" suggestions="{{commonAllergy}}" placeholder="如：花生、虾" tone="red" bind:change="onAllergies" />
+  </view>
+
+  <view class="card sec">
+    <view class="sec__title">🙅 忌口</view>
+    <view class="sec__hint">尽量避开；实在没得选时才会放宽</view>
+    <tag-input value="{{form.avoid_ingredients}}" suggestions="{{commonAvoid}}" placeholder="如：香菜、内脏" bind:change="onAvoid" />
+  </view>
+
+  <view class="card sec">
+    <view class="sec__title mb-16">🌶 能吃多辣</view>
+    <view class="grid-5">
+      <view wx:for="{{spiceOptions}}" wx:key="v" class="spice {{form.spice_level === item.v ? 'is-active' : ''}}" data-v="{{item.v}}" bindtap="chooseSpice">
+        <text class="spice__emoji">{{item.emoji}}</text>
+        <text>{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card sec">
+    <view class="sec__title">😋 喜欢的口味</view>
+    <view class="sec__hint">会作为口味画像的起点，新用户也能一上来就推得准</view>
+    <view class="chips">
+      <view wx:for="{{tastes}}" wx:key="name" class="pill {{item.on ? 'pill--pink' : ''}}" data-name="{{item.name}}" bindtap="toggleTaste">{{item.name}}</view>
+    </view>
+  </view>
+
+  <view class="card sec">
+    <view class="sec__title mb-16">⏱ 一道菜最多花多久</view>
+    <view class="grid-5">
+      <view wx:for="{{cookTimes}}" wx:key="*this" class="spice time {{form.max_cook_time === item ? 'is-mint' : ''}}" data-v="{{item}}" bindtap="chooseCookTime">{{item === 0 ? '不限' : item + ' 分钟'}}</view>
+    </view>
+  </view>
+
+  <view class="card sec">
+    <view class="sec__title mb-16">👨‍👩‍👧 几个人吃饭</view>
+    <view class="household">
+      <view class="household__btn {{form.household_size <= 0 ? 'is-off' : ''}}" hover-class="tap-active" data-step="-1" bindtap="changeHousehold"><icon name="minus" size="32" stroke="2.6" color="text2" /></view>
+      <view class="household__value">{{form.household_size === 0 ? '未设置' : form.household_size + ' 人'}}</view>
+      <view class="household__btn" hover-class="tap-active" data-step="1" bindtap="changeHousehold"><icon name="plus" size="32" stroke="2.6" color="text2" /></view>
+    </view>
+  </view>
+
+  <view class="card sec">
+    <view class="sec__title mb-16">🎯 饮食目标</view>
+    <view class="chips">
+      <view wx:for="{{goals}}" wx:key="name" class="pill {{item.on ? 'pill--purple' : ''}}" data-name="{{item.name}}" bindtap="toggleGoal">{{item.name}}</view>
+    </view>
+  </view>
+
+  <view class="card sec">
+    <view class="sec__title">📝 给 AI 的补充说明</view>
+    <view class="sec__hint">例如：孩子不吃辣、周末喜欢做硬菜、最近在控油</view>
+    <textarea class="field-textarea" value="{{form.notes}}" maxlength="500" auto-height placeholder="写下你的饮食习惯…" placeholder-class="placeholder" cursor-spacing="140" bindinput="onNotes" />
+  </view>
+  <view class="bottom-space"></view>
+</view>
+
+<view class="save-bar">
+  <view class="btn btn-lg btn-block btn-primary-glow {{dirty && !saving ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="save">
+    <view wx:if="{{saving}}" class="spinner"></view>
+    <text wx:else>{{dirty ? '保存偏好' : '已保存'}}</text>
+  </view>
+</view>

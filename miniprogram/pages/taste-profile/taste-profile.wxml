@@ -1,0 +1,62 @@
+<nav-bar icon="bot" title="口味画像" subtitle="根据你自己的用餐记录整理" />
+
+<view class="content anim-fade-up">
+  <view wx:if="{{loading}}" class="skeleton sk"></view>
+  <view wx:elif="{{error || !profile}}" class="card card-pad c-text2 t-sm">画像暂时无法加载，请稍后重试。</view>
+  <block wx:else>
+    <view class="card hero">
+      <view class="hero__kicker"><icon name="sparkles" size="26" stroke="2.4" color="primary" /><text>近 {{profile.windowDays}} 天</text></view>
+      <view class="hero__summary">{{profile.summary}}</view>
+      <view class="hero__stats">
+        <view class="hero__stat"><view class="hero__value">{{profile.records}}</view><view class="hero__label">餐次</view></view>
+        <view class="hero__stat"><view class="hero__value">{{profile.distinct}}</view><view class="hero__label">不同菜品</view></view>
+        <view class="hero__stat"><view class="hero__value">{{profile.avg}}</view><view class="hero__label">平均用时</view></view>
+      </view>
+      <view class="hero__facts">
+        <view class="fact"><icon name="flame" size="26" stroke="2.3" color="primary" /><text>辣味占比 {{profile.spicy}}%</text></view>
+        <view class="fact"><icon name="leaf" size="26" stroke="2.3" color="mint-ink" /><text>避开过敏与忌口食材</text></view>
+        <view wx:if="{{profile.repeatDays}}" class="fact"><icon name="clock-3" size="26" stroke="2.3" color="text2" /><text>推荐去重 {{profile.repeatDays}} 天</text></view>
+      </view>
+    </view>
+
+    <view class="card panel">
+      <view class="block">
+        <view class="block__title">常选口味</view>
+        <view wx:if="{{!tastes.length}}" class="empty-line">累积一些用餐记录后会显示趋势</view>
+        <view wx:for="{{tastes}}" wx:key="name" class="weight">
+          <text class="weight__name truncate">{{item.name}}</text>
+          <view class="weight__track"><view class="weight__fill" style="width:{{item.width}}%;"></view></view>
+          <text class="weight__count">{{item.count}} 次</text>
+        </view>
+      </view>
+      <view class="block">
+        <view class="block__title">常吃菜系</view>
+        <view wx:if="{{!categories.length}}" class="empty-line">累积一些用餐记录后会显示趋势</view>
+        <view wx:for="{{categories}}" wx:key="name" class="weight">
+          <text class="weight__name truncate">{{item.name}}</text>
+          <view class="weight__track"><view class="weight__fill weight__fill--mint" style="width:{{item.width}}%;"></view></view>
+          <text class="weight__count">{{item.count}} 次</text>
+        </view>
+      </view>
+      <view class="block">
+        <view class="block__title">最近常吃</view>
+        <view wx:if="{{!topDishes.length}}" class="empty-line">还没有足够的用餐记录</view>
+        <view wx:for="{{topDishes}}" wx:key="id" class="top" hover-class="tap-fade" data-id="{{item.id}}" bindtap="openDish">
+          <text class="truncate">{{item.name}}</text>
+          <view class="top__count"><text>{{item.count}} 次</text><icon name="arrow-up-right" size="24" stroke="2.4" color="text3" /></view>
+        </view>
+      </view>
+      <view class="block">
+        <view class="block__title">需要避开</view>
+        <view wx:if="{{!disliked.length}}" class="empty-line">暂无明确不喜欢的菜品</view>
+        <view wx:else class="chips"><text wx:for="{{disliked}}" wx:key="id" class="chip chip-ghost">{{item.name}}</text></view>
+      </view>
+    </view>
+
+    <view class="grid-2">
+      <view class="btn btn-dark" hover-class="tap-active" bindtap="goPreferences"><text>调整饮食偏好</text><icon name="arrow-up-right" size="28" stroke="2.4" color="white" /></view>
+      <view class="btn btn-soft" hover-class="tap-active" bindtap="goAssistant"><icon name="sparkles" size="28" stroke="2.4" color="primary" /><text>按画像点菜</text></view>
+    </view>
+  </block>
+  <view class="safe-space"></view>
+</view>

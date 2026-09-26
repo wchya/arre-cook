@@ -1,84 +1,71 @@
-page { background: #f6f4ef; }
-.page { box-sizing: border-box; height: 100vh; min-height: 0; background: #f6f4ef; color: #1f2924; }
-.page-inner { box-sizing: border-box; min-height: 100%; padding: calc(28rpx + env(safe-area-inset-top)) 32rpx calc(40rpx + env(safe-area-inset-bottom)); }
-.topbar { display: flex; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; }
-.brand-mark { width: 58rpx; height: 58rpx; display: flex; align-items: center; justify-content: center; margin-right: 13rpx; border-radius: 16rpx; background: #1f2924; color: #f5d8a4; font-family: Georgia, serif; font-size: 30rpx; font-weight: 700; }
-.brand-name { color: #1f2924; font-family: Georgia, "Times New Roman", serif; font-size: 29rpx; font-weight: 700; letter-spacing: .5rpx; line-height: 1.1; }
-.brand-subtitle { margin-top: 5rpx; color: #737d75; font-size: 17rpx; letter-spacing: 1.5rpx; }
-.privacy-badge { display: flex; align-items: center; padding: 9rpx 13rpx; border: 1px solid #d8ded8; border-radius: 99rpx; color: #506d5c; font-size: 18rpx; white-space: nowrap; }
-.privacy-dot { width: 11rpx; height: 11rpx; margin-right: 7rpx; border-radius: 50%; background: #31825c; }
-.intro { padding: 74rpx 2rpx 36rpx; }
-.intro-label { color: #9a7049; font-size: 17rpx; font-weight: 700; letter-spacing: 3rpx; }
-.intro-title { max-width: 620rpx; margin-top: 17rpx; color: #1f2924; font-family: Georgia, "Songti SC", serif; font-size: 55rpx; font-weight: 700; line-height: 1.22; }
-.intro-title text { color: #bd6342; }
-.intro-copy { margin-top: 17rpx; color: #626f66; font-size: 23rpx; line-height: 1.55; }
-.login-card { box-sizing: border-box; padding: 30rpx 26rpx 26rpx; border: 1px solid #e1e2dc; border-radius: 18rpx; background: #fffefa; box-shadow: 0 14rpx 34rpx rgba(50, 55, 43, .07); }
-.card-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 26rpx; }
-.card-eyebrow { color: #717b73; font-size: 15rpx; font-weight: 700; letter-spacing: 2.2rpx; }
-.card-title { margin-top: 9rpx; color: #1f2924; font-size: 33rpx; font-weight: 800; }
-.card-index { padding-top: 5rpx; color: #7d867e; font-family: Georgia, serif; font-size: 18rpx; }
-.message, .error { display: flex; align-items: flex-start; padding: 14rpx 15rpx; margin: -4rpx 0 19rpx; border-radius: 10rpx; font-size: 21rpx; line-height: 1.5; }
-.message { background: #edf7f0; color: #2c6747; }
-.error { background: #fff0eb; color: #9a3f2c; }
-.status-icon { width: 28rpx; height: 28rpx; flex: 0 0 28rpx; display: flex; align-items: center; justify-content: center; margin-right: 9rpx; border-radius: 50%; color: #fff; font-size: 17rpx; font-weight: 800; }
-.status-success { background: #31825c; }
-.status-error { background: #b85539; }
-.quick-entry { display: flex; align-items: center; justify-content: space-between; padding: 18rpx 16rpx 18rpx 18rpx; border: 1px solid #cfe5d6; border-radius: 13rpx; background: #f1f9f3; }
-.quick-entry-copy { min-width: 0; padding-right: 12rpx; }
-.quick-entry-title { color: #205d40; font-size: 25rpx; font-weight: 800; }
-.quick-entry-subtitle { margin-top: 6rpx; color: #526f5b; font-size: 18rpx; }
-.wechat-button { display: flex; align-items: center; justify-content: center; width: 196rpx; height: 68rpx; flex: 0 0 196rpx; padding: 0 10rpx; border-radius: 9rpx; background: #287b53; color: #fff; font-size: 23rpx; font-weight: 800; line-height: 68rpx; box-shadow: 0 7rpx 14rpx rgba(40, 123, 83, .17); }
-.wechat-symbol { position: relative; width: 40rpx; height: 34rpx; flex: 0 0 40rpx; margin-right: 8rpx; }
-.wechat-bubble { position: absolute; box-sizing: border-box; border: 2rpx solid #fff; border-radius: 50%; }
-.wechat-bubble-main { top: 3rpx; left: 0; width: 29rpx; height: 22rpx; }
-.wechat-bubble-main::after { position: absolute; bottom: -4rpx; left: 4rpx; width: 6rpx; height: 6rpx; border-left: 2rpx solid #fff; background: #287b53; content: ""; transform: skew(-30deg); }
-.wechat-bubble-small { right: 0; bottom: 1rpx; width: 22rpx; height: 17rpx; background: #287b53; }
-.wechat-button .button-arrow { margin-left: 9rpx; font-size: 26rpx; }
-.wechat-button[disabled] { background: #92b7a0; box-shadow: none; }
-.wechat-hover { background: #226a47; transform: translateY(1rpx); }
-.divider { display: flex; align-items: center; margin: 25rpx 0 20rpx; color: #68736b; font-size: 17rpx; white-space: nowrap; }
-.divider-line { height: 1px; flex: 1; background: #e3e5df; }
-.divider text { margin: 0 13rpx; }
-.mode-switch { display: flex; padding: 4rpx; margin-bottom: 24rpx; border: 1px solid #e3e4de; border-radius: 10rpx; background: #f4f3ee; }
-.mode-tab { flex: 1; height: 62rpx; padding: 0; border-radius: 7rpx; background: transparent; color: #667169; font-size: 22rpx; line-height: 62rpx; }
-.mode-tab-active { background: #1f2924; color: #fff; font-weight: 700; box-shadow: 0 4rpx 9rpx rgba(31, 41, 36, .14); }
-.mode-tab-hover { opacity: .8; }
-.field-label { margin-bottom: 9rpx; color: #465349; font-size: 20rpx; font-weight: 700; }
-.code-label { margin-top: 20rpx; }
-.input-wrap { position: relative; display: flex; align-items: center; box-sizing: border-box; height: 82rpx; border: 1px solid #d9ded7; border-radius: 9rpx; background: #fff; }
-.input-wrap:focus-within { border-color: #74a888; box-shadow: 0 0 0 4rpx rgba(58, 155, 110, .1); }
-.input { box-sizing: border-box; height: 80rpx; padding: 0 18rpx; background: transparent; color: #1f2924; font-size: 25rpx; }
-.input-with-prefix { flex: 1; min-width: 0; padding-left: 0; }
-.input-prefix { width: 64rpx; flex: 0 0 64rpx; color: #68756b; font-family: Georgia, serif; font-size: 23rpx; font-weight: 700; text-align: center; }
-.code-prefix { font-size: 18rpx; }
-.lock-prefix { font-size: 18rpx; letter-spacing: 3rpx; }
-.code-row { display: flex; align-items: center; }
-.code-wrap { flex: 1; min-width: 0; }
-.code-input { min-width: 0; }
-.send-button { width: 178rpx; height: 82rpx; flex: 0 0 178rpx; margin-left: 12rpx; padding: 0 6rpx; border: 1px solid #d7b695; border-radius: 9rpx; background: #fff8ee; color: #87562e; font-size: 20rpx; line-height: 82rpx; }
-.send-button[disabled] { border-color: #e1e3dd; background: #f3f3ef; color: #707970; }
-.password-input { padding-right: 80rpx; }
-.password-toggle { position: absolute; right: 7rpx; top: 6rpx; width: 70rpx; height: 68rpx; padding: 0; border-radius: 6rpx; background: transparent; color: #456d53; font-size: 19rpx; line-height: 68rpx; }
-.primary-button { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; height: 82rpx; margin-top: 23rpx; border-radius: 9rpx; background: #1f2924; color: #fff; font-size: 25rpx; font-weight: 800; line-height: 82rpx; }
-.primary-button[disabled] { opacity: .43; }
-.button-arrow { margin-left: 16rpx; font-family: Georgia, serif; font-size: 28rpx; font-weight: 400; line-height: 1; }
-.primary-hover { background: #36453d; transform: translateY(1rpx); }
-.button-hover { opacity: .78; }
-.helper-note { margin-top: 13rpx; color: #717b73; font-size: 18rpx; line-height: 1.5; }
-.consent-box { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin: -7rpx 0 22rpx; padding: 0 6rpx; color: #626d64; font-size: 19rpx; line-height: 1.8; }
-.consent-label { display: inline-flex; align-items: center; }
-.consent-label checkbox { transform: scale(.72); margin-right: -5rpx; }
-.legal-link { color: #286c49; font-weight: 700; }
-.consent-and { margin: 0 5rpx; color: #6c776f; }
-.footer-note { display: flex; align-items: center; justify-content: center; padding-top: 22rpx; color: #727d74; font-size: 17rpx; }
-.footer-rule { width: 31rpx; height: 1px; margin: 0 11rpx; background: #d8dcd5; }
-@media (max-width: 340px) {
-  .page-inner { padding-left: 24rpx; padding-right: 24rpx; }
-  .intro { padding-top: 58rpx; }
-  .intro-title { font-size: 50rpx; }
-  .login-card { padding-left: 20rpx; padding-right: 20rpx; }
-  .quick-entry { padding-left: 14rpx; padding-right: 12rpx; }
-  .wechat-button { width: 174rpx; flex-basis: 174rpx; font-size: 21rpx; }
-  .send-button { width: 160rpx; flex-basis: 160rpx; margin-left: 9rpx; font-size: 18rpx; }
-}
+page { background: var(--bg); }
+
+.login { position: relative; min-height: 100vh; overflow: hidden; }
+
+/* 暖色光晕背景（对应 Web 登录页三团 blur 光斑） */
+.glow { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(90rpx); }
+.glow-a { top: -260rpx; left: -200rpx; width: 640rpx; height: 640rpx; background: rgba(232, 115, 74, .26); }
+.glow-b { top: 260rpx; right: -200rpx; width: 580rpx; height: 580rpx; background: rgba(245, 215, 110, .32); }
+.glow-c { bottom: -160rpx; left: 180rpx; width: 540rpx; height: 540rpx; background: rgba(110, 198, 184, .22); }
+
+.login__inner { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; padding: 0 44rpx calc(28rpx + env(safe-area-inset-bottom)); }
+
+/* 品牌区 */
+.brand__logo { width: 124rpx; height: 124rpx; margin-bottom: 36rpx; border-radius: 38rpx; box-shadow: 0 28rpx 72rpx rgba(232, 115, 74, .28); }
+.brand__title { color: var(--text); font-size: 58rpx; font-weight: 900; line-height: 1.24; letter-spacing: -1rpx; }
+.brand__desc { margin-top: 18rpx; color: var(--text2); font-size: 27rpx; line-height: 1.65; }
+
+/* 登录卡片（毛玻璃） */
+.panel { margin-top: 44rpx; padding: 32rpx 32rpx 36rpx; border: 1px solid rgba(255, 255, 255, .6); border-radius: 56rpx; background: rgba(255, 255, 255, .9); box-shadow: 0 48rpx 120rpx rgba(26, 26, 46, .10); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); animation-delay: .06s; }
+.modes { margin-bottom: 36rpx; }
+.modes .segmented-item { font-size: 25rpx; }
+.panel__notice { margin: -8rpx 0 28rpx; }
+.pane { animation: popSoft .25s ease both; }
+.label-gap { margin-top: 28rpx; }
+
+/* 输入框 */
+.field-input--icon { margin-left: 18rpx; }
+.field-clear { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; flex-shrink: 0; margin-left: 12rpx; border-radius: 50%; background: var(--text4); }
+.code-btn { display: flex; align-items: center; justify-content: center; min-width: 156rpx; height: 64rpx; flex-shrink: 0; margin: 0 -14rpx 0 16rpx; padding: 0 22rpx; border-radius: 22rpx; background: var(--primary-light); color: var(--primary); font-size: 25rpx; font-weight: 700; white-space: nowrap; transition: opacity .2s ease, transform .15s ease; }
+.code-btn.is-disabled { opacity: .5; }
+.eye { display: flex; align-items: center; justify-content: center; width: 64rpx; height: 64rpx; margin-right: -12rpx; }
+
+.domains { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 16rpx; }
+.domain-chip { padding: 8rpx 22rpx; font-weight: 600; }
+
+/* 6 位验证码格子 */
+.otp { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14rpx; }
+.otp__box { display: flex; align-items: center; justify-content: center; height: 100rpx; border: 3rpx solid var(--border); border-radius: 26rpx; background: var(--bg); transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease; }
+.otp__box.is-filled { border-color: var(--border2); background: var(--card); }
+.otp__box.is-active { border-color: var(--primary); background: var(--card); box-shadow: 0 0 0 8rpx rgba(232, 115, 74, .10); }
+.otp__digit { color: var(--text); font-size: 42rpx; font-weight: 800; }
+.otp__caret { width: 4rpx; height: 44rpx; border-radius: 2rpx; background: var(--primary); animation: caret 1s steps(1) infinite; }
+.otp__input { position: absolute; top: 0; left: -3000rpx; width: 200rpx; height: 100rpx; opacity: 0; }
+@keyframes caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+.submit { margin-top: 36rpx; }
+
+/* 微信登录 */
+.pane--wechat { display: flex; flex-direction: column; align-items: center; padding-top: 8rpx; text-align: center; }
+.wx-badge { display: flex; align-items: center; justify-content: center; width: 112rpx; height: 112rpx; margin-bottom: 20rpx; border-radius: 36rpx; background: linear-gradient(135deg, #E9FAF1 0%, #D5F5E4 100%); box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, .9), 0 16rpx 40rpx rgba(7, 193, 96, .14); }
+.wx-title { color: var(--text); font-size: 34rpx; font-weight: 800; }
+.wx-desc { margin: 8rpx 0 36rpx; color: var(--text3); font-size: 24rpx; }
+.wx-alt { display: flex; align-items: center; gap: 4rpx; margin-top: 28rpx; color: var(--primary); font-size: 24rpx; font-weight: 600; }
+
+/* 底部协议 */
+.footer { margin-top: auto; padding-top: 40rpx; }
+.consent { display: flex; align-items: flex-start; justify-content: center; gap: 14rpx; padding: 16rpx 16rpx; border-radius: 24rpx; transition: background-color .25s ease; }
+.consent.is-hint { background: rgba(232, 115, 74, .10); }
+.check { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; flex-shrink: 0; margin-top: 3rpx; border: 3rpx solid var(--text4); border-radius: 50%; background: #fff; transition: background-color .2s ease, border-color .2s ease; }
+.consent.is-hint .check { border-color: var(--primary); }
+.check.is-on { border-color: var(--primary); background: var(--primary); animation: pop .3s ease; }
+.consent__text { color: var(--text2); font-size: 24rpx; line-height: 1.6; }
+.link { color: var(--primary); font-weight: 600; }
+.safe-note { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 12rpx; color: var(--text3); font-size: 21rpx; }
+
+/* 协议确认弹层 */
+.consent-sheet { padding: 8rpx 40rpx 24rpx; }
+.consent-sheet__docs { overflow: hidden; margin-bottom: 36rpx; border: 1px solid var(--border); border-radius: 32rpx; }
+.doc-row { display: flex; align-items: center; gap: 22rpx; padding: 26rpx 28rpx; transition: background-color .15s ease; }
+.doc-row + .doc-row { border-top: 1px solid var(--border); }
+.consent-sheet__cancel { margin-top: 12rpx; color: var(--text3); font-weight: 600; }

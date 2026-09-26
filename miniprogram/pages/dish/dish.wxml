@@ -1,0 +1,219 @@
+<nav-bar theme="transparent" fixed="{{true}}" opacity="{{navOpacity}}" title="{{dish ? dish.name : '菜品详情'}}" subtitle="{{dish ? dish.category : ''}}">
+  <button wx:if="{{dish}}" class="btn-reset nav-action" open-type="share" hover-class="tap-active" aria-label="分享菜品">
+    <icon name="share-2" size="32" stroke="2.3" color="text2" />
+  </button>
+  <view wx:if="{{canEdit}}" class="nav-action" hover-class="tap-active" bindtap="editDish" aria-role="button" aria-label="编辑菜品">
+    <icon name="pencil" size="32" stroke="2.3" color="text2" />
+  </view>
+</nav-bar>
+
+<!-- 加载中骨架 -->
+<view wx:if="{{loading}}" class="detail-skeleton">
+  <view class="skeleton hero-skeleton" style="height:{{heroHeight}}rpx;"></view>
+  <view class="detail">
+    <view class="skeleton sk-title"></view>
+    <view class="flex gap-16 mt-24"><view class="skeleton sk-chip"></view><view class="skeleton sk-chip"></view><view class="skeleton sk-chip"></view></view>
+    <view class="skeleton sk-block"></view>
+    <view class="skeleton sk-block short"></view>
+  </view>
+</view>
+
+<!-- 不存在 -->
+<view wx:elif="{{notFound || !dish}}" class="missing">
+  <empty emoji="🍽" title="菜品不存在" desc="可能已被删除，或者你没有查看权限">
+    <view class="btn btn-primary" hover-class="tap-active" bindtap="goHome">回到首页</view>
+  </empty>
+</view>
+
+<block wx:else>
+  <!-- 头图（多图时可左右滑动，点击查看大图） -->
+  <view class="hero" style="height:{{heroHeight}}rpx;">
+    <swiper wx:if="{{gallery.length > 1}}" class="hero__swiper" circular autoplay="{{false}}" bindchange="onGalleryChange">
+      <swiper-item wx:for="{{gallery}}" wx:key="*this" data-index="{{index}}" bindtap="previewGallery">
+        <dish-image src="{{item}}" emoji="{{dish.emoji}}" emoji-size="160" lazy="{{false}}" />
+      </swiper-item>
+    </swiper>
+    <view wx:else class="hero__single" data-index="0" bindtap="previewGallery">
+      <dish-image src="{{dish.cover}}" emoji="{{dish.emoji}}" emoji-size="160" lazy="{{false}}" />
+    </view>
+    <view class="hero__shade"></view>
+    <view class="hero__fade"></view>
+    <view wx:if="{{gallery.length > 1}}" class="hero__counter">{{galleryIndex + 1}} / {{gallery.length}}</view>
+    <view class="hero__fav {{favAnim ? 'anim-heartbeat' : ''}}" hover-class="tap-active" bindtap="toggleFavorite" aria-role="button" aria-label="{{favorite ? '取消收藏' : '收藏'}}">
+      <icon name="heart" size="42" stroke="2.3" color="{{favorite ? 'primary' : 'text2'}}" fill="{{favorite}}" />
+    </view>
+  </view>
+
+  <view class="detail">
+    <view class="dish-name">{{dish.name}}</view>
+    <view class="chips">
+      <text wx:for="{{chips}}" wx:key="key" class="chip chip-{{item.tone}}">{{item.text}}</text>
+    </view>
+    <view wx:if="{{tags.length}}" class="chips tag-row">
+      <text wx:for="{{tags}}" wx:key="*this" class="chip chip-sm chip-ghost">#{{item}}</text>
+    </view>
+
+    <!-- 小贴士 -->
+    <view wx:if="{{dish.remark}}" class="tip">
+      <view class="tip__title">💡 小贴士</view>
+      <view class="tip__text">{{dish.remark}}</view>
+    </view>
+
+    <!-- 做菜记录 -->
+    <view wx:if="{{stats}}" class="card card-pad stats">
+      <view class="flex items-center justify-between">
+        <view class="flex items-center gap-16">
+          <text class="stats__title">做菜记录</text>
+          <text class="mastery mastery-{{mastery.tone}}">{{mastery.icon}} {{mastery.label}}</text>
+        </view>
+        <text class="t-xs c-text3">做了 {{stats.total_count}} 次</text>
+      </view>
+      <view class="grid-3 stats__grid">
+        <view class="mini-stat"><view class="mini-stat__value c-primary">{{stats.lunch_count}}</view><view class="mini-stat__label">午餐</view></view>
+        <view class="mini-stat"><view class="mini-stat__value c-mint">{{stats.dinner_count}}</view><view class="mini-stat__label">晚餐</view></view>
+        <view class="mini-stat"><view class="mini-stat__value">{{stats.avg_interval > 0 ? stats.avg_interval + '天' : '-'}}</view><view class="mini-stat__label">平均间隔</view></view>
+      </view>
+      <view wx:if="{{lastDate}}" class="t-xs c-text3 mt-16">上次做：{{lastDate}}</view>
+      <view wx:if="{{moodBar.length}}" class="mood">
+        <view class="t-xs c-text3">满意度</view>
+        <view class="mood__bar">
+          <view wx:for="{{moodBar}}" wx:key="key" class="mood__seg seg-{{item.tone}}" style="width:{{item.pct}}%;"></view>
+        </view>
+        <view class="mood__legend">
+          <view wx:for="{{moodBar}}" wx:key="key" class="mood__item"><view class="mood__dot seg-{{item.tone}}"></view>{{item.label}} {{item.pct}}%</view>
+        </view>
+      </view>
+      <view wx:if="{{ratingStars.length}}" class="rating">
+        <text class="t-xs c-text3">平均评分</text>
+        <view class="flex items-center">
+          <icon wx:for="{{ratingStars}}" wx:key="n" name="star" size="24" stroke="2" color="{{item.on ? 'yellow' : 'text4'}}" fill="{{item.on}}" />
+        </view>
+        <text class="t-xs bold">{{avgRating}}</text>
+      </view>
+    </view>
+
+    <!-- 教程视频 -->
+    <view wx:if="{{dish.videoUrl}}" class="video-btn" hover-class="tap-active" bindtap="copyVideo">
+      <icon name="video" size="32" stroke="2.3" color="pink-ink" />
+      <text>观看教程视频</text>
+      <text class="video-btn__hint">复制链接</text>
+    </view>
+
+    <!-- 食材 -->
+    <view wx:if="{{ingredients.length || seasonings.length}}" class="block">
+      <view class="block-head">
+        <view class="block-title">🥬 食材</view>
+        <view class="portion">
+          <view wx:for="{{portions}}" wx:key="*this" class="portion__item {{portion === item ? 'is-active' : ''}}" data-value="{{item}}" bindtap="choosePortion">{{item}}人份</view>
+        </view>
+      </view>
+      <view class="prep-hint">点一下食材标记“已备好”<text wx:if="{{preparedCount}}" class="c-mint bold"> · 已备好 {{preparedCount}}/{{ingredients.length + seasonings.length}}</text></view>
+      <block wx:if="{{ingredients.length}}">
+        <view class="sub-title">配料</view>
+        <view class="grid-3">
+          <view wx:for="{{ingredients}}" wx:key="key" class="ing {{item.done ? 'is-done' : ''}}" data-key="{{item.key}}" bindtap="togglePrepared" hover-class="tap-active" hover-stay-time="60">
+            <view wx:if="{{item.done}}" class="ing__check"><icon name="check" size="18" stroke="3.4" color="white" /></view>
+            <view class="ing__name">{{item.name}}</view>
+            <view wx:if="{{item.amount}}" class="ing__amount">{{item.amount}}</view>
+          </view>
+        </view>
+      </block>
+      <block wx:if="{{seasonings.length}}">
+        <view class="sub-title">调料</view>
+        <view class="grid-3">
+          <view wx:for="{{seasonings}}" wx:key="key" class="ing {{item.done ? 'is-done' : ''}}" data-key="{{item.key}}" bindtap="togglePrepared" hover-class="tap-active" hover-stay-time="60">
+            <view wx:if="{{item.done}}" class="ing__check"><icon name="check" size="18" stroke="3.4" color="white" /></view>
+            <view class="ing__name">{{item.name}}</view>
+            <view wx:if="{{item.amount}}" class="ing__amount">{{item.amount}}</view>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <!-- 制作步骤 -->
+    <view wx:if="{{steps.length}}" class="block">
+      <view class="block-title">📝 制作步骤</view>
+      <view class="steps">
+        <view wx:for="{{steps}}" wx:key="index" class="step">
+          <view class="step__num">{{index + 1}}</view>
+          <view class="step__body">
+            <view class="step__text">{{item.text}}</view>
+            <view wx:if="{{item.time}}" class="step__time"><icon name="timer" size="22" stroke="2.4" color="text3" /><text>{{item.time}} 分钟</text></view>
+            <image wx:if="{{item.image}}" class="step__image" src="{{item.image}}" mode="aspectFill" lazy-load webp data-url="{{item.image}}" bindtap="previewStep" />
+          </view>
+          <view class="step__play" hover-class="tap-active" data-step="{{index}}" bindtap="startCooking" aria-role="button" aria-label="从第 {{index + 1}} 步开始">
+            <icon name="play" size="26" stroke="2.4" color="mint-ink" fill />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="btn btn-lg btn-block btn-primary-glow cook-btn" hover-class="tap-active" data-step="0" bindtap="startCooking">
+      <icon name="chef-hat" size="36" stroke="2.3" color="white" />
+      <text>开始做菜</text>
+    </view>
+
+    <!-- 做菜回忆 -->
+    <view wx:if="{{records.length}}" class="block">
+      <view class="section-head"><view class="section-title">📜 做菜回忆</view></view>
+      <view wx:if="{{photos.length}}" class="memories">
+        <view class="t-xs c-text3 mb-16">📷 回忆照片 ({{photos.length}})</view>
+        <scroll-view class="memories__strip" scroll-x enhanced show-scrollbar="{{false}}">
+          <image wx:for="{{photos}}" wx:key="*this" class="memories__photo" src="{{item}}" mode="aspectFill" lazy-load webp data-url="{{item}}" bindtap="previewMemory" />
+        </scroll-view>
+      </view>
+      <view class="timeline">
+        <view class="timeline__line"></view>
+        <view wx:for="{{records}}" wx:key="id" class="tl-item">
+          <view class="tl-dot"><view class="tl-dot__core {{item.lunch ? 'is-lunch' : 'is-dinner'}}"></view></view>
+          <view class="card tl-card">
+            <view class="flex items-center justify-between">
+              <view class="flex items-center gap-12">
+                <text class="t-sm bold">{{item.date}}</text>
+                <text class="t-2xs c-text3">{{item.weekday}}</text>
+                <text class="chip chip-sm {{item.lunch ? 'chip-primary' : 'chip-mint'}}">{{item.lunch ? '午餐' : '晚餐'}}</text>
+              </view>
+              <text wx:if="{{item.mood}}" class="tl-mood">{{item.mood}}</text>
+            </view>
+            <view wx:if="{{item.stars.length || item.homeMood || item.remark}}" class="tl-meta">
+              <view wx:if="{{item.stars.length}}" class="flex items-center">
+                <icon wx:for="{{item.stars}}" wx:for-item="star" wx:key="n" name="star" size="20" stroke="2" color="{{star.on ? 'yellow' : 'text4'}}" fill="{{star.on}}" />
+              </view>
+              <text wx:if="{{item.homeMood}}" class="chip chip-sm chip-ghost">{{item.homeMood}}</text>
+              <text wx:if="{{item.remark}}" class="t-xs c-text2">“{{item.remark}}”</text>
+            </view>
+            <view wx:if="{{item.photos.length}}" class="tl-photos">
+              <image wx:for="{{item.photos}}" wx:for-item="url" wx:key="*this" class="tl-photo" src="{{url}}" mode="aspectFill" lazy-load webp data-url="{{url}}" bindtap="previewMemory" />
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 同类菜品 -->
+    <view wx:if="{{similar.length}}" class="block">
+      <view class="section-head"><view class="section-title">🍽 同类菜品</view></view>
+      <scroll-view class="similar" scroll-x enhanced show-scrollbar="{{false}}">
+        <view wx:for="{{similar}}" wx:key="id" class="similar__item">
+          <dish-card dish="{{item}}" image-height="200" />
+        </view>
+      </scroll-view>
+    </view>
+
+    <view class="bottom-space"></view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="action-bar">
+    <view class="btn flex-1 {{todayLunch ? 'btn-done' : 'btn-primary'}}" hover-class="tap-active" data-meal="lunch" bindtap="recordMeal">
+      <view wx:if="{{recording === 'lunch'}}" class="spinner"></view>
+      <text wx:else>{{todayLunch ? '✓ 已记入午餐' : '🍳 中午吃这个'}}</text>
+    </view>
+    <view class="btn flex-1 {{todayDinner ? 'btn-done' : 'btn-mint'}}" hover-class="tap-active" data-meal="dinner" bindtap="recordMeal">
+      <view wx:if="{{recording === 'dinner'}}" class="spinner"></view>
+      <text wx:else>{{todayDinner ? '✓ 已记入晚餐' : '🍲 晚上吃这个'}}</text>
+    </view>
+  </view>
+</block>
+
+<confetti id="confetti" />

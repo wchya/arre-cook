@@ -1,0 +1,10 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#FAFAF8",
+  "disableScroll": true,
+  "usingComponents": {
+    "nav-bar": "/components/nav-bar/index",
+    "dish-image": "/components/dish-image/index",
+    "icon": "/components/icon/index"
+  }
+}

@@ -1,0 +1,138 @@
+<nav-bar icon="sparkles" title="AI 推荐官" subtitle="按你的口味画像点菜，也能聊着问做法" />
+
+<view class="content page anim-fade-up">
+  <!-- 口味画像 -->
+  <view wx:if="{{profileLoading}}" class="skeleton profile-sk"></view>
+  <view wx:elif="{{profile}}" class="card card-pad" hover-class="tap-active" hover-stay-time="80" bindtap="goProfile">
+    <view class="flex items-start gap-24 mb-24">
+      <view class="head-icon tone-purple"><icon name="bot" size="44" stroke="2.4" color="purple" /></view>
+      <view class="flex-1">
+        <view class="card-title">你的口味画像</view>
+        <view class="card-sub">近 {{profile.windowDays}} 天 · 推荐官据此为你点菜</view>
+      </view>
+      <icon name="chevron-right" size="30" color="text4" />
+    </view>
+    <view class="summary">{{profile.summary}}</view>
+    <view class="grid-4 metrics">
+      <view class="metric"><view class="metric__value c-primary">{{profile.spicy}}</view><view class="metric__label">辣味占比</view></view>
+      <view class="metric"><view class="metric__value">{{profile.records}}</view><view class="metric__label">餐次</view></view>
+      <view class="metric"><view class="metric__value">{{profile.distinct}}</view><view class="metric__label">不同菜</view></view>
+      <view class="metric"><view class="metric__value">{{profile.avgTime}}</view><view class="metric__label">平均耗时</view></view>
+    </view>
+    <view class="grid-2 bars">
+      <view>
+        <view class="bars__title">口味偏好</view>
+        <view wx:if="{{!tasteBars.length}}" class="t-xs c-text3">还没有足够的记录</view>
+        <view wx:for="{{tasteBars}}" wx:key="name" class="bar">
+          <text class="bar__name truncate">{{item.name}}</text>
+          <view class="bar__track"><view class="bar__fill" style="width:{{item.width}}%;"></view></view>
+          <text class="bar__pct">{{item.pct}}</text>
+        </view>
+      </view>
+      <view>
+        <view class="bars__title">常吃菜系</view>
+        <view wx:if="{{!categoryBars.length}}" class="t-xs c-text3">还没有足够的记录</view>
+        <view wx:for="{{categoryBars}}" wx:key="name" class="bar">
+          <text class="bar__name truncate">{{item.name}}</text>
+          <view class="bar__track"><view class="bar__fill bar__fill--mint" style="width:{{item.width}}%;"></view></view>
+          <text class="bar__pct">{{item.pct}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{profileTags.length}}" class="chips profile-tags">
+      <text wx:for="{{profileTags}}" wx:key="key" class="chip chip-{{item.tone}} bold">{{item.text}}</text>
+    </view>
+  </view>
+
+  <!-- 条件 -->
+  <view class="card card-pad mt-32">
+    <view class="flex items-center justify-between mb-24">
+      <view>
+        <view class="card-title">今天想怎么吃</view>
+        <view class="card-sub">条件会和口味画像一起打分</view>
+      </view>
+      <view class="btn btn-sm btn-primary {{picking ? 'is-disabled' : ''}}" hover-class="tap-active" bindtap="recommend">
+        <icon name="refresh-cw" size="26" stroke="2.5" color="white" class="{{picking ? 'spin' : ''}}" />
+        <text>{{items.length ? '再来一批' : '给我推荐'}}</text>
+      </view>
+    </view>
+
+    <view class="flex gap-16 mb-24">
+      <view wx:for="{{meals}}" wx:key="key" class="opt flex-1 {{meal === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" bindtap="pickMeal">{{item.label}}</view>
+    </view>
+
+    <scroll-view class="mood-row" scroll-x enhanced show-scrollbar="{{false}}">
+      <view wx:for="{{moods}}" wx:key="key" class="opt opt--inline {{mood === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" bindtap="pickMood">
+        <icon name="{{item.icon}}" size="28" stroke="2.4" color="{{mood === item.key ? 'primary' : 'text2'}}" />
+        <text>{{item.label}}</text>
+      </view>
+    </scroll-view>
+
+    <view class="label">想要的口味（可多选）</view>
+    <view class="chips mb-24">
+      <view wx:for="{{tasteOptions}}" wx:key="name" class="pill {{item.on ? 'is-on' : ''}}" data-index="{{index}}" bindtap="toggleTaste">{{item.name}}</view>
+    </view>
+
+    <view class="label">烹饪时间</view>
+    <view class="flex gap-12 mb-24">
+      <view wx:for="{{cookTimes}}" wx:key="value" class="pill pill--time flex-1 {{maxCookTime === item.value ? 'is-mint' : ''}}" data-value="{{item.value}}" bindtap="pickCookTime">{{item.label}}</view>
+    </view>
+
+    <view class="grid-2">
+      <view>
+        <view class="label">想用的食材</view>
+        <view class="field input-sm"><input class="field-input" value="{{includeText}}" placeholder="如：牛肉 青椒" placeholder-class="placeholder" bindinput="onInclude" /></view>
+      </view>
+      <view>
+        <view class="label">忌口 / 不想吃</view>
+        <view class="field input-sm"><input class="field-input" value="{{excludeText}}" placeholder="如：香菜 内脏" placeholder-class="placeholder" bindinput="onExclude" /></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 推荐结果 -->
+  <view wx:if="{{items.length}}" id="results" class="mt-32">
+    <view class="flex items-center justify-between mb-24">
+      <view class="card-title">为你挑了 {{items.length}} 道</view>
+      <view wx:if="{{summary}}" class="result-summary truncate">{{summary}}</view>
+    </view>
+    <view wx:for="{{items}}" wx:key="id" class="card result anim-pop-soft">
+      <view class="result__main">
+        <view class="result__thumb" data-id="{{item.id}}" bindtap="openDish"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="64" /></view>
+        <view class="flex-1">
+          <view class="flex items-start justify-between gap-12">
+            <view class="result__name truncate" data-id="{{item.id}}" bindtap="openDish">{{item.name}}</view>
+            <text class="score">匹配 {{item.score}}</text>
+          </view>
+          <view class="chips result__chips">
+            <text class="chip chip-sm chip-ghost">{{item.category}}</text>
+            <text class="chip chip-sm chip-ghost">⏱ {{item.cookTime ? item.cookTime + '分钟' : '时间未填'}}</text>
+            <text class="chip chip-sm chip-ghost">{{item.diffLabel}}</text>
+            <text wx:if="{{item.taste}}" class="chip chip-sm chip-pink">{{item.taste}}</text>
+          </view>
+          <view class="result__reasons">
+            <text wx:for="{{item.reasons}}" wx:for-item="reason" wx:key="*this" class="reason">💡 {{reason}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="result__actions">
+        <view class="btn btn-sm btn-primary flex-1 {{busyId ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-meal="lunch" bindtap="eat">🍳 中午吃</view>
+        <view class="btn btn-sm btn-mint flex-1 {{busyId ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-meal="dinner" bindtap="eat">🍲 晚上吃</view>
+        <view class="dislike" hover-class="tap-active" data-id="{{item.id}}" bindtap="reject" aria-role="button" aria-label="不想吃，换一道"><icon name="thumbs-down" size="28" stroke="2.4" color="text3" /></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 对话入口 -->
+  <view class="card chat-entry mt-32" hover-class="tap-active" hover-stay-time="80" bindtap="goChat">
+    <view class="head-icon tone-primary"><icon name="message-circle" size="44" stroke="2.4" color="primary" /></view>
+    <view class="flex-1">
+      <view class="card-title">和食谱小助手聊聊</view>
+      <view class="card-sub">问做法、排一周菜单、按冰箱食材配菜</view>
+    </view>
+    <icon name="chevron-right" size="30" color="text3" />
+  </view>
+  <view class="safe-space"></view>
+</view>
+
+<confetti id="confetti" />

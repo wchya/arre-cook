@@ -1,0 +1,20 @@
+<view class="tabbar">
+  <view class="tabbar__grid">
+    <view wx:for="{{left}}" wx:key="path" class="tab {{selected === item.index ? 'is-active' : ''}}" data-index="{{item.index}}" bindtap="switchTab" hover-class="tab--press" hover-stay-time="60" aria-role="tab" aria-label="{{item.text}}">
+      <view class="tab__pill"><icon name="{{item.icon}}" size="38" stroke="{{selected === item.index ? 2.6 : 2.1}}" color="{{selected === item.index ? 'primary' : 'text3'}}" /></view>
+      <text class="tab__label">{{item.text}}</text>
+    </view>
+
+    <view class="tab-center">
+      <view class="ai-btn" bindtap="openAssistant" hover-class="ai-btn--press" hover-stay-time="80" aria-role="button" aria-label="AI 食谱助手">
+        <icon name="sparkles" size="46" stroke="2.3" color="white" />
+        <text class="ai-btn__label">AI 助手</text>
+      </view>
+    </view>
+
+    <view wx:for="{{right}}" wx:key="path" class="tab {{selected === item.index ? 'is-active' : ''}}" data-index="{{item.index}}" bindtap="switchTab" hover-class="tab--press" hover-stay-time="60" aria-role="tab" aria-label="{{item.text}}">
+      <view class="tab__pill"><icon name="{{item.icon}}" size="38" stroke="{{selected === item.index ? 2.6 : 2.1}}" color="{{selected === item.index ? 'primary' : 'text3'}}" /></view>
+      <text class="tab__label">{{item.text}}</text>
+    </view>
+  </view>
+</view>

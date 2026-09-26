@@ -1,0 +1,5 @@
+:host { display: block; width: 100%; height: 100%; }
+.dimg { position: relative; width: 100%; height: 100%; overflow: hidden; background: linear-gradient(135deg, var(--primary-light) 0%, var(--pink-light) 100%); }
+.dimg__img { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .35s ease; }
+.dimg__img.is-loaded { opacity: 1; }
+.dimg__fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; line-height: 1; }

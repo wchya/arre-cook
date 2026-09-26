@@ -1,0 +1,23 @@
+<nav-bar icon="bell" title="站内信" subtitle="{{unread ? unread + ' 条未读消息' : '消息与服务提醒'}}">
+  <view wx:if="{{unread}}" class="mark-all {{marking ? 'tap-fade' : ''}}" hover-class="tap-active" bindtap="markAll"><icon name="check" size="24" stroke="2.8" color="primary" /><text>全部已读</text></view>
+</nav-bar>
+
+<view class="content anim-fade-up">
+  <view wx:if="{{loading}}"><view wx:for="{{[1, 2, 3]}}" wx:key="*this" class="skeleton sk"></view></view>
+  <view wx:elif="{{!items.length}}" class="card">
+    <empty emoji="📭" title="暂无站内信" desc="系统更新、健康提醒和安全事件会显示在这里" compact />
+  </view>
+  <view wx:for="{{items}}" wx:key="id" class="note {{item.read ? '' : 'is-unread'}}" hover-class="tap-active" hover-stay-time="80" data-id="{{item.id}}" bindtap="open">
+    <view class="note__icon tone-{{item.tone}}"><icon name="{{item.icon}}" size="34" stroke="2.3" color="{{item.color}}" /></view>
+    <view class="flex-1">
+      <view class="flex items-center gap-12">
+        <text class="note__title truncate">{{item.title}}</text>
+        <view wx:if="{{!item.read}}" class="note__dot"></view>
+      </view>
+      <text class="note__content" user-select>{{item.content}}</text>
+      <view class="note__meta">{{item.label}} · {{item.time}}</view>
+    </view>
+    <icon wx:if="{{item.link}}" name="chevron-right" size="30" color="text4" />
+  </view>
+  <view class="safe-space"></view>
+</view>

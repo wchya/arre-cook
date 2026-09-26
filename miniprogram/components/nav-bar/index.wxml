@@ -1,0 +1,21 @@
+<view
+  class="nav nav--{{theme}} {{fixed ? 'nav--fixed' : ''}}"
+  style="padding-top:{{statusBarHeight}}px;{{theme === 'transparent' ? 'background-color: rgba(250, 250, 248, ' + opacity + ');' : ''}}"
+>
+  <view class="nav__bar" style="height:{{navBarHeight}}px;padding-right:{{capsuleSpace}}px;">
+    <view wx:if="{{showBack}}" class="nav__btn" hover-class="tap-active" hover-stay-time="80" bindtap="onBack" aria-role="button" aria-label="返回">
+      <icon name="arrow-left" size="36" stroke="2.4" color="{{theme === 'dark' ? 'white' : 'text2'}}" />
+    </view>
+    <view wx:elif="{{showHome}}" class="nav__btn" hover-class="tap-active" hover-stay-time="80" bindtap="onHome" aria-role="button" aria-label="回到首页">
+      <icon name="house" size="34" stroke="2.3" color="{{theme === 'dark' ? 'white' : 'text2'}}" />
+    </view>
+    <view wx:if="{{icon}}" class="nav__icon" style="{{theme === 'transparent' ? 'opacity:' + opacity : ''}}">
+      <icon name="{{icon}}" size="42" stroke="2.45" color="primary" />
+    </view>
+    <view class="nav__titles" style="{{theme === 'transparent' ? 'opacity:' + opacity : ''}}">
+      <view class="nav__title">{{title}}<text wx:if="{{accent}}" class="nav__accent">{{accent}}</text></view>
+      <view wx:if="{{subtitle}}" class="nav__subtitle">{{subtitle}}</view>
+    </view>
+    <view class="nav__extra"><slot></slot></view>
+  </view>
+</view>

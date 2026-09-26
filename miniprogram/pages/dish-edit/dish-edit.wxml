@@ -1,0 +1,132 @@
+<nav-bar title="{{isNew ? '新建私房菜' : '编辑菜品'}}" subtitle="只有你自己看得到" icon="chef-hat" />
+
+<view class="content anim-fade-up de-body">
+  <view class="card de-sec">
+    <view class="de-sec__title"><icon name="notebook-pen" size="26" stroke="2.4" color="primary" /><text>基本信息</text></view>
+
+    <view class="de-field">
+      <view class="field-label">菜品名称 *</view>
+      <view class="field {{focusKey === 'name' ? 'is-focus' : ''}}">
+        <input class="field-input" value="{{name}}" maxlength="30" placeholder="如：番茄炒蛋" placeholder-class="placeholder" data-key="name" bindfocus="onFocus" bindblur="onBlur" bindinput="onName" />
+      </view>
+    </view>
+
+    <view class="de-field">
+      <view class="field-label">分类</view>
+      <view class="chips">
+        <view wx:for="{{categories}}" wx:key="*this" class="chip {{category === item ? 'chip-solid' : 'chip-ghost'}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseCategory">{{item}}</view>
+      </view>
+    </view>
+
+    <view class="de-field">
+      <view class="field-label">适合餐次</view>
+      <view class="segmented de-seg">
+        <view class="segmented-thumb" style="{{mealStyle}}"></view>
+        <view wx:for="{{meals}}" wx:key="value" class="segmented-item {{mealType === item.value ? 'is-active' : ''}}" data-value="{{item.value}}" bindtap="chooseMeal">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="de-field">
+      <view class="field-label">难度</view>
+      <view class="segmented de-seg">
+        <view class="segmented-thumb" style="{{diffStyle}}"></view>
+        <view wx:for="{{diffs}}" wx:key="value" class="segmented-item {{difficulty === item.value ? 'is-active' : ''}}" data-value="{{item.value}}" bindtap="chooseDiff">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="de-field">
+      <view class="field-label">口味（可多选）</view>
+      <tag-input value="{{tasteList}}" suggestions="{{tastes}}" tone="primary" placeholder="添加口味，回车确认" bind:change="onTasteChange" />
+    </view>
+
+    <view class="de-field flex gap-24">
+      <view class="flex-1">
+        <view class="field-label">烹饪时间</view>
+        <view class="de-num">
+          <view class="de-num__btn" hover-class="tap-active" data-delta="-5" bindtap="stepCook"><icon name="minus" size="28" stroke="2.6" color="text2" /></view>
+          <text class="de-num__val">{{cookTime}}</text>
+          <view class="de-num__btn" hover-class="tap-active" data-delta="5" bindtap="stepCook"><icon name="plus" size="28" stroke="2.6" color="text2" /></view>
+          <text class="de-num__unit">分钟</text>
+        </view>
+      </view>
+      <view class="flex-1">
+        <view class="field-label">排序权重</view>
+        <view class="de-num">
+          <view class="de-num__btn" hover-class="tap-active" data-delta="-1" bindtap="stepSort"><icon name="minus" size="28" stroke="2.6" color="text2" /></view>
+          <text class="de-num__val">{{sortOrder}}</text>
+          <view class="de-num__btn" hover-class="tap-active" data-delta="1" bindtap="stepSort"><icon name="plus" size="28" stroke="2.6" color="text2" /></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card de-sec">
+    <view class="de-sec__title"><icon name="image" size="26" stroke="2.4" color="primary" /><text>图片与视频</text></view>
+    <view class="de-field">
+      <view class="field-label">主图</view>
+      <view class="de-cover" hover-class="tap-fade" bindtap="pickCover">
+        <image wx:if="{{cover}}" class="de-cover__img" src="{{cover}}" mode="aspectFill" webp />
+        <view wx:else class="de-cover__ph"><icon name="camera" size="52" stroke="2" color="text3" /><text>点击上传主图</text></view>
+        <view class="de-cover__badge">
+          <view wx:if="{{uploadingCover}}" class="spinner spinner-dark"></view>
+          <block wx:else><icon name="camera" size="22" stroke="2.4" color="white" /><text>{{cover ? '更换' : '上传'}}</text></block>
+        </view>
+      </view>
+    </view>
+    <view class="de-field">
+      <view class="field-label">更多图片</view>
+      <view class="de-thumbs">
+        <view wx:for="{{imageThumbs}}" wx:key="*this" class="de-thumb">
+          <image class="de-thumb__img" src="{{item}}" mode="aspectFill" webp />
+          <view class="de-thumb__del" catchtap="removeImage" data-index="{{index}}"><icon name="x" size="24" stroke="2.6" color="white" /></view>
+        </view>
+        <view class="de-add" hover-class="tap-active" bindtap="pickExtra">
+          <view wx:if="{{uploadingExtra}}" class="spinner"></view>
+          <block wx:else><icon name="plus" size="34" stroke="2.4" color="text3" /><text>添加</text></block>
+        </view>
+      </view>
+    </view>
+    <view class="de-field">
+      <view class="field-label">教程视频链接</view>
+      <view class="field {{focusKey === 'video' ? 'is-focus' : ''}}">
+        <input class="field-input" value="{{videoUrl}}" placeholder="B站 / 抖音 / YouTube 链接" placeholder-class="placeholder" data-key="video" bindfocus="onFocus" bindblur="onBlur" bindinput="onVideo" />
+      </view>
+    </view>
+  </view>
+
+  <view class="card de-sec">
+    <view class="de-sec__title"><icon name="soup" size="26" stroke="2.4" color="primary" /><text>食材与步骤</text></view>
+    <view class="de-field">
+      <view class="field-label">配料清单</view>
+      <textarea class="field-textarea {{focusKey === 'ing' ? 'is-focus' : ''}}" value="{{ingredientsText}}" placeholder="每行一样，如：番茄 2个" placeholder-class="placeholder" data-key="ing" bindfocus="onFocus" bindblur="onBlur" bindinput="onIngredients" auto-height />
+      <view class="field-hint">每行「名称 数量」，最后一段作为数量</view>
+    </view>
+    <view class="de-field">
+      <view class="field-label">调料清单</view>
+      <textarea class="field-textarea {{focusKey === 'sea' ? 'is-focus' : ''}}" value="{{seasoningsText}}" placeholder="如：盐 1茶匙" placeholder-class="placeholder" data-key="sea" bindfocus="onFocus" bindblur="onBlur" bindinput="onSeasonings" auto-height />
+    </view>
+    <view class="de-field">
+      <view class="field-label">制作步骤</view>
+      <textarea class="field-textarea {{focusKey === 'step' ? 'is-focus' : ''}}" value="{{stepsText}}" placeholder="每行一步，可写 (3分钟) 标注时间" placeholder-class="placeholder" data-key="step" bindfocus="onFocus" bindblur="onBlur" bindinput="onSteps" auto-height />
+    </view>
+  </view>
+
+  <view class="card de-sec">
+    <view class="de-sec__title"><icon name="tag" size="26" stroke="2.4" color="primary" /><text>标签与备注</text></view>
+    <view class="de-field">
+      <view class="field-label">标签</view>
+      <tag-input value="{{tags}}" tone="primary" placeholder="添加标签，回车确认" bind:change="onTagsChange" />
+    </view>
+    <view class="de-field">
+      <view class="field-label">备注</view>
+      <textarea class="field-textarea {{focusKey === 'remark' ? 'is-focus' : ''}}" value="{{remark}}" placeholder="烹饪小贴士、注意事项…" placeholder-class="placeholder" data-key="remark" bindfocus="onFocus" bindblur="onBlur" bindinput="onRemark" auto-height />
+    </view>
+  </view>
+</view>
+
+<view class="de-save">
+  <view class="btn btn-primary btn-lg btn-block {{name && !saving ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="save">
+    <view wx:if="{{saving}}" class="spinner"></view>
+    <block wx:else><icon name="check" size="30" stroke="2.6" color="white" /><text>{{isNew ? '创建私房菜' : '保存修改'}}</text></block>
+  </view>
+</view>

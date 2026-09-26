@@ -1,0 +1,12 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#FAFAF8",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark",
+  "usingComponents": {
+    "nav-bar": "/components/nav-bar/index",
+    "icon": "/components/icon/index",
+    "sheet": "/components/sheet/index",
+    "empty": "/components/empty/index"
+  }
+}

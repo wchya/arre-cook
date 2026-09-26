@@ -1,0 +1,60 @@
+<nav-bar icon="images" title="照片墙" subtitle="把饭桌上的片刻收起来">
+  <text wx:if="{{totalPhotos}}" class="meta-pill">{{totalDays}} 天 · {{totalPhotos}} 张</text>
+</nav-bar>
+
+<view class="content anim-fade-up">
+  <view wx:if="{{loading}}" class="tl">
+    <view wx:for="{{[0,1,2]}}" wx:key="*this" class="tl-item">
+      <view class="skeleton sk-title"></view>
+      <view class="skeleton sk-card"></view>
+    </view>
+  </view>
+
+  <view wx:elif="{{!days.length}}" class="card empty-card">
+    <empty emoji="📷" title="还没有回忆照片" desc="在「记录」里给每天的饭菜拍张照，日子久了，这里就是你们的回忆墙~">
+      <view class="btn btn-primary btn-sm" hover-class="tap-active" bindtap="goHistory">去记录今天</view>
+    </empty>
+  </view>
+
+  <block wx:else>
+    <view class="intro">🍚 每一餐，都是我们一起走过的日子</view>
+    <view class="tl">
+      <view wx:for="{{days}}" wx:key="key" class="tl-item">
+        <view class="tl-dot"></view>
+        <view class="day-head">
+          <text class="day-md">{{item.month}}.{{item.day}}</text>
+          <text class="day-sub">{{item.year}} · {{item.weekday}}</text>
+          <view wx:if="{{item.homeMoodLabel || item.dayMoodLabel}}" class="day-moods">
+            <view wx:if="{{item.homeMoodLabel}}" class="mood-chip mood-chip--home"><text class="mood-emoji">{{item.homeMoodEmoji}}</text>{{item.homeMoodLabel}}</view>
+            <view wx:if="{{item.dayMoodLabel}}" class="mood-chip"><text class="mood-emoji">{{item.dayMoodEmoji}}</text>{{item.dayMoodLabel}}</view>
+          </view>
+        </view>
+
+        <view class="memory card">
+          <view class="photos {{item.single ? 'photos--single' : ''}}">
+            <view wx:for="{{item.cover}}" wx:for-item="ph" wx:for-index="pi" wx:key="url" class="photo" style="transform: rotate({{ph.tilt}}deg);" hover-class="tap-active" data-di="{{index}}" data-pi="{{pi}}" bindtap="previewPhoto">
+              <view class="photo__frame">
+                <image class="photo__img {{item.single ? 'photo__img--single' : ''}}" src="{{ph.url}}" mode="aspectFill" webp lazy-load />
+              </view>
+              <view wx:if="{{ph.overlay}}" class="photo__more">+{{ph.overlay}}</view>
+            </view>
+          </view>
+
+          <view wx:if="{{item.dayRemark}}" class="memory__remark">“{{item.dayRemark}}”</view>
+
+          <view wx:if="{{item.records.length}}" class="memory__records">
+            <view wx:for="{{item.records}}" wx:for-item="r" wx:key="dishId" class="rec" hover-class="tap-fade" data-id="{{r.dishId}}" bindtap="openDish">
+              <view class="rec__dot {{r.isLunch ? 'rec__dot--lunch' : 'rec__dot--dinner'}}"></view>
+              <text class="rec__meal">{{r.mealLabel}}</text>
+              <text class="rec__name truncate">{{r.dishName}}</text>
+              <view wx:if="{{r.hasMood}}" class="rec__mood"><text class="mood-emoji">{{r.moodEmoji}}</text><text class="rec__moodtext">{{r.moodLabel}}</text></view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="tl-end"><text class="tl-end__line"></text>到这里啦<text class="tl-end__line"></text></view>
+  </block>
+
+  <view class="safe-space"></view>
+</view>

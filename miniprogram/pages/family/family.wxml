@@ -1,0 +1,180 @@
+<nav-bar title="我的家庭" subtitle="{{family ? family.name : '一起安排每一餐'}}" icon="users-round" />
+
+<view class="content anim-fade-up">
+  <!-- 加载中 -->
+  <block wx:if="{{loading}}">
+    <view class="skeleton" style="height:220rpx;border-radius:32rpx;margin-bottom:24rpx;"></view>
+    <view class="skeleton" style="height:360rpx;border-radius:32rpx;"></view>
+  </block>
+
+  <!-- 还没有家庭 -->
+  <block wx:elif="{{!hasFamily}}">
+    <view class="card card-pad join-hero">
+      <view class="join-hero__icon"><icon name="house-plus" size="52" stroke="2" color="primary" /></view>
+      <view class="join-hero__title">创建你的家庭</view>
+      <view class="join-hero__desc">和家人共享菜谱、一周菜单和买菜清单，一起决定每天吃什么。</view>
+      <view class="field mt-24 {{createFocus ? 'is-focus' : ''}}">
+        <input class="field-input" value="{{createName}}" maxlength="30" placeholder="家庭名称，如「我们家」" placeholder-class="placeholder" data-k="createFocus" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="onCreateInput" confirm-type="done" bindconfirm="createFamily" />
+      </view>
+      <view class="btn btn-primary btn-block mt-16 {{createName && !busy ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="createFamily">
+        <view wx:if="{{busy}}" class="spinner"></view>
+        <block wx:else><icon name="house-plus" size="30" stroke="2.4" color="white" /><text>创建家庭</text></block>
+      </view>
+    </view>
+
+    <view class="section-head mt-32"><view class="section-title">收到邀请？</view></view>
+    <view class="card card-pad">
+      <view class="field-label">邀请链接</view>
+      <textarea class="join-textarea {{joinFocus ? 'is-focus' : ''}}" value="{{joinToken}}" placeholder="粘贴家庭创建者发来的邀请链接" placeholder-class="placeholder" auto-height data-k="joinFocus" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="onJoinInput" />
+      <view class="field-hint">需用受邀的邮箱账号登录后加入；一个账号同时只能属于一个家庭。</view>
+      <view class="btn btn-soft btn-block mt-16 {{joinToken && !busy ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="joinFamily"><icon name="door-open" size="30" stroke="2.4" color="primary" /><text>加入家庭</text></view>
+    </view>
+  </block>
+
+  <!-- 已在家庭中 -->
+  <block wx:else>
+    <view class="fam-hero card">
+      <view class="fam-hero__glow"></view>
+      <view class="fam-hero__row">
+        <view class="fam-hero__icon"><icon name="users-round" size="44" stroke="2.2" color="white" /></view>
+        <view class="flex-1">
+          <view class="fam-hero__name truncate">{{family.name}}</view>
+          <view class="fam-hero__meta">{{memberCount}} 位成员 · {{isOwner ? '你是创建者' : '家庭成员'}}</view>
+        </view>
+        <view wx:if="{{isOwner}}" class="fam-hero__edit" hover-class="tap-active" bindtap="openRename"><icon name="square-pen" size="34" stroke="2.2" color="white" /></view>
+      </view>
+    </view>
+
+    <view class="group">
+      <view class="group-body">
+        <view class="row" hover-class="tap-bg" bindtap="goPlan">
+          <view class="row-icon tone-mint"><icon name="calendar-days" size="34" stroke="2.3" color="mint-ink" /></view>
+          <view class="row-main"><view class="row-title">家庭一周菜单</view><view class="row-desc">和家人一起安排 7 天午晚餐</view></view>
+          <icon name="chevron-right" size="32" stroke="2" color="text4" />
+        </view>
+      </view>
+    </view>
+
+    <view class="section-head mt-8">
+      <view class="section-title">家庭成员</view>
+      <view class="section-sub">{{memberCount}}/12</view>
+    </view>
+    <view class="group">
+      <view class="group-body">
+        <view wx:for="{{members}}" wx:key="user_id" class="row">
+          <view class="member-avatar {{item.isOwner ? 'member-avatar--owner' : ''}}">{{item.initial}}</view>
+          <view class="row-main">
+            <view class="member-name">
+              <text class="row-title truncate">{{item.nickname}}</text>
+              <view wx:if="{{item.isOwner}}" class="chip chip-primary chip-sm owner-chip"><icon name="crown" size="18" color="primary" /><text>创建者</text></view>
+            </view>
+            <view class="row-desc truncate">{{item.email || '未绑定邮箱'}}</view>
+          </view>
+          <view wx:if="{{isOwner && !item.isOwner}}" class="member-remove" hover-class="tap-active" data-id="{{item.user_id}}" data-name="{{item.nickname}}" bindtap="removeMember"><icon name="user-minus" size="32" stroke="2.2" color="text3" /></view>
+        </view>
+      </view>
+    </view>
+
+    <block wx:if="{{isOwner}}">
+      <view class="section-head mt-8"><view class="section-title">邀请成员</view></view>
+      <view class="card card-pad">
+        <view class="invite-row">
+          <view class="field flex-1 {{inviteFocus ? 'is-focus' : ''}}">
+            <input class="field-input" value="{{inviteEmail}}" placeholder="对方的邮箱" placeholder-class="placeholder" data-k="inviteFocus" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="onInviteInput" confirm-type="send" bindconfirm="sendInvite" />
+          </view>
+          <view class="icon-btn {{inviteEmail && !busy ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="sendInvite"><icon name="mail-plus" size="32" stroke="2.4" color="white" /></view>
+        </view>
+        <view wx:if="{{inviteLink}}" class="invite-link" hover-class="tap-fade" bindtap="copyInvite">
+          <icon name="copy" size="26" stroke="2.2" color="primary" /><text class="truncate">{{inviteLink}}</text><text class="invite-link__copy">复制</text>
+        </view>
+        <view class="field-hint">邀请 7 天内有效，需对方用受邀邮箱登录后接受。</view>
+
+        <block wx:if="{{invitations.length}}">
+          <view class="divider-label mt-16">待接受邀请</view>
+          <view wx:for="{{invitations}}" wx:key="id" class="invite-item">
+            <view class="flex-1">
+              <view class="invite-item__email truncate">{{item.email}}</view>
+              <view wx:if="{{item.expiresLabel}}" class="invite-item__exp">{{item.expiresLabel}}</view>
+            </view>
+            <view class="invite-item__revoke" hover-class="tap-fade" data-id="{{item.id}}" bindtap="revokeInvite">撤销</view>
+          </view>
+        </block>
+      </view>
+    </block>
+
+    <view class="section-head mt-8">
+      <view class="section-title">买菜清单</view>
+      <view wx:if="{{shopping.length}}" class="section-action" hover-class="tap-active" bindtap="openImport"><icon name="plus" size="24" stroke="2.6" color="primary" /><text>导入食材</text></view>
+    </view>
+    <view class="card card-pad">
+      <view class="shop-add">
+        <view class="field flex-1 {{itemFocus ? 'is-focus' : ''}}"><input class="field-input" value="{{itemName}}" placeholder="添加食材" placeholder-class="placeholder" data-k="itemFocus" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="onItemNameInput" confirm-type="done" bindconfirm="addItem" /></view>
+        <view class="field shop-amount {{amountFocus ? 'is-focus' : ''}}"><input class="field-input" value="{{itemAmount}}" placeholder="数量" placeholder-class="placeholder" data-k="amountFocus" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="onItemAmountInput" /></view>
+        <view class="icon-btn {{itemName && !busy ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="addItem"><icon name="plus" size="34" stroke="2.6" color="white" /></view>
+      </view>
+
+      <view wx:if="{{!shopping.length}}" class="shop-empty">买菜清单还没有食材</view>
+      <view wx:else class="shop-list">
+        <view wx:for="{{shopping}}" wx:key="id" class="shop-item">
+          <view class="shop-check {{item.checked ? 'is-on' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-checked="{{item.checked}}" bindtap="toggleItem"><icon wx:if="{{item.checked}}" name="check" size="24" stroke="3" color="white" /></view>
+          <view class="shop-name {{item.checked ? 'is-done' : ''}}"><text class="truncate">{{item.name}}</text><text wx:if="{{item.amount}}" class="shop-amount-text">{{item.amount}}</text></view>
+          <view class="shop-del" hover-class="tap-fade" data-id="{{item.id}}" bindtap="removeItem"><icon name="trash-2" size="30" stroke="2.2" color="text4" /></view>
+        </view>
+      </view>
+      <view wx:if="{{boughtCount}}" class="shop-foot">已买 {{boughtCount}}/{{shopping.length}}</view>
+    </view>
+
+    <view class="group mt-32">
+      <view class="group-body">
+        <view wx:if="{{isOwner && transferables.length}}" class="row" hover-class="tap-bg" bindtap="openTransfer">
+          <view class="row-icon tone-yellow"><icon name="flag" size="32" stroke="2.3" color="yellow-dark" /></view>
+          <view class="row-main"><view class="row-title">转让创建者</view><view class="row-desc">把家庭交给其他成员管理</view></view>
+          <icon name="chevron-right" size="32" stroke="2" color="text4" />
+        </view>
+        <view wx:if="{{isOwner}}" class="row" hover-class="tap-bg" bindtap="deleteFamily">
+          <view class="row-icon tone-danger"><icon name="trash-2" size="32" stroke="2.3" color="red" /></view>
+          <view class="row-main"><view class="row-title c-red">解散家庭</view><view class="row-desc">删除家庭菜单、买菜清单与家庭菜谱</view></view>
+        </view>
+        <view wx:else class="row" hover-class="tap-bg" bindtap="leaveFamily">
+          <view class="row-icon tone-danger"><icon name="door-open" size="32" stroke="2.3" color="red" /></view>
+          <view class="row-main"><view class="row-title c-red">退出家庭</view><view class="row-desc">退出后需重新受邀才能加入</view></view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <view class="tabbar-spacer"></view>
+</view>
+
+<sheet show="{{renameOpen}}" title="家庭名称" bind:close="closeRename">
+  <view class="sheet-body">
+    <view class="field is-focus"><input class="field-input" value="{{renameValue}}" maxlength="30" focus="{{renameOpen}}" placeholder="家庭名称" placeholder-class="placeholder" cursor-spacing="120" bindinput="onRenameInput" bindconfirm="saveRename" /></view>
+    <view class="flex gap-20 mt-32">
+      <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeRename">取消</view>
+      <view class="btn btn-primary flex-1 {{renameValue && !savingRename ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveRename"><view wx:if="{{savingRename}}" class="spinner"></view><text wx:else>保存</text></view>
+    </view>
+  </view>
+</sheet>
+
+<sheet show="{{transferOpen}}" title="转让创建者" subtitle="选择要接管家庭的成员" bind:close="closeTransfer">
+  <view class="sheet-body">
+    <view wx:for="{{transferables}}" wx:key="user_id" class="transfer-item" hover-class="tap-bg" data-id="{{item.user_id}}" data-name="{{item.nickname}}" bindtap="pickTransfer">
+      <view class="member-avatar">{{item.initial}}</view>
+      <view class="row-main"><view class="row-title truncate">{{item.nickname}}</view><view class="row-desc truncate">{{item.email || '未绑定邮箱'}}</view></view>
+      <icon name="chevron-right" size="30" color="text4" />
+    </view>
+  </view>
+</sheet>
+
+<sheet show="{{importOpen}}" title="导入食材" subtitle="从家庭菜谱把食材加入买菜清单" bind:close="closeImport">
+  <view class="sheet-body">
+    <view wx:if="{{!familyDishes.length}}" class="shop-empty">家庭还没有共享菜谱</view>
+    <view wx:else class="import-list">
+      <view wx:for="{{familyDishes}}" wx:key="id" class="transfer-item" hover-class="tap-bg" data-id="{{item.id}}" bindtap="importDish">
+        <view class="row-icon tone-mint"><icon name="shopping-basket" size="30" stroke="2.3" color="mint-ink" /></view>
+        <view class="row-main"><view class="row-title truncate">{{item.name}}</view></view>
+        <text class="import-add">加入</text>
+      </view>
+    </view>
+  </view>
+</sheet>

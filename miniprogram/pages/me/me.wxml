@@ -1,26 +1,178 @@
-<scroll-view class="mp-screen" scroll-y show-scrollbar="false">
-  <view class="mp-content me-content">
-    <view class="mp-header"><view><view class="mp-title">我的</view><view class="mp-subtitle">账号与个人饮食数据</view></view></view>
-    <view wx:if="{{error}}" class="mp-error">{{error}}</view>
-    <view wx:if="{{user}}" class="profile-panel">
-      <image wx:if="{{user.avatar}}" class="profile-avatar" src="{{user.avatar}}" mode="aspectFill" />
-      <view wx:else class="profile-avatar profile-initial">{{initial}}</view>
-      <view class="profile-details"><view class="profile-name">{{user.nickname || user.username || '食谱用户'}}</view><view class="profile-email">{{user.email || user.username}}</view><view class="profile-state">{{user.wechat_bound ? '已绑定微信' : '微信未绑定'}}</view></view>
+<view class="screen">
+  <scroll-view class="screen-scroll" scroll-y enhanced show-scrollbar="{{false}}" refresher-enabled refresher-background="#FFE9DE" refresher-triggered="{{refreshing}}" bindrefresherrefresh="onRefresh">
+    <!-- 头部：渐变背景 + 头像昵称 + 统计 -->
+    <view class="hero" style="padding-top:{{topPad}}px;">
+      <view class="hero__glow"></view>
+      <view class="profile">
+        <button class="btn-reset avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" hover-class="tap-active" aria-label="更换头像">
+          <image wx:if="{{avatar}}" class="avatar" src="{{avatar}}" mode="aspectFill" webp />
+          <view wx:else class="avatar avatar--initial">{{initial}}</view>
+          <view class="avatar__cam">
+            <view wx:if="{{uploadingAvatar}}" class="spinner spinner-dark avatar__spin"></view>
+            <icon wx:else name="camera" size="24" stroke="2.4" color="text2" />
+          </view>
+        </button>
+        <view class="profile__info">
+          <view class="profile__name" hover-class="tap-fade" bindtap="openName">
+            <text class="truncate">{{user ? user.nickname : '加载中…'}}</text>
+            <icon name="notebook-pen" size="28" stroke="2.2" color="text3" />
+          </view>
+          <view class="profile__email truncate">{{user ? (user.email || user.username) : ''}}</view>
+          <view class="profile__badges">
+            <text wx:if="{{user && user.role === 'admin'}}" class="badge-tag badge-tag--dark">管理员</text>
+            <text wx:if="{{user && user.wechat_bound}}" class="badge-tag badge-tag--mint">已绑定微信</text>
+            <text class="badge-tag">🏆 {{unlocked}} 个成就</text>
+          </view>
+        </view>
+      </view>
+      <view class="tiles">
+        <view class="tile"><view class="tile__value">{{stats ? stats.total_records : '-'}}</view><view class="tile__label">记录</view></view>
+        <view class="tile"><view class="tile__value">{{stats ? stats.current_streak : '-'}}</view><view class="tile__label">连续天数</view></view>
+        <view class="tile"><view class="tile__value">{{stats ? stats.distinct_dishes : '-'}}</view><view class="tile__label">吃过的菜</view></view>
+        <view class="tile"><view class="tile__value">{{stats ? stats.favorite_count : '-'}}</view><view class="tile__label">收藏</view></view>
+      </view>
     </view>
 
-    <view wx:if="{{stats}}" class="stats-row">
-      <view class="personal-stat"><text class="personal-value">{{stats.total_records}}</text><text class="personal-label">餐饮记录</text></view>
-      <view class="personal-stat"><text class="personal-value">{{stats.current_streak}}</text><text class="personal-label">连续记录天数</text></view>
-      <view class="personal-stat"><text class="personal-value">{{stats.distinct_dishes}}</text><text class="personal-label">吃过的菜</text></view>
-    </view>
+    <view class="content me-content">
+      <view class="group">
+        <view class="group-title">AI 与口味</view>
+        <view class="group-body">
+          <view class="row" hover-class="tap-bg" data-url="/pages/notifications/notifications" bindtap="go">
+            <view class="row-icon tone-primary"><icon name="bell" size="36" stroke="2.3" color="primary" /></view>
+            <view class="row-main"><view class="row-title">站内信</view><view class="row-desc">{{unread ? unread + ' 条未读消息' : '系统更新、健康与安全提醒'}}</view></view>
+            <view wx:if="{{unread}}" class="badge">{{unread > 99 ? '99+' : unread}}</view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/suggestions/suggestions" bindtap="go">
+            <view class="row-icon tone-primary"><icon name="inbox" size="36" stroke="2.3" color="primary" /></view>
+            <view class="row-main"><view class="row-title">AI 建议</view><view class="row-desc">{{pending ? pending + ' 条待处理' : '智能体推送给你的菜单建议'}}</view></view>
+            <view wx:if="{{pending}}" class="badge">{{pending}}</view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/taste-profile/taste-profile" bindtap="go">
+            <view class="row-icon tone-purple"><icon name="sparkles" size="36" stroke="2.3" color="purple" /></view>
+            <view class="row-main"><view class="row-title">口味画像</view><view class="row-desc">看看 AI 眼中的你，按条件挑菜</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/preferences/preferences" bindtap="go">
+            <view class="row-icon tone-mint"><icon name="salad" size="36" stroke="2.3" color="mint-ink" /></view>
+            <view class="row-main"><view class="row-title">饮食偏好</view><view class="row-desc">忌口、过敏、辣度、做饭时长</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/agents/agents" bindtap="go">
+            <view class="row-icon tone-yellow"><icon name="plug" size="36" stroke="2.3" color="yellow-dark" /></view>
+            <view class="row-main"><view class="row-title">AI 连接</view><view class="row-desc">接入 DeepSeek、Hermes 等第三方智能体</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+        </view>
+      </view>
 
-    <view class="mp-section account-section">
-      <view class="account-link" bindtap="goDiary"><view class="link-mark mark-green">食</view><view class="link-copy"><view class="link-title">饮食记录与健康报告</view><view class="link-desc">查看每日记录和饮食趋势</view></view><text class="link-arrow">›</text></view>
-      <view class="account-link" bindtap="goAgents"><view class="link-mark mark-coral">AI</view><view class="link-copy"><view class="link-title">Agent 接入管理</view><view class="link-desc">令牌、调用情况与数据权限</view></view><text class="link-arrow">›</text></view>
-      <view class="account-link" bindtap="goChat"><view class="link-mark mark-gold">聊</view><view class="link-copy"><view class="link-title">饮食助手</view><view class="link-desc">通过对话管理食谱和饮食信息</view></view><text class="link-arrow">›</text></view>
-    </view>
+      <view class="group">
+        <view class="group-title">我的内容</view>
+        <view class="group-body">
+          <view class="row" hover-class="tap-bg" data-url="/pages/diary/diary" bindtap="go">
+            <view class="row-icon tone-mint"><icon name="activity" size="36" stroke="2.3" color="mint-ink" /></view>
+            <view class="row-main"><view class="row-title">饮食记录与报告</view><view class="row-desc">记录实际吃的菜系，查看饮食变化</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/family/family" bindtap="go">
+            <view class="row-icon tone-yellow"><icon name="users-round" size="36" stroke="2.3" color="yellow-dark" /></view>
+            <view class="row-main"><view class="row-title">我的家庭</view><view class="row-desc">共享菜谱、家庭菜单与买菜清单</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/favorites/favorites" bindtap="go">
+            <view class="row-icon tone-pink"><icon name="heart" size="36" stroke="2.3" color="pink-ink" /></view>
+            <view class="row-main"><view class="row-title">我的收藏</view><view class="row-desc">{{stats && stats.favorite_count ? '已收藏 ' + stats.favorite_count + ' 道菜' : '收藏喜欢的菜，随时再做'}}</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/plan/plan" bindtap="go">
+            <view class="row-icon tone-mint"><icon name="shopping-basket" size="36" stroke="2.3" color="mint-ink" /></view>
+            <view class="row-main"><view class="row-title">一周菜单与买菜清单</view><view class="row-desc">自动排好 7 天午晚餐，合并采购食材</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/photo-wall/photo-wall" bindtap="go">
+            <view class="row-icon tone-primary"><icon name="images" size="36" stroke="2.3" color="primary" /></view>
+            <view class="row-main"><view class="row-title">照片墙</view><view class="row-desc">每一餐留下的照片与心情</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/achievements/achievements" bindtap="go">
+            <view class="row-icon tone-yellow"><icon name="trophy" size="36" stroke="2.3" color="yellow-dark" /></view>
+            <view class="row-main"><view class="row-title">成就</view><view class="row-desc">已解锁 {{unlocked}}/{{achievementTotal}}</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/dish-edit/dish-edit" bindtap="go">
+            <view class="row-icon tone-purple"><icon name="chef-hat" size="36" stroke="2.3" color="purple" /></view>
+            <view class="row-main"><view class="row-title">新建私房菜</view><view class="row-desc">{{stats && stats.private_dishes ? '已有 ' + stats.private_dishes + ' 道私房菜' : '只有你自己看得到'}}</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+        </view>
+      </view>
 
-    <view class="account-note">登录后读取和修改的数据均归属于当前账号。Agent 令牌可在接入管理中随时撤销。</view>
-    <button class="logout-button" loading="{{loading}}" bindtap="logout">退出登录</button>
-  </view>
-</scroll-view>
+      <view class="group">
+        <view class="group-title">偏好设置</view>
+        <view class="group-body">
+          <view class="row" hover-class="tap-bg" bindtap="openRepeat">
+            <view class="row-icon tone-muted"><icon name="refresh-cw" size="34" stroke="2.3" color="text2" /></view>
+            <view class="row-main"><view class="row-title">推荐去重</view><view class="row-desc">{{repeatDays ? '近 ' + repeatDays + ' 天吃过的菜不优先推荐' : '使用默认去重天数'}}</view></view>
+            <text class="row-value">{{repeatDays ? repeatDays + ' 天' : '默认'}} ›</text>
+          </view>
+          <view class="row" hover-class="tap-bg" bindtap="toggleVoice">
+            <view class="row-icon tone-muted"><icon name="volume-2" size="34" stroke="2.3" color="text2" /></view>
+            <view class="row-main"><view class="row-title">语音播报</view><view class="row-desc">做菜时朗读步骤</view></view>
+            <view class="switch {{voiceOn ? 'is-on' : ''}}"></view>
+          </view>
+          <view class="row" hover-class="tap-bg" bindtap="toggleBlind">
+            <view class="row-icon tone-muted"><icon name="gift" size="34" stroke="2.3" color="text2" /></view>
+            <view class="row-main"><view class="row-title">惊喜盲盒</view><view class="row-desc">首页显示盲盒</view></view>
+            <view class="switch {{blindOn ? 'is-on' : ''}}"></view>
+          </view>
+        </view>
+      </view>
+
+      <view class="group">
+        <view class="group-body">
+          <view class="row" hover-class="tap-bg" data-url="/pages/account/account" bindtap="go">
+            <view class="row-icon tone-muted"><icon name="shield" size="34" stroke="2.3" color="text2" /></view>
+            <view class="row-main"><view class="row-title">账号与安全</view><view class="row-desc">密码、登录设备、导出与注销</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
+          <view wx:if="{{user && user.role === 'admin'}}" class="row" hover-class="tap-bg" bindtap="adminTip">
+            <view class="row-icon tone-dark"><icon name="layout-dashboard" size="34" stroke="2.3" color="bg" /></view>
+            <view class="row-main"><view class="row-title">管理后台</view><view class="row-desc">菜谱、用户、AI 模型与站点设置</view></view>
+            <text class="row-value">网页端 ›</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="logout" hover-class="tap-active" bindtap="logout">
+        <icon name="log-out" size="32" stroke="2.4" color="red" />
+        <text>退出登录</text>
+      </view>
+      <view class="foot">NiniMenu · 你的数据只属于你</view>
+    </view>
+    <view class="tabbar-spacer"></view>
+  </scroll-view>
+
+  <sheet show="{{nameOpen}}" title="修改昵称" bind:close="closeName">
+    <view class="sheet-body">
+      <view class="field is-focus">
+        <input class="field-input" type="nickname" value="{{nickname}}" maxlength="20" focus="{{nameOpen}}" placeholder="1-20 个字" placeholder-class="placeholder" cursor-spacing="120" bindinput="onNameInput" bindblur="onNameInput" bindconfirm="saveName" />
+      </view>
+      <view class="field-hint">可以直接使用微信昵称</view>
+      <view class="flex gap-20 mt-32">
+        <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeName">取消</view>
+        <view class="btn btn-primary flex-1 {{nickname && !savingName ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveName">
+          <view wx:if="{{savingName}}" class="spinner"></view><text wx:else>保存</text>
+        </view>
+      </view>
+    </view>
+  </sheet>
+
+  <sheet show="{{repeatOpen}}" title="推荐去重天数" subtitle="这几天内吃过的菜，推荐时会先避开" bind:close="closeRepeat">
+    <view class="sheet-body">
+      <view class="grid-4">
+        <view wx:for="{{repeatOptions}}" wx:key="*this" class="repeat {{(item === '0' && !repeatDays) || repeatDays === item ? 'is-active' : ''}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseRepeat">{{item === '0' ? '默认' : item + ' 天'}}</view>
+      </view>
+    </view>
+  </sheet>
+</view>

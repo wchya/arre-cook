@@ -1,0 +1,6 @@
+<view class="empty {{compact ? 'empty--compact' : ''}}">
+  <view class="empty__emoji anim-float">{{emoji}}</view>
+  <view wx:if="{{title}}" class="empty__title">{{title}}</view>
+  <view wx:if="{{desc}}" class="empty__desc">{{desc}}</view>
+  <view class="empty__action"><slot></slot></view>
+</view>

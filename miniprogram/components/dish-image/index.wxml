@@ -1,0 +1,4 @@
+<view class="dimg">
+  <image wx:if="{{src && !failed}}" class="dimg__img {{loaded ? 'is-loaded' : ''}}" src="{{src}}" mode="{{mode}}" lazy-load="{{lazy}}" webp="{{true}}" show-menu-by-longpress="{{false}}" binderror="onError" bindload="onLoad" />
+  <view wx:if="{{!src || failed}}" class="dimg__fallback" style="font-size:{{emojiSize}}rpx;">{{emoji || '🍽'}}</view>
+</view>

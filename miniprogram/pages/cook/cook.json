@@ -1,0 +1,11 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#1A1A2E",
+  "backgroundTextStyle": "light",
+  "disableScroll": true,
+  "usingComponents": {
+    "nav-bar": "/components/nav-bar/index",
+    "icon": "/components/icon/index",
+    "sheet": "/components/sheet/index"
+  }
+}

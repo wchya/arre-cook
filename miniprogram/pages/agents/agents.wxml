@@ -1,53 +1,135 @@
-<scroll-view class="mp-screen" scroll-y show-scrollbar="false">
-  <view class="mp-content agent-content">
-    <view class="mp-header"><view><view class="mp-title">Agent 接入</view><view class="mp-subtitle">查看连接和调用记录，管理每个 Agent 的独立令牌。</view></view></view>
-    <view wx:if="{{error}}" class="mp-error">{{error}}</view>
+<nav-bar title="AI 连接" subtitle="把食谱数据安全地交给智能体" icon="plug" />
 
-    <view class="agent-callout">
-      <view class="callout-mark">A</view>
-      <view class="callout-copy"><view class="callout-title">和饮食助手对话</view><view class="callout-text">让助手结合你的菜谱与饮食记录给出建议。</view></view>
-      <button class="chat-button" bindtap="openChat">打开</button>
+<view class="content anim-fade-up">
+  <view class="conn-hero">
+    <view class="conn-hero__title"><icon name="shield-check" size="34" stroke="2.4" color="purple" /><text>只属于你的数据通道</text></view>
+    <view class="conn-hero__item">每个令牌只能访问<text class="bold">你本人</text>的数据，且只能做你勾选的事</view>
+    <view class="conn-hero__item">支持 MCP、OpenAPI、函数调用等多种接入方式</view>
+    <view class="conn-hero__item">每次调用都记录在下方「调用记录」，可随时撤销</view>
+  </view>
+
+  <view class="section-head">
+    <view class="section-title">已连接的智能体</view>
+    <view class="btn btn-primary btn-sm" hover-class="tap-active" bindtap="openCreate"><icon name="plus" size="26" stroke="2.6" color="white" /><text>新建令牌</text></view>
+  </view>
+
+  <view wx:if="{{summary}}" class="grid-4 conn-stats">
+    <view class="stat-card"><view class="stat-value">{{summary.activeTokens}}</view><view class="stat-label">有效令牌</view></view>
+    <view class="stat-card"><view class="stat-value">{{summary.calls24}}</view><view class="stat-label">24h 调用</view></view>
+    <view class="stat-card"><view class="stat-value">{{summary.calls}}</view><view class="stat-label">累计调用</view></view>
+    <view class="stat-card"><view class="stat-value">{{summary.successRate}}</view><view class="stat-label">成功率</view></view>
+  </view>
+
+  <view wx:if="{{loading}}" class="skeleton conn-sk"></view>
+  <view wx:elif="{{!active.length}}" class="card">
+    <empty emoji="🔑" title="还没有连接任何智能体" desc="新建一个令牌，填进 Hermes、DeepSeek 或其他 MCP 客户端即可" compact>
+      <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="openCreate">新建第一个令牌</view>
+    </empty>
+  </view>
+  <view wx:else class="conn-list">
+    <view wx:for="{{active}}" wx:key="id" class="card card-pad tk">
+      <view class="tk__avatar">{{item.initial}}</view>
+      <view class="flex-1 tk__body">
+        <view class="tk__head">
+          <text class="tk__name truncate">{{item.name}}</text>
+          <text wx:if="{{item.prefix}}" class="tk__prefix">{{item.prefix}}…</text>
+        </view>
+        <view class="tk__meta">最近使用 {{item.lastUsed}} · {{item.expiry}}</view>
+        <view wx:if="{{item.scopeChips.length}}" class="chips tk__scopes">
+          <text wx:for="{{item.scopeChips}}" wx:for-item="s" wx:key="*this" class="chip chip-ghost chip-sm">{{s}}</text>
+        </view>
+      </view>
+      <view class="tk__acts">
+        <view class="tk__act tone-muted" hover-class="tap-active" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="openRename" aria-label="重命名"><icon name="pencil" size="26" stroke="2.4" color="text2" /></view>
+        <view class="tk__act tone-yellow" hover-class="tap-active" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="rotate" aria-label="轮换令牌"><icon name="refresh-cw" size="26" stroke="2.4" color="yellow-dark" /></view>
+        <view class="tk__act tk__act--danger" hover-class="tap-active" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="revoke" aria-label="撤销"><icon name="trash-2" size="26" stroke="2.4" color="red" /></view>
+      </view>
+    </view>
+    <view wx:if="{{inactiveCount}}" class="conn-inactive">另有 {{inactiveCount}} 个已撤销或过期的令牌</view>
+  </view>
+
+  <view class="card card-pad conn-snip">
+    <view class="section-title">接入方式</view>
+    <view class="section-sub">把配置里的令牌换成你新建的令牌</view>
+    <scroll-view scroll-x class="snip-tabs" show-scrollbar="{{false}}" enhanced>
+      <view wx:for="{{snippets}}" wx:key="key" class="snip-tab {{index === snippetIndex ? 'is-active' : ''}}" data-index="{{index}}" bindtap="pickSnippet">{{item.label}}</view>
+    </scroll-view>
+    <view wx:if="{{snippet}}" class="snip-note">{{snippet.note}}</view>
+    <view wx:if="{{snippet}}" class="code">
+      <scroll-view scroll-x class="code__scroll" show-scrollbar="{{false}}"><text class="code__text" user-select>{{snippet.code}}</text></scroll-view>
+      <view class="code__copy" hover-class="tap-active" data-text="{{snippet.code}}" bindtap="copy"><icon name="copy" size="26" stroke="2.4" color="white" /></view>
+    </view>
+  </view>
+
+  <view class="card card-pad">
+    <view class="section-title">调用记录</view>
+    <view wx:if="{{!audit.length}}" class="conn-audit-empty">暂无智能体调用</view>
+    <view wx:else class="conn-audit">
+      <view wx:for="{{audit}}" wx:key="id" class="audit">
+        <view class="audit__dot {{item.dot}}"></view>
+        <view class="flex-1">
+          <view class="audit__main truncate">{{item.actor}} · <text class="audit__tool">{{item.tool}}</text></view>
+          <view wx:if="{{item.error}}" class="audit__err truncate">{{item.error}}</view>
+        </view>
+        <view class="audit__time">{{item.channel}} · {{item.time}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="tabbar-spacer"></view>
+</view>
+
+<sheet show="{{createOpen}}" title="新建智能体令牌" bind:close="closeCreate">
+  <view class="sheet-body conn-create">
+    <view class="field-label">给它起个名字</view>
+    <view class="field is-focus"><input class="field-input" value="{{name}}" maxlength="32" placeholder="例如 Hermes、DeepSeek" placeholder-class="placeholder" cursor-spacing="140" bindinput="onNameInput" /></view>
+    <view class="chips mt-16">
+      <view wx:for="{{nameSuggestions}}" wx:key="*this" class="chip chip-ghost" hover-class="tap-active" data-name="{{item}}" bindtap="pickName">{{item}}</view>
     </view>
 
-    <view wx:if="{{summary}}" class="agent-stats">
-      <view class="agent-stat"><text class="stat-value">{{summary.active_tokens}}</text><text class="stat-label">有效令牌</text></view>
-      <view class="agent-stat"><text class="stat-value">{{summary.calls_last_24_hours}}</text><text class="stat-label">24 小时调用</text></view>
-      <view class="agent-stat"><text class="stat-value">{{summary.calls}}</text><text class="stat-label">累计调用</text></view>
-      <view class="agent-stat"><text class="stat-value">{{summary.error_total}}</text><text class="stat-label">失败 / 拒绝</text></view>
-    </view>
-
-    <view class="mp-section-heading agent-list-heading"><view class="mp-section-title">连接令牌</view><button class="create-button" bindtap="openCreate">＋ 新建</button></view>
-    <view wx:if="{{showCreate}}" class="mp-panel create-panel">
-      <view class="create-title">新建个人令牌</view>
-      <label class="agent-field"><text>连接名称</text><input class="mp-input" value="{{name}}" maxlength="40" placeholder="例如 Hermes、DeepSeek" bindinput="onNameInput" /></label>
-      <label class="agent-field"><text>权限</text><picker mode="selector" range="{{presets}}" range-key="label" value="{{presetIndex}}" bindchange="onPresetChange"><view class="picker-value">{{presets[presetIndex].label}} · {{presets[presetIndex].desc}}</view></picker></label>
-      <label class="agent-field"><text>有效期</text><picker mode="selector" range="{{expires}}" value="{{expiryIndex}}" bindchange="onExpiryChange"><view class="picker-value">{{expires[expiryIndex] === 0 ? '永久' : expires[expiryIndex] + ' 天'}}</view></picker></label>
-      <view wx:if="{{error}}" class="mp-error form-error">{{error}}</view>
-      <view class="form-actions"><button class="cancel-button" bindtap="closeCreate">取消</button><button class="mp-primary create-submit" loading="{{saving}}" disabled="{{saving}}" bindtap="createToken">创建令牌</button></view>
-    </view>
-
-    <view wx:if="{{createdToken}}" class="new-token-panel">
-      <view class="new-token-heading"><view><view class="new-token-title">令牌已创建</view><view class="mp-small">完整令牌只显示这一次，请立即复制保存。</view></view><button class="dismiss-button" bindtap="dismissToken">关闭</button></view>
-      <view class="token-value">{{createdToken}}</view>
-      <button class="copy-button" bindtap="copyToken">复制令牌</button>
-    </view>
-
-    <view wx:if="{{loading}}" class="loading-note">正在读取连接信息…</view>
-    <view wx:elif="{{tokens.length === 0 && !showCreate}}" class="mp-panel agent-empty"><view class="empty-title">还没有连接令牌</view><view class="mp-muted">为 Hermes、DeepSeek Harness 等 Agent 单独创建令牌，并按需授予权限。</view><button class="mp-secondary empty-create" bindtap="openCreate">创建第一个令牌</button></view>
-    <view wx:else class="token-list">
-      <view wx:for="{{tokens}}" wx:key="id" class="token-row">
-        <view class="token-top"><view class="token-name">{{item.name}}</view><text class="token-state {{item.active ? 'token-on' : 'token-off'}}">{{item.active ? '有效' : '已撤销'}}</text></view>
-        <view class="token-prefix">{{item.prefix}}••••••••</view>
-        <view class="token-scopes">{{item.scopeText}}</view>
-        <view class="token-foot"><text>最近调用：{{item.last_used_at || '从未'}}</text><button wx:if="{{item.active}}" class="revoke-button" data-id="{{item.id}}" bindtap="revokeToken">撤销</button></view>
+    <view class="field-label mt-24">允许它做什么</view>
+    <view class="preset-list">
+      <view wx:for="{{presets}}" wx:key="key" class="preset {{presetKey === item.key ? 'is-active' : ''}}" hover-class="tap-active" data-key="{{item.key}}" bindtap="pickPreset">
+        <view class="preset__radio"><icon wx:if="{{presetKey === item.key}}" name="check" size="22" stroke="3" color="white" /></view>
+        <view class="flex-1"><view class="preset__title">{{item.title}}</view><view class="preset__desc">{{item.desc}}</view></view>
       </view>
     </view>
 
-    <view class="mp-section">
-      <view class="mp-section-heading"><view class="mp-section-title">最近调用</view><text class="mp-small">{{audit.length}} 条</text></view>
-      <view wx:if="{{audit.length === 0}}" class="audit-empty">暂无调用记录</view>
-      <view wx:else class="audit-list"><view wx:for="{{audit}}" wx:key="id" class="audit-row"><view class="audit-status {{item.status === 'ok' ? 'audit-ok' : 'audit-fail'}}"></view><view class="audit-main"><view class="audit-tool">{{item.tool || 'Agent 调用'}}</view><view class="audit-meta">{{item.actor || item.channel || 'Agent'}} · {{item.duration_ms}} ms</view></view><text class="audit-result">{{item.status === 'ok' ? '成功' : item.status === 'denied' ? '无权限' : '失败'}}</text></view></view>
+    <view class="field-label mt-24">有效期</view>
+    <view class="grid-4 mt-12">
+      <view wx:for="{{expires}}" wx:key="days" class="expire {{expiresDays === item.days ? 'is-active' : ''}}" hover-class="tap-active" data-days="{{item.days}}" bindtap="pickExpiry">{{item.label}}</view>
     </view>
-    <view class="agent-note">每个令牌只关联当前账号的数据。发现异常调用时可立即撤销令牌。</view>
+
+    <view class="flex gap-20 mt-32">
+      <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeCreate">取消</view>
+      <view class="btn btn-primary flex-1 {{name && !saving ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="createToken">
+        <view wx:if="{{saving}}" class="spinner"></view><text wx:else>创建令牌</text>
+      </view>
+    </view>
   </view>
-</scroll-view>
+</sheet>
+
+<sheet show="{{createdOpen}}" title="令牌已创建 🎉" closable="{{false}}" mask-closable="{{false}}" bind:close="dismissCreated">
+  <view class="sheet-body">
+    <view class="notice notice-error conn-warn">这是唯一一次显示完整令牌，请立即复制保存。遗失后只能撤销重建。</view>
+    <view class="token-box" hover-class="tap-active" data-text="{{createdToken}}" bindtap="copy">
+      <text class="token-box__text">{{createdToken}}</text>
+      <icon name="copy" size="30" stroke="2.4" color="primary" />
+    </view>
+    <view class="conn-mcp">MCP 地址：<text class="conn-mcp__url" user-select>{{mcpUrl}}</text></view>
+    <view class="conn-mcp conn-mcp--sub">下方「接入方式」的示例已自动填好这个令牌，可直接复制。</view>
+    <view class="btn btn-primary btn-block mt-24" hover-class="tap-active" bindtap="dismissCreated">我已保存</view>
+  </view>
+</sheet>
+
+<sheet show="{{renameOpen}}" title="重命名令牌" bind:close="closeRename">
+  <view class="sheet-body">
+    <view class="field is-focus"><input class="field-input" value="{{renameName}}" maxlength="32" focus="{{renameOpen}}" placeholder="令牌名称" placeholder-class="placeholder" cursor-spacing="140" bindinput="onRenameInput" bindconfirm="saveRename" /></view>
+    <view class="flex gap-20 mt-32">
+      <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeRename">取消</view>
+      <view class="btn btn-primary flex-1 {{renameName && !renaming ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveRename">
+        <view wx:if="{{renaming}}" class="spinner"></view><text wx:else>保存</text>
+      </view>
+    </view>
+  </view>
+</sheet>

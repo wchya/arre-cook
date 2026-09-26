@@ -1,0 +1,54 @@
+<view class="cook">
+  <nav-bar theme="dark" title="🍳 {{name || '烹饪模式'}}" subtitle="{{steps.length ? '共 ' + steps.length + ' 步 · 左右滑动切换' : ''}}" hide-back="{{true}}">
+    <view class="close" hover-class="tap-active" bindtap="close" aria-role="button" aria-label="退出烹饪模式"><icon name="x" size="34" stroke="2.4" color="white" /></view>
+  </nav-bar>
+
+  <view class="progress"><view class="progress__bar" style="width:{{progress}}%;"></view></view>
+
+  <view wx:if="{{loading}}" class="center-state"><view class="spinner"></view></view>
+  <view wx:elif="{{!steps.length}}" class="center-state"><text class="empty-text">这道菜还没有制作步骤</text></view>
+
+  <swiper wx:else class="stage" current="{{current}}" duration="300" bindchange="onSwiperChange">
+    <swiper-item wx:for="{{steps}}" wx:key="index">
+      <scroll-view class="step" scroll-y enhanced show-scrollbar="{{false}}">
+        <view class="step__inner">
+          <view class="step__count">步骤 {{index + 1}} / {{steps.length}}</view>
+          <view class="step__num">{{index + 1}}</view>
+          <view class="step__text">{{item.text}}</view>
+          <image wx:if="{{item.image}}" class="step__image" src="{{item.image}}" mode="aspectFill" webp data-url="{{item.image}}" bindtap="previewImage" />
+          <view wx:if="{{item.time && index === current}}" class="timer" bindtap="toggleTimer">
+            <view class="timer__ring" style="background:conic-gradient(#E8734A {{ringPct}}%, rgba(255,255,255,.1) 0);">
+              <view class="timer__inner">
+                <view class="timer__clock {{running && remaining <= 10 ? 'anim-pulse' : ''}}">{{clock}}</view>
+                <view class="timer__state">{{running ? '进行中…' : remaining < total ? '已暂停' : '点击开始计时'}}</view>
+              </view>
+            </view>
+          </view>
+          <view wx:elif="{{item.time}}" class="timer-hint"><icon name="timer" size="26" color="white" /><text>约 {{item.time}} 分钟</text></view>
+        </view>
+      </scroll-view>
+    </swiper-item>
+  </swiper>
+
+  <view wx:if="{{steps.length}}" class="controls">
+    <view class="ctrl {{current === 0 ? 'is-off' : ''}}" hover-class="tap-active" bindtap="prev" aria-role="button" aria-label="上一步"><icon name="skip-back" size="40" stroke="2.2" color="white" /></view>
+    <view class="ctrl" hover-class="tap-active" bindtap="openList" aria-role="button" aria-label="全部步骤"><icon name="list-checks" size="40" stroke="2.2" color="white" /></view>
+    <view class="ctrl ctrl--main {{total ? '' : 'is-muted'}}" hover-class="tap-active" bindtap="toggleTimer" bindlongpress="resetTimer" aria-role="button" aria-label="{{running ? '暂停计时' : '开始计时'}}">
+      <icon name="{{running ? 'pause' : 'play'}}" size="52" stroke="2.2" color="white" fill />
+    </view>
+    <view class="ctrl" hover-class="tap-active" bindtap="next" aria-role="button" aria-label="下一步"><icon name="skip-forward" size="40" stroke="2.2" color="white" /></view>
+    <view class="ctrl {{current === steps.length - 1 ? 'ctrl--done' : ''}}" hover-class="tap-active" bindtap="finish" aria-role="button" aria-label="完成"><icon name="check" size="40" stroke="2.6" color="white" /></view>
+  </view>
+
+  <sheet show="{{listOpen}}" title="全部步骤" subtitle="点一下跳到对应步骤" bind:close="closeList">
+    <view class="list">
+      <view wx:for="{{steps}}" wx:key="index" class="list__item {{current === index ? 'is-current' : ''}}" hover-class="tap-bg" data-index="{{index}}" bindtap="jumpTo">
+        <view class="list__num">{{index + 1}}</view>
+        <view class="flex-1">
+          <view class="list__text">{{item.text}}</view>
+          <view wx:if="{{item.time}}" class="list__time">⏱ {{item.time}} 分钟</view>
+        </view>
+      </view>
+    </view>
+  </sheet>
+</view>

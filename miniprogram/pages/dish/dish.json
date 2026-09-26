@@ -1,0 +1,13 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#FAFAF8",
+  "backgroundColorTop": "#FFF0EB",
+  "usingComponents": {
+    "empty": "/components/empty/index",
+    "nav-bar": "/components/nav-bar/index",
+    "dish-image": "/components/dish-image/index",
+    "dish-card": "/components/dish-card/index",
+    "confetti": "/components/confetti/index",
+    "icon": "/components/icon/index"
+  }
+}

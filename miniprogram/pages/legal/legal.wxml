@@ -1,12 +1,12 @@
-<scroll-view class="legal-page" scroll-y="true" show-scrollbar="false">
-  <view class="legal-header">
-    <view class="legal-mark">👨‍🍳</view>
-    <view class="legal-title">{{title}}</view>
-    <view class="legal-subtitle">arre 食谱推荐小助手</view>
+<nav-bar title="{{title}}" subtitle="arre 食谱推荐小助手" icon="file-text" />
+
+<view class="content anim-fade-up">
+  <view class="card card-pad legal-doc">
+    <view wx:for="{{sections}}" wx:key="heading" class="legal-sec">
+      <view class="legal-sec__h">{{item.heading}}</view>
+      <view wx:for="{{item.paragraphs}}" wx:for-item="p" wx:key="*this" class="legal-sec__p">{{p}}</view>
+    </view>
   </view>
-  <view wx:for="{{sections}}" wx:key="heading" class="legal-section">
-    <view class="section-heading">{{item.heading}}</view>
-    <view wx:for="{{item.paragraphs}}" wx:key="*this" class="section-paragraph">{{item}}</view>
-  </view>
-  <view class="legal-footer">请在使用登录、饮食记录、图片上传或 AI 功能前阅读并确认本页面内容。</view>
-</scroll-view>
+  <view class="legal-foot">请在使用登录、饮食记录、图片上传或 AI 功能前阅读并确认本页面内容。</view>
+  <view class="tabbar-spacer"></view>
+</view>

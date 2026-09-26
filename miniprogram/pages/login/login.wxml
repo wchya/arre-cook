@@ -1,83 +1,146 @@
-<scroll-view class="page" scroll-y="true" enable-flex="true" show-scrollbar="false" enhanced="true">
-  <view class="page-inner">
-    <view class="topbar">
-      <view class="brand">
-        <view class="brand-mark">N</view>
-        <view>
-          <view class="brand-name">NiniMenu</view>
-          <view class="brand-subtitle">你的每日餐桌</view>
-        </view>
-      </view>
-      <view class="privacy-badge"><view class="privacy-dot"></view><text>私密保存</text></view>
+<view class="login">
+  <view class="glow glow-a"></view>
+  <view class="glow glow-b"></view>
+  <view class="glow glow-c"></view>
+
+  <view class="login__inner" style="padding-top:{{topPad}}px;">
+    <!-- 品牌区：与 Web 登录页一致的厨师徽标 + 大标题 -->
+    <view class="brand anim-fade-up">
+      <image class="brand__logo" src="/assets/chef-mark.svg" mode="aspectFit" />
+      <view class="brand__title">今天吃什么，</view>
+      <view class="brand__title">交给 <text class="accent">NiniMenu</text></view>
+      <view class="brand__desc">按你的口味推荐每一餐，AI 助手帮你排菜单、记饮食、列清单。</view>
     </view>
 
-    <view class="intro">
-      <view class="intro-label">WELCOME HOME</view>
-      <view class="intro-title">今天吃什么，<text>现在就有答案。</text></view>
-      <view class="intro-copy">登录后管理你的菜谱、饮食记录和健康计划。</view>
-    </view>
-
-    <view class="login-card">
-      <view class="card-heading">
-        <view>
-          <view class="card-eyebrow">ACCOUNT ACCESS</view>
-          <view class="card-title">进入你的厨房</view>
+    <!-- 登录卡片 -->
+    <view class="panel anim-fade-up">
+      <view wx:if="{{modes.length > 1}}" class="segmented modes" role="tablist">
+        <view class="segmented-thumb" style="width:calc((100% - 16rpx) / {{modes.length}});transform:translateX({{modeIndex * 100}}%);"></view>
+        <view wx:for="{{modes}}" wx:key="key" class="segmented-item {{mode === item.key ? 'is-active' : ''}}" data-mode="{{item.key}}" bindtap="switchMode" aria-role="tab" aria-selected="{{mode === item.key}}">
+          <icon name="{{item.icon}}" size="30" stroke="2.4" color="{{mode === item.key ? (item.key === 'wechat' ? 'wechat' : 'text') : 'text3'}}" />
+          <text>{{item.label}}</text>
         </view>
-        <view class="card-index">01 / 01</view>
       </view>
 
-      <view wx:if="{{message}}" class="message" role="status"><view class="status-icon status-success">✓</view><text>{{message}}</text></view>
-      <view wx:if="{{error}}" class="error" role="alert"><view class="status-icon status-error">!</view><text>{{error}}</text></view>
-
-      <view class="consent-box">
-        <checkbox-group bindchange="onConsentChange"><label class="consent-label"><checkbox value="agreed" checked="{{agreed}}" color="#2f8a61" /><text>我已阅读并同意</text></label></checkbox-group>
-        <navigator url="/pages/legal/legal?type=terms" class="legal-link">用户服务协议</navigator><text class="consent-and">和</text><navigator url="/pages/legal/legal?type=privacy" class="legal-link">隐私政策</navigator>
+      <view wx:if="{{notice}}" class="notice notice-{{notice.type}} panel__notice anim-pop-soft" role="alert">
+        <icon name="{{notice.icon}}" size="30" stroke="2.4" color="{{notice.color}}" />
+        <text class="flex-1">{{notice.text}}</text>
       </view>
 
-      <view wx:if="{{wechatEnabled}}" class="quick-entry">
-        <view class="quick-entry-copy">
-          <view class="quick-entry-title">微信快捷登录</view>
-          <view class="quick-entry-subtitle">已绑定微信账号可直接进入</view>
+      <!-- 微信一键登录 -->
+      <view wx:if="{{mode === 'wechat'}}" class="pane pane--wechat">
+        <view class="wx-badge"><icon name="wechat" size="60" color="wechat" /></view>
+        <view class="wx-title">微信一键登录</view>
+        <view class="wx-desc">已绑定微信的账号可直接进入，无需输入密码</view>
+        <view class="btn btn-lg btn-block btn-wechat {{loading ? 'is-disabled' : ''}}" hover-class="tap-active" hover-stay-time="80" bindtap="loginWithWechat" aria-role="button">
+          <view wx:if="{{loading === 'wechat'}}" class="spinner"></view>
+          <block wx:else>
+            <icon name="wechat" size="40" color="white" />
+            <text>微信一键登录</text>
+          </block>
         </view>
-        <button class="wechat-button" hover-class="wechat-hover" loading="{{loading}}" disabled="{{loading || !agreed}}" bindtap="loginWithWechat">
-          <view class="wechat-symbol"><view class="wechat-bubble wechat-bubble-main"></view><view class="wechat-bubble wechat-bubble-small"></view></view>
-          <text>微信登录</text>
-          <text class="button-arrow">→</text>
-        </button>
-      </view>
-
-      <view wx:if="{{wechatEnabled}}" class="divider"><view class="divider-line"></view><text>或使用其他方式</text><view class="divider-line"></view></view>
-
-      <view wx:if="{{emailEnabled}}" class="mode-switch" role="tablist">
-        <button class="mode-tab {{loginMode === 'email' ? 'mode-tab-active' : ''}}" hover-class="mode-tab-hover" data-mode="email" bindtap="switchLoginMode">邮箱验证码</button>
-        <button class="mode-tab {{loginMode === 'password' ? 'mode-tab-active' : ''}}" hover-class="mode-tab-hover" data-mode="password" bindtap="switchLoginMode">账号密码</button>
-      </view>
-
-      <block wx:if="{{emailEnabled && loginMode === 'email'}}">
-        <view class="field-label">QQ / Foxmail 邮箱</view>
-        <view class="input-wrap"><text class="input-prefix">@</text><input class="input input-with-prefix" type="text" maxlength="120" value="{{email}}" placeholder="name@qq.com" autocomplete="email" bindinput="onEmailInput" /></view>
-        <view class="field-label code-label">邮箱验证码</view>
-        <view class="code-row">
-          <view class="input-wrap code-wrap"><text class="input-prefix code-prefix">6 位</text><input class="input input-with-prefix code-input" type="number" maxlength="6" value="{{code}}" placeholder="输入验证码" bindinput="onCodeInput" /></view>
-          <button class="send-button" hover-class="button-hover" loading="{{sending}}" disabled="{{sending || cooldown > 0 || !agreed}}" bindtap="sendCode">{{cooldown > 0 ? cooldown + ' 秒' : '发送验证码'}}</button>
+        <view wx:if="{{options.email}}" class="wx-alt" hover-class="tap-fade" bindtap="goCodeMode">
+          <text>首次使用？用邮箱验证码登录并绑定微信</text>
+          <icon name="chevron-right" size="26" stroke="2.4" color="primary" />
         </view>
-        <button class="primary-button" hover-class="primary-hover" loading="{{loading}}" disabled="{{loading || code.length !== 6 || !agreed}}" bindtap="submitEmail"><text>登录并继续</text><text class="button-arrow">→</text></button>
-        <view wx:if="{{!registerOpen}}" class="helper-note">目前暂停新账号注册</view>
-        <view wx:elif="{{wechatEnabled}}" class="helper-note">首次使用会将微信绑定到这个邮箱账号</view>
-        <view wx:else class="helper-note">验证邮箱后自动创建账号</view>
-      </block>
+      </view>
 
-      <block wx:if="{{loginMode === 'password'}}">
+      <!-- 邮箱验证码 -->
+      <view wx:elif="{{mode === 'code'}}" class="pane">
+        <view class="field-label">邮箱</view>
+        <view class="field {{focus === 'email' ? 'is-focus' : ''}}">
+          <icon name="mail" size="34" stroke="2.2" color="{{focus === 'email' ? 'primary' : 'text3'}}" />
+          <input class="field-input field-input--icon" type="text" value="{{email}}" maxlength="120" placeholder="你的 QQ 邮箱，如 123456@qq.com" placeholder-class="placeholder" confirm-type="next" cursor-spacing="160" data-field="email" bindinput="onEmailInput" bindfocus="onFocus" bindblur="onBlur" bindconfirm="focusCodeInput" />
+          <view wx:if="{{email && focus === 'email'}}" class="field-clear" catchtap="clearEmail" aria-role="button" aria-label="清空邮箱">
+            <icon name="x" size="22" stroke="2.8" color="white" />
+          </view>
+          <view class="code-btn {{sending || cooldown > 0 || !emailValid ? 'is-disabled' : ''}}" hover-class="tap-active" hover-stay-time="80" catchtap="sendCode" aria-role="button">
+            <view wx:if="{{sending}}" class="spinner spinner-dark"></view>
+            <text wx:elif="{{cooldown > 0}}">{{cooldown}}s</text>
+            <text wx:else>{{codeSent ? '重新发送' : '获取验证码'}}</text>
+          </view>
+        </view>
+        <view wx:if="{{domainHints.length}}" class="domains">
+          <view wx:for="{{domainHints}}" wx:key="*this" class="chip chip-primary domain-chip" data-domain="{{item}}" bindtap="applyDomain" hover-class="tap-active">@{{item}}</view>
+        </view>
+
+        <view class="field-label label-gap">验证码</view>
+        <view class="otp" bindtap="focusCodeInput">
+          <view wx:for="{{codeCells}}" wx:key="i" class="otp__box {{item.v ? 'is-filled' : ''}} {{codeFocus && item.i === code.length ? 'is-active' : ''}}">
+            <text wx:if="{{item.v}}" class="otp__digit anim-pop">{{item.v}}</text>
+            <view wx:elif="{{codeFocus && item.i === code.length}}" class="otp__caret"></view>
+          </view>
+          <input class="otp__input" type="number" maxlength="6" value="{{code}}" focus="{{codeFocus}}" cursor-spacing="140" bindinput="onCodeInput" bindfocus="onCodeFocus" bindblur="onCodeBlur" bindconfirm="submitCode" />
+        </view>
+        <view class="field-hint">{{emailHint}}</view>
+
+        <view class="btn btn-lg btn-block btn-primary-glow submit {{emailValid && code.length === 6 && !loading ? '' : 'is-disabled'}}" hover-class="tap-active" hover-stay-time="80" bindtap="submitCode" aria-role="button">
+          <view wx:if="{{loading === 'submit'}}" class="spinner"></view>
+          <block wx:else>
+            <text>登录</text>
+            <icon name="arrow-right" size="34" stroke="2.6" color="white" />
+          </block>
+        </view>
+      </view>
+
+      <!-- 账号密码 -->
+      <view wx:else class="pane">
         <view class="field-label">账号</view>
-        <view class="input-wrap"><text class="input-prefix">ID</text><input class="input input-with-prefix" type="text" maxlength="120" value="{{account}}" placeholder="邮箱或用户名" autocomplete="username" bindinput="onAccountInput" /></view>
-        <view class="field-label code-label">密码</view>
-        <view class="input-wrap"><text class="input-prefix lock-prefix">••</text><input class="input input-with-prefix password-input" type="{{passwordVisible ? 'text' : 'password'}}" maxlength="128" value="{{password}}" placeholder="输入密码" autocomplete="current-password" bindinput="onPasswordInput" /><button class="password-toggle" hover-class="button-hover" bindtap="togglePasswordVisibility">{{passwordVisible ? '隐藏' : '显示'}}</button></view>
-        <button class="primary-button" hover-class="primary-hover" loading="{{loading}}" disabled="{{loading || !account || !password || !agreed}}" bindtap="submitPassword"><text>账号密码登录</text><text class="button-arrow">→</text></button>
-        <view class="helper-note">提审账号也可以从这里进入完整功能。</view>
-      </block>
+        <view class="field {{focus === 'account' ? 'is-focus' : ''}}">
+          <icon name="user-round" size="34" stroke="2.2" color="{{focus === 'account' ? 'primary' : 'text3'}}" />
+          <input class="field-input field-input--icon" type="text" value="{{account}}" maxlength="120" placeholder="邮箱或用户名" placeholder-class="placeholder" confirm-type="next" cursor-spacing="160" data-field="account" bindinput="onAccountInput" bindfocus="onFocus" bindblur="onBlur" />
+        </view>
+        <view class="field-label label-gap">密码</view>
+        <view class="field {{focus === 'password' ? 'is-focus' : ''}}">
+          <icon name="lock" size="34" stroke="2.2" color="{{focus === 'password' ? 'primary' : 'text3'}}" />
+          <input class="field-input field-input--icon" password="{{!passwordVisible}}" type="text" value="{{password}}" maxlength="128" placeholder="输入密码" placeholder-class="placeholder" confirm-type="done" cursor-spacing="140" data-field="password" bindinput="onPasswordInput" bindfocus="onFocus" bindblur="onBlur" bindconfirm="submitPassword" />
+          <view class="eye" catchtap="togglePasswordVisible" aria-role="button" aria-label="{{passwordVisible ? '隐藏密码' : '显示密码'}}">
+            <icon name="{{passwordVisible ? 'eye-off' : 'eye'}}" size="34" stroke="2.2" color="text3" />
+          </view>
+        </view>
+        <view class="field-hint">在「我的 → 账号与安全」设置过密码后可用；审核账号也从这里登录。</view>
 
+        <view class="btn btn-lg btn-block btn-primary-glow submit {{account && password && !loading ? '' : 'is-disabled'}}" hover-class="tap-active" hover-stay-time="80" bindtap="submitPassword" aria-role="button">
+          <view wx:if="{{loading === 'submit'}}" class="spinner"></view>
+          <block wx:else>
+            <text>登录</text>
+            <icon name="arrow-right" size="34" stroke="2.6" color="white" />
+          </block>
+        </view>
+      </view>
     </view>
 
-    <view class="footer-note"><view class="footer-rule"></view><text>你的账号数据仅对你可见</text><view class="footer-rule"></view></view>
+    <!-- 底部：协议勾选 + 数据说明 -->
+    <view class="footer">
+      <view class="consent {{consentShake ? 'anim-shake' : ''}} {{consentHint && !agreed ? 'is-hint' : ''}}" bindtap="toggleConsent" aria-role="checkbox" aria-checked="{{agreed}}">
+        <view class="check {{agreed ? 'is-on' : ''}}">
+          <icon wx:if="{{agreed}}" name="check" size="22" stroke="3.4" color="white" />
+        </view>
+        <view class="consent__text">我已阅读并同意<text class="link" catchtap="openTerms">《用户服务协议》</text>和<text class="link" catchtap="openPrivacy">《隐私政策》</text></view>
+      </view>
+      <view class="safe-note">
+        <icon name="shield-check" size="24" stroke="2.4" color="text3" />
+        <text>你的饮食数据只属于你，AI 也只能读取你授权的部分</text>
+      </view>
+    </view>
   </view>
-</scroll-view>
+
+  <sheet show="{{consentSheet}}" title="请阅读并同意以下条款" subtitle="为了保障你的账号与数据安全" bind:close="closeConsentSheet">
+    <view class="consent-sheet">
+      <view class="consent-sheet__docs">
+        <view class="doc-row" hover-class="tap-bg" bindtap="openTerms">
+          <view class="row-icon tone-primary"><icon name="file-text" size="34" color="primary" /></view>
+          <view class="flex-1"><view class="row-title">用户服务协议</view><view class="row-desc">账号使用、内容规则与服务说明</view></view>
+          <icon name="chevron-right" size="30" color="text4" />
+        </view>
+        <view class="doc-row" hover-class="tap-bg" bindtap="openPrivacy">
+          <view class="row-icon tone-mint"><icon name="shield-check" size="34" color="mint-ink" /></view>
+          <view class="flex-1"><view class="row-title">隐私政策</view><view class="row-desc">我们如何收集、使用和保护你的数据</view></view>
+          <icon name="chevron-right" size="30" color="text4" />
+        </view>
+      </view>
+      <view class="btn btn-lg btn-block btn-primary-glow" hover-class="tap-active" hover-stay-time="80" bindtap="agreeAndContinue">同意并继续</view>
+      <view class="btn btn-lg btn-block consent-sheet__cancel" hover-class="tap-fade" bindtap="closeConsentSheet">暂不同意</view>
+    </view>
+  </sheet>
+</view>

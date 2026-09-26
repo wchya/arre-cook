@@ -1,0 +1,122 @@
+<nav-bar icon="shopping-basket" title="一周菜单与买菜清单" subtitle="7 天午晚餐 · 食材自动合并" />
+
+<view class="content anim-fade-up">
+  <view class="segmented tabs">
+    <view class="segmented-thumb" style="width:calc((100% - 16rpx) / 2);transform:translateX({{tabIndex * 100}}%);"></view>
+    <view class="segmented-item {{tab === 'week' ? 'is-active' : ''}}" data-tab="week" bindtap="switchTab"><icon name="calendar-days" size="30" stroke="2.4" color="{{tab === 'week' ? 'text' : 'text3'}}" /><text>一周菜单</text></view>
+    <view class="segmented-item {{tab === 'shopping' ? 'is-active' : ''}}" data-tab="shopping" bindtap="switchTab"><icon name="shopping-cart" size="30" stroke="2.4" color="{{tab === 'shopping' ? 'text' : 'text3'}}" /><text>买菜清单</text><text wx:if="{{needBuy}}" class="tab-badge">{{needBuy}}</text></view>
+  </view>
+
+  <!-- 一周菜单 -->
+  <block wx:if="{{tab === 'week'}}">
+    <view class="section-head">
+      <view>
+        <view class="section-title">📅 一周菜单</view>
+        <view class="section-sub">今天、明天的菜单点一下就能记入用餐</view>
+      </view>
+      <view class="section-action {{regenerating ? 'tap-fade' : ''}}" hover-class="tap-active" bindtap="regenerate">
+        <icon name="refresh-cw" size="26" stroke="2.4" color="text2" class="{{regenerating ? 'spin' : ''}}" />
+        <text class="ml-8">{{regenerating ? '生成中…' : '重新生成'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{weekLoading}}"><view wx:for="{{[1, 2]}}" wx:key="*this" class="skeleton day-sk"></view></view>
+    <view wx:elif="{{!days.length}}" class="card"><empty emoji="📅" title="还没有一周菜单" desc="点“重新生成”，按口味自动排好 7 天午晚餐" compact /></view>
+    <view wx:else class="days">
+      <view wx:for="{{visibleDays}}" wx:key="date" class="card day {{item.quick ? 'is-quick' : ''}}" hover-class="{{item.quick ? 'tap-active' : 'none'}}" hover-stay-time="80" data-date="{{item.date}}" bindtap="openQuick">
+        <view class="day__head">
+          <view class="day__name">{{item.dayName}}<text wx:if="{{item.tag}}" class="day__tag {{item.tag === '今天' ? 'c-primary' : 'c-mint'}}">{{item.tag}}</text></view>
+          <view class="flex items-center gap-8">
+            <text class="day__date">{{item.short}}</text>
+            <view wx:if="{{item.quick}}" class="quick-hint">点菜 ›</view>
+          </view>
+        </view>
+        <view wx:if="{{item.lunch.length}}" class="meal-row">
+          <text class="meal-row__label c-primary">午餐</text>
+          <view class="meal-row__dishes">
+            <view wx:for="{{item.lunch}}" wx:for-item="dish" wx:key="id" class="dish-chip dish-chip--lunch" hover-class="tap-active" hover-stop-propagation data-id="{{dish.id}}" catchtap="openDish">{{dish.name}}</view>
+          </view>
+        </view>
+        <view wx:if="{{item.dinner.length}}" class="meal-row">
+          <text class="meal-row__label c-mint">晚餐</text>
+          <view class="meal-row__dishes">
+            <view wx:for="{{item.dinner}}" wx:for-item="dish" wx:key="id" class="dish-chip dish-chip--dinner" hover-class="tap-active" hover-stop-propagation data-id="{{dish.id}}" catchtap="openDish">{{dish.name}}</view>
+          </view>
+        </view>
+        <view wx:if="{{!item.lunch.length && !item.dinner.length}}" class="t-xs c-text3">暂无菜品</view>
+      </view>
+    </view>
+    <view wx:if="{{days.length > 2}}" class="more-btn" hover-class="tap-active" bindtap="toggleAll">
+      <text>{{showAll ? '收起菜单' : '查看完整一周菜单'}}</text>
+      <icon name="{{showAll ? 'chevron-up' : 'chevron-down'}}" size="28" stroke="2.4" color="mint-ink" />
+    </view>
+
+    <view class="card entry" hover-class="tap-active" bindtap="goTomorrow">
+      <view class="entry__icon">🌙</view>
+      <view class="flex-1"><view class="row-title">单独规划明天</view><view class="row-desc">按偏好生成、替换、手动挑菜</view></view>
+      <icon name="chevron-right" size="30" color="text3" />
+    </view>
+  </block>
+
+  <!-- 买菜清单 -->
+  <block wx:else>
+    <view class="section-head">
+      <view>
+        <view class="section-title">🛒 买菜清单</view>
+        <view wx:if="{{totalItems}}" class="section-sub c-mint">待买 {{needBuy}} · 已买 {{checkedCount}} · 家中 {{stockCount}}</view>
+        <view wx:else class="section-sub">根据今日和明日菜单自动合并食材</view>
+      </view>
+      <view wx:if="{{totalItems}}" class="section-action" hover-class="tap-active" bindtap="copyList"><icon name="copy" size="26" stroke="2.4" color="text2" /><text class="ml-8">复制</text></view>
+    </view>
+
+    <view wx:if="{{totalItems}}" class="progress-card card">
+      <view class="flex items-center justify-between mb-16">
+        <text class="t-sm bold">采购进度</text>
+        <text class="t-xs c-text3">{{checkedCount + stockCount}}/{{totalItems}}</text>
+      </view>
+      <view class="progress"><view class="progress__bar" style="width:{{totalItems ? (checkedCount + stockCount) * 100 / totalItems : 0}}%;"></view></view>
+    </view>
+
+    <view wx:if="{{shoppingLoading}}" class="skeleton day-sk"></view>
+    <view wx:elif="{{!categories.length}}" class="card">
+      <empty emoji="🧺" title="暂无买菜清单" desc="点菜后自动生成今日 + 明日食材" compact>
+        <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="goDishes">去选菜</view>
+      </empty>
+    </view>
+    <view wx:else class="card shop">
+      <view wx:for="{{categories}}" wx:for-item="cat" wx:key="name" class="shop__cat">
+        <view class="shop__cat-name">{{cat.name}}<icon wx:if="{{cat.done}}" name="circle-check" size="26" stroke="2.4" color="mint-ink" /></view>
+        <view wx:for="{{cat.items}}" wx:key="key" class="shop__item {{item.stock ? 'is-stock' : ''}}">
+          <view class="check {{item.checked ? 'is-checked' : ''}} {{item.stock ? 'is-home' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" data-stock="{{item.stock}}" bindtap="toggleCheck">
+            <text wx:if="{{item.stock}}" class="check__home">家</text>
+            <icon wx:elif="{{item.checked}}" name="check" size="24" stroke="3.4" color="white" />
+          </view>
+          <view class="shop__name {{item.checked || item.stock ? 'is-done' : ''}}" data-name="{{item.name}}" data-checked="{{item.checked}}" data-stock="{{item.stock}}" bindtap="toggleCheck">{{item.name}}</view>
+          <text class="shop__amount">{{item.amount}}</text>
+          <view class="stock-btn {{item.stock ? 'is-on' : ''}}" hover-class="tap-active" data-name="{{item.name}}" data-stock="{{item.stock}}" bindtap="toggleStock">{{item.stock ? '家中有' : '库存'}}</view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{categories.length}}" class="tip-line">勾选表示已买；家里已有的食材点“库存”，之后生成的清单会自动跳过</view>
+  </block>
+  <view class="safe-space"></view>
+</view>
+
+<sheet show="{{quickOpen}}" title="快速点菜 · {{quickDay ? (quickDay.tag || quickDay.dayName) : ''}}" subtitle="{{quickDay ? quickDay.short + ' ' + quickDay.dayName : ''}}" bind:close="closeQuick">
+  <view class="quick" wx:if="{{quickDay}}">
+    <view wx:if="{{quickDay.lunch.length}}" class="mb-24">
+      <view class="quick__label c-primary">🍳 午餐</view>
+      <view class="chips"><text wx:for="{{quickDay.lunch}}" wx:key="id" class="dish-chip dish-chip--lunch">{{item.name}}</text></view>
+    </view>
+    <view wx:if="{{quickDay.dinner.length}}" class="mb-24">
+      <view class="quick__label c-mint">🍲 晚餐</view>
+      <view class="chips"><text wx:for="{{quickDay.dinner}}" wx:key="id" class="dish-chip dish-chip--dinner">{{item.name}}</text></view>
+    </view>
+    <view class="flex gap-20 mt-16">
+      <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeQuick">取消</view>
+      <view class="btn btn-primary flex-1 {{recording ? 'is-disabled' : ''}}" hover-class="tap-active" bindtap="confirmQuick">
+        <view wx:if="{{recording}}" class="spinner"></view><text wx:else>确认点菜</text>
+      </view>
+    </view>
+  </view>
+</sheet>

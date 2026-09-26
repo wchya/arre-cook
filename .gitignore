@@ -4,6 +4,9 @@ env.bak
 *.bak
 docs/private.*.key
 
+# IDE
+.idea/
+
 # 构建产物
 dist/
 dist-win/

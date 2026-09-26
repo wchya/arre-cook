@@ -1,0 +1,137 @@
+<nav-bar icon="calendar-clock" title="明天吃什么" subtitle="{{dateLabel}}" />
+
+<view wx:if="{{loading}}" class="content">
+  <view class="skeleton sk-a"></view>
+  <view class="skeleton sk-b"></view>
+  <view class="skeleton sk-b"></view>
+</view>
+
+<view wx:else class="content anim-fade-up">
+  <!-- 概览 -->
+  <view class="card card-pad">
+    <view class="flex items-start justify-between gap-16 mb-24">
+      <view class="flex items-center gap-16">
+        <view class="head-icon tone-primary"><icon name="calendar-clock" size="44" stroke="2.45" color="primary" /></view>
+        <view>
+          <view class="summary-title">明天菜单</view>
+          <view class="summary-date">{{dateLabel}}</view>
+        </view>
+      </view>
+      <text class="save-state {{hasSaved && !hasChanges ? 'is-saved' : ''}}">{{hasSaved ? (hasChanges ? '有修改' : '已保存') : '待保存'}}</text>
+    </view>
+    <view class="grid-3 mb-24">
+      <view class="mini"><view class="mini__label">菜品</view><view class="mini__value">{{totalCount}} 道</view></view>
+      <view class="mini"><view class="mini__value">午餐 {{lunchCount}} 道</view><view class="mini__label">约用时 {{lunchMinutes ? lunchMinutes + 'm' : '-'}}</view></view>
+      <view class="mini"><view class="mini__value">晚餐 {{dinnerCount}} 道</view><view class="mini__label">约用时 {{dinnerMinutes ? dinnerMinutes + 'm' : '-'}}</view></view>
+    </view>
+    <view class="grid-2">
+      <view class="btn btn-primary {{picking ? 'is-disabled' : ''}}" hover-class="tap-active" bindtap="regenerate"><icon name="dices" size="32" stroke="2.5" color="white" /><text>重新生成</text></view>
+      <view class="btn btn-ghost" hover-class="tap-active" bindtap="goPlan"><icon name="shopping-basket" size="32" stroke="2.35" color="text2" /><text>买菜清单</text></view>
+    </view>
+  </view>
+
+  <!-- 偏好 -->
+  <view class="flex items-center justify-between mt-32 mb-16">
+    <view>
+      <view class="block-title">偏好</view>
+      <view class="block-sub">生成和替换都会按这里来</view>
+    </view>
+    <view class="try-btn {{picking ? 'tap-fade' : ''}}" hover-class="tap-active" bindtap="regenerate"><icon name="dices" size="26" stroke="2.5" color="text2" /><text>试一版</text></view>
+  </view>
+  <scroll-view class="profiles" scroll-x enhanced show-scrollbar="{{false}}">
+    <view wx:for="{{profiles}}" wx:key="key" class="profile {{profile === item.key ? 'is-active' : ''}}" hover-class="tap-active" data-key="{{item.key}}" bindtap="chooseProfile">
+      <view class="profile__icon"><icon name="{{item.icon}}" size="32" stroke="2.35" color="{{profile === item.key ? 'primary' : 'text3'}}" /></view>
+      <view>
+        <view class="profile__label">{{item.label}}</view>
+        <view class="profile__hint">{{item.hint}}</view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 午餐 / 晚餐 -->
+  <view wx:for="{{meals}}" wx:for-item="meal" wx:key="key" class="card planner mt-32">
+    <view class="planner__head">
+      <view class="flex items-center gap-20 flex-1">
+        <view class="planner__icon tone-{{meal.tone}}"><icon name="{{meal.icon}}" size="44" stroke="2.45" color="{{meal.tone === 'mint' ? 'mint-ink' : 'primary'}}" /></view>
+        <view class="flex-1">
+          <view class="planner__title">{{meal.label}}</view>
+          <view class="planner__helper">{{meal.helper}}<text wx:if="{{meal.minutes}}"> · 约 {{meal.minutes}} 分钟</text></view>
+        </view>
+      </view>
+      <view class="stepper">
+        <view class="stepper__btn {{meal.target <= 0 ? 'is-off' : ''}}" data-meal="{{meal.key}}" data-step="-1" bindtap="changeTarget"><icon name="minus" size="26" stroke="2.4" color="text3" /></view>
+        <view class="stepper__value">{{meal.target}}</view>
+        <view class="stepper__btn {{meal.target >= 5 ? 'is-off' : ''}}" data-meal="{{meal.key}}" data-step="1" bindtap="changeTarget"><icon name="plus" size="26" stroke="2.4" color="text3" /></view>
+      </view>
+    </view>
+
+    <view class="planner__body">
+      <view wx:if="{{!meal.dishes.length}}" class="planner__empty">
+        <view class="planner__empty-icon tone-{{meal.tone}}"><icon name="utensils-crossed" size="44" stroke="2.35" color="{{meal.tone === 'mint' ? 'mint-ink' : 'primary'}}" /></view>
+        <view class="t-sm bold c-text">还没选{{meal.short}}</view>
+        <view class="t-xs c-text3 mt-8">可以智能补齐，也可以自己挑</view>
+      </view>
+      <view wx:for="{{meal.dishes}}" wx:key="id" class="plan-dish">
+        <view class="plan-dish__thumb" data-id="{{item.id}}" bindtap="openDish"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="56" /></view>
+        <view class="flex-1" data-id="{{item.id}}" bindtap="openDish">
+          <view class="plan-dish__name truncate">{{item.name}}</view>
+          <view class="chips plan-dish__chips">
+            <text wx:if="{{item.category}}" class="chip chip-sm chip-ghost">{{item.category}}</text>
+            <text class="chip chip-sm chip-ghost">⏱ {{item.timeText}}</text>
+            <text wx:if="{{item.diffLabel}}" class="chip chip-sm chip-{{item.diffTone}}">{{item.diffLabel}}</text>
+          </view>
+        </view>
+        <view class="round-btn tone-{{meal.tone}}" hover-class="tap-active" data-meal="{{meal.key}}" data-id="{{item.id}}" bindtap="swapDish" aria-role="button" aria-label="替换"><icon name="refresh-cw" size="28" stroke="2.35" color="{{meal.tone === 'mint' ? 'mint-ink' : 'primary'}}" /></view>
+        <view class="round-btn tone-muted" hover-class="tap-active" data-meal="{{meal.key}}" data-id="{{item.id}}" bindtap="removeDish" aria-role="button" aria-label="移除"><icon name="trash-2" size="28" stroke="2.25" color="text3" /></view>
+      </view>
+    </view>
+
+    <view class="planner__foot">
+      <view class="foot-btn {{picking || !meal.missing ? 'is-off' : ''}}" hover-class="tap-active" data-meal="{{meal.key}}" bindtap="fillMeal"><icon name="plus" size="26" stroke="2.5" color="text2" /><text>{{meal.missing ? '补 ' + meal.missing + ' 道' : '已够数'}}</text></view>
+      <view class="foot-btn {{picking || !meal.target ? 'is-off' : ''}}" hover-class="tap-active" data-meal="{{meal.key}}" bindtap="replaceMeal"><icon name="dices" size="26" stroke="2.5" color="text2" /><text>换一批</text></view>
+      <view class="foot-btn {{picking ? 'is-off' : ''}}" hover-class="tap-active" data-meal="{{meal.key}}" bindtap="openPicker"><icon name="search" size="26" stroke="2.5" color="text2" /><text>手动选</text></view>
+    </view>
+  </view>
+  <view class="bottom-space"></view>
+</view>
+
+<!-- 底部保存栏 -->
+<view wx:if="{{!loading}}" class="save-bar">
+  <view class="flex-1">
+    <view class="save-bar__title truncate">{{totalCount ? dateLabel + ' · ' + totalCount + ' 道菜' : '还没有选择菜品'}}</view>
+    <view class="save-bar__sub truncate">{{hasSaved ? (hasChanges ? '保存后会覆盖原明日菜单' : '当前菜单已同步到买菜清单') : '保存后自动生成买菜清单'}}</view>
+  </view>
+  <view class="btn btn-primary save-btn {{saving || !totalCount || (hasSaved && !hasChanges) ? 'is-disabled' : ''}}" hover-class="tap-active" bindtap="save">
+    <view wx:if="{{saving}}" class="spinner"></view>
+    <block wx:else><icon name="check" size="32" stroke="2.6" color="white" /><text>{{hasSaved ? (hasChanges ? '更新菜单' : '已保存') : '保存菜单'}}</text></block>
+  </view>
+</view>
+
+<!-- 手动选菜 -->
+<sheet show="{{pickerOpen}}" title="{{pickerTitle}}" subtitle="{{pickerList.length}} 道可选" bind:close="closePicker">
+  <view class="picker-head">
+    <view class="field input-sm">
+      <icon name="search" size="30" stroke="2.35" color="text3" />
+      <input class="field-input picker-input" value="{{pickerSearch}}" placeholder="搜索菜名、分类、配料" placeholder-class="placeholder" bindinput="onPickerSearch" />
+    </view>
+    <scroll-view class="picker-cats" scroll-x enhanced show-scrollbar="{{false}}">
+      <view wx:for="{{pickerCategories}}" wx:key="*this" class="picker-cat {{pickerCategory === item ? 'is-active' : ''}}" data-name="{{item}}" bindtap="choosePickerCategory">{{item}}</view>
+    </scroll-view>
+  </view>
+  <view class="picker-list">
+    <view wx:if="{{pickerLoading}}"><view wx:for="{{[1, 2, 3, 4, 5]}}" wx:key="*this" class="skeleton picker-sk"></view></view>
+    <empty wx:elif="{{!pickerList.length}}" emoji="🔍" title="没有找到合适的菜" desc="换个关键词或分类试试" compact />
+    <view wx:for="{{pickerList}}" wx:key="id" class="picker-row">
+      <view class="picker-row__thumb"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="48" /></view>
+      <view class="flex-1">
+        <view class="picker-row__name truncate">{{item.name}}</view>
+        <view class="picker-row__meta truncate">{{item.category}} · {{item.timeText}} · {{item.diffLabel}}</view>
+      </view>
+      <view wx:if="{{item.selectedMeal && item.selectedMeal !== pickerMeal}}" class="pick-btn pick-btn--off">已在{{item.selectedLabel}}</view>
+      <view wx:elif="{{item.selectedMeal}}" class="pick-btn pick-btn--remove" hover-class="tap-active" data-id="{{item.id}}" bindtap="pickerRemove"><icon name="x" size="22" stroke="2.6" color="red" /><text>移除</text></view>
+      <view wx:else class="pick-btn {{pickerMeal === 'dinner' ? 'pick-btn--mint' : ''}}" hover-class="tap-active" data-id="{{item.id}}" bindtap="pickerAdd"><icon name="plus" size="22" stroke="2.8" color="white" /><text>加入</text></view>
+    </view>
+  </view>
+</sheet>
+
+<confetti id="confetti" />

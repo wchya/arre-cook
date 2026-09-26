@@ -1,0 +1,26 @@
+.sk { height: 480rpx; border-radius: 32rpx; }
+.hero { margin-bottom: 32rpx; padding: 40rpx; }
+.hero__kicker { display: flex; align-items: center; gap: 8rpx; color: var(--text3); font-size: 24rpx; font-weight: 600; }
+.hero__summary { margin-top: 24rpx; color: var(--text); font-size: 30rpx; line-height: 1.85; }
+.hero__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 40rpx; padding: 24rpx 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: center; }
+.hero__stat + .hero__stat { border-left: 1px solid var(--border); }
+.hero__value { color: var(--text); font-size: 40rpx; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hero__label { color: var(--text3); font-size: 22rpx; }
+.hero__facts { display: flex; flex-wrap: wrap; gap: 16rpx 40rpx; margin-top: 32rpx; }
+.fact { display: flex; align-items: center; gap: 10rpx; color: var(--text2); font-size: 24rpx; }
+
+.panel { margin-bottom: 32rpx; padding: 0 32rpx; }
+.block { padding: 32rpx 0; }
+.block + .block { border-top: 1px solid var(--border); }
+.block__title { margin-bottom: 24rpx; color: var(--text); font-size: 28rpx; font-weight: 700; }
+.empty-line { color: var(--text3); font-size: 24rpx; }
+.weight { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; font-size: 24rpx; }
+.weight__name { width: 152rpx; flex-shrink: 0; color: var(--text2); font-weight: 500; }
+.weight__track { flex: 1; height: 16rpx; overflow: hidden; border-radius: 999rpx; background: var(--bg); }
+.weight__fill { height: 100%; border-radius: 999rpx; background: var(--primary); }
+.weight__fill--mint { background: var(--mint); }
+.weight__count { width: 80rpx; flex-shrink: 0; color: var(--text3); text-align: right; font-variant-numeric: tabular-nums; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding: 24rpx 0; color: var(--text); font-size: 28rpx; font-weight: 500; }
+.top + .top { border-top: 1px solid var(--border); }
+.top__count { display: flex; flex-shrink: 0; align-items: center; gap: 6rpx; color: var(--text3); font-size: 24rpx; }
+.safe-space { height: calc(48rpx + env(safe-area-inset-bottom)); }

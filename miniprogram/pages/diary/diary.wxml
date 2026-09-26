@@ -1,57 +1,149 @@
-<scroll-view class="mp-screen" scroll-y show-scrollbar="false">
-  <view class="mp-content diary-content">
-    <view class="mp-header"><view><view class="mp-title">饮食记录</view><view class="mp-subtitle">记下每一餐，再看见饮食的变化。</view></view></view>
+<nav-bar title="饮食记录" subtitle="实际吃过的，才进入报告" icon="activity"></nav-bar>
 
-    <view class="segmented-control">
-      <button class="segment {{view === 'journal' ? 'segment-active' : ''}}" data-view="journal" bindtap="switchView">我的记录</button>
-      <button class="segment {{view === 'report' ? 'segment-active' : ''}}" data-view="report" bindtap="switchView">健康报告</button>
+<view class="content anim-fade-up">
+  <view class="segmented view-seg">
+    <view class="segmented-thumb" style="width:calc((100% - 16rpx) / 2);transform:translateX({{viewIndex * 100}}%);"></view>
+    <view class="segmented-item {{view === 'journal' ? 'is-active' : ''}}" data-view="journal" bindtap="switchView"><icon name="book-open" size="28" stroke="2.4" color="{{view === 'journal' ? 'text' : 'text3'}}" /><text>饮食日记</text></view>
+    <view class="segmented-item {{view === 'report' ? 'is-active' : ''}}" data-view="report" bindtap="switchView"><icon name="chart-pie" size="28" stroke="2.4" color="{{view === 'report' ? 'text' : 'text3'}}" /><text>健康报告</text></view>
+  </view>
+
+  <!-- 饮食日记 -->
+  <block wx:if="{{view === 'journal'}}">
+    <view wx:if="{{loading}}" class="skeleton sk"></view>
+    <block wx:else>
+      <view wx:if="{{!dayGroups.length}}" class="card">
+        <empty emoji="🍽" title="还没有饮食记录" desc="今天吃了什么？记录一餐，开启你的饮食日记" compact>
+          <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="openForm">记录一餐</view>
+        </empty>
+      </view>
+      <view wx:for="{{dayGroups}}" wx:key="date" class="day">
+        <view class="day__head"><text class="day__label">{{item.label}}</text><text class="day__weekday">{{item.weekday}}</text></view>
+        <view class="card day__card">
+          <view wx:for="{{item.items}}" wx:for-item="entry" wx:key="id" class="entry">
+            <view class="entry__meal">{{entry.mealEmoji}}</view>
+            <view class="flex-1">
+              <text class="entry__tag">{{entry.mealLabel}}</text>
+              <view class="entry__name truncate">{{entry.dishName}}</view>
+              <view wx:if="{{entry.cuisine || entry.groups.length}}" class="chips entry__chips">
+                <text wx:if="{{entry.cuisine}}" class="chip chip-sm chip-ghost">{{entry.cuisine}}</text>
+                <text wx:for="{{entry.groups}}" wx:for-item="g" wx:key="*this" class="chip chip-sm chip-mint">{{g}}</text>
+              </view>
+              <view wx:if="{{entry.notes}}" class="entry__notes">{{entry.notes}}</view>
+            </view>
+            <view class="entry__del" hover-class="tap-active" data-id="{{entry.id}}" bindtap="removeEntry"><icon name="trash-2" size="30" stroke="2.2" color="text4" /></view>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{dayGroups.length}}" class="row-link" hover-class="tap-bg" bindtap="goHistory">
+        <icon name="calendar-check" size="32" stroke="2.3" color="mint-ink" /><text class="flex-1">查看菜谱用餐记录</text><icon name="chevron-right" size="30" color="text4" />
+      </view>
+    </block>
+  </block>
+
+  <!-- 健康报告 -->
+  <block wx:elif="{{view === 'report'}}">
+    <view class="period">
+      <view class="period__btn {{days === 7 ? 'is-active' : ''}}" hover-class="tap-active" data-days="7" bindtap="choosePeriod">近 7 天</view>
+      <view class="period__btn {{days === 30 ? 'is-active' : ''}}" hover-class="tap-active" data-days="30" bindtap="choosePeriod">近 30 天</view>
     </view>
 
-    <view wx:if="{{error}}" class="mp-error diary-error">{{error}}</view>
-
-    <block wx:if="{{view === 'journal'}}">
-      <view class="mp-section-heading diary-list-heading"><view class="mp-section-title">本月记录</view><button class="add-button" bindtap="showNewEntry">＋ 记一餐</button></view>
-      <view wx:if="{{showForm}}" class="mp-panel entry-form">
-        <view class="form-title">记录今天吃的菜</view>
-        <view class="form-grid">
-          <label class="form-field"><text>日期</text><picker mode="date" value="{{mealDate}}" bindchange="onDateChange"><view class="picker-value">{{mealDate}}</view></picker></label>
-          <label class="form-field"><text>餐次</text><picker mode="selector" range="{{meals}}" range-key="label" value="{{mealIndex}}" bindchange="onMealChange"><view class="picker-value">{{meals[mealIndex].label}}</view></picker></label>
-        </view>
-        <label class="form-field"><text>菜名</text><input class="mp-input" value="{{dishName}}" maxlength="80" placeholder="例如：番茄炒蛋" bindinput="onDishInput" /></label>
-        <label class="form-field"><text>菜系</text><input class="mp-input" value="{{cuisine}}" maxlength="40" placeholder="例如：家常菜、川菜" bindinput="onCuisineInput" /></label>
-        <view class="form-field"><text>食物类别</text><checkbox-group class="food-groups" bindchange="onFoodGroupsChange"><label wx:for="{{groups}}" wx:key="value" class="food-group"><checkbox value="{{item.value}}" checked="{{item.checked}}" color="#2f8a61" />{{item.label}}</label></checkbox-group></view>
-        <label class="form-field"><text>备注</text><textarea class="notes-input" value="{{notes}}" maxlength="200" auto-height placeholder="可记录口味、份量或身体感受" bindinput="onNotesInput" /></label>
-        <button class="mp-primary save-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveEntry">保存饮食记录</button>
+    <view wx:if="{{loading}}" class="skeleton sk"></view>
+    <block wx:elif="{{report}}">
+      <view class="grid-2 mb-24">
+        <view class="stat-card"><view class="stat-value c-primary">{{report.logged_days}}<text class="stat-unit">/ {{report.period}} 天</text></view><view class="stat-label">有记录的日子</view></view>
+        <view class="stat-card"><view class="stat-value c-mint">{{report.meal_count}}</view><view class="stat-label">饮食记录条目</view></view>
       </view>
 
-      <view wx:if="{{loading}}" class="loading-note">正在加载记录…</view>
-      <view wx:elif="{{entries.length === 0}}" class="mp-panel journal-empty"><view class="empty-title">还没有手动记录</view><view class="mp-muted">记下你实际吃的菜系和食物类别，健康报告会根据这些内容整理趋势。</view><button class="mp-secondary empty-add" bindtap="showNewEntry">添加第一条记录</button></view>
-      <view wx:else class="journal-list">
-        <view wx:for="{{entries}}" wx:key="id" class="journal-item">
-          <view class="journal-date"><view class="date-dot"></view><text>{{item.meal_date}}</text><text class="meal-label">{{item.meal_type === 'breakfast' ? '早餐' : item.meal_type === 'lunch' ? '午餐' : item.meal_type === 'dinner' ? '晚餐' : '加餐'}}</text></view>
-          <view class="journal-main"><view class="journal-dish">{{item.dish_name}}</view><button class="delete-button" data-id="{{item.id}}" bindtap="removeEntry" aria-label="删除记录">删除</button></view>
-          <view wx:if="{{item.cuisine}}" class="journal-cuisine">{{item.cuisine}}</view>
-          <view class="journal-tags"><text wx:for="{{item.food_groups}}" wx:for-item="group" wx:key="*this" class="journal-tag">{{group}}</text></view>
-          <view wx:if="{{item.notes}}" class="journal-notes">{{item.notes}}</view>
+      <view wx:if="{{report.insights.length}}" class="card card-pad mb-24">
+        <view class="section-title mb-16"><icon name="trending-up" size="32" stroke="2.3" color="primary" /><text>这段时间的变化</text></view>
+        <view wx:for="{{report.insights}}" wx:key="*this" class="insight">{{item}}</view>
+      </view>
+
+      <view wx:if="{{cuisineBars.length}}" class="card card-pad mb-24">
+        <view class="section-title mb-16"><icon name="chart-column" size="32" stroke="2.3" color="purple" /><text>菜系分布</text></view>
+        <view wx:for="{{cuisineBars}}" wx:key="name" class="bar">
+          <text class="bar__label truncate">{{item.name}}</text>
+          <view class="bar__track"><view class="bar__fill bar__fill--purple" style="width:{{item.pct}}%;"></view></view>
+          <text class="bar__val">{{item.count}}</text>
         </view>
       </view>
+
+      <view wx:if="{{hasGroups}}" class="card card-pad mb-24">
+        <view class="section-title mb-16"><icon name="salad" size="32" stroke="2.3" color="mint-ink" /><text>食物类别</text></view>
+        <view wx:for="{{groupBars}}" wx:key="value" class="bar">
+          <text class="bar__label">{{item.label}}</text>
+          <view class="bar__track"><view class="bar__fill bar__fill--{{item.tone}}" style="width:{{item.pct}}%;"></view></view>
+          <text class="bar__val">{{item.days}} 天</text>
+        </view>
+        <view class="hint">仅统计手动标注的日子，未标注不代表没吃。</view>
+      </view>
+
+      <view wx:if="{{report.plan_actions.length}}" class="card card-pad mb-24">
+        <view class="section-title mb-16"><icon name="target" size="32" stroke="2.3" color="yellow-dark" /><text>接下来这样安排</text></view>
+        <view wx:for="{{report.plan_actions}}" wx:key="*this" class="action"><text class="action__idx">{{index + 1}}</text><text class="action__text">{{item}}</text></view>
+        <view class="btn btn-soft btn-sm mt-16" hover-class="tap-active" bindtap="goPlan"><icon name="calendar-days" size="28" stroke="2.4" color="primary" /><text>安排一周菜单</text></view>
+      </view>
+
+      <view wx:if="{{recs.length}}" class="card mb-24">
+        <view class="section-title rec-head"><icon name="sparkles" size="32" stroke="2.3" color="pink-ink" /><text>换个口味试试</text></view>
+        <view wx:for="{{recs}}" wx:key="id" class="rec" hover-class="tap-bg" data-id="{{item.id}}" bindtap="goDish">
+          <view class="rec__thumb"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="40" /></view>
+          <view class="flex-1"><view class="rec__name truncate">{{item.name}}</view><view class="rec__reason">{{item.reason}}</view></view>
+          <icon name="chevron-right" size="30" color="text4" />
+        </view>
+      </view>
+
+      <view class="btn btn-ghost btn-block" hover-class="tap-active" bindtap="goChat"><icon name="sparkles" size="30" stroke="2.4" color="text2" /><text>和 AI 助手聊聊饮食规划</text></view>
+      <view class="disclaimer">报告用于整理你填写的饮食信息，不提供营养诊断或医疗建议。</view>
     </block>
+    <view wx:else class="card"><empty emoji="📊" title="还没有足够的数据" desc="记录几餐后，这里会生成你的饮食报告" compact /></view>
+  </block>
 
-    <block wx:if="{{view === 'report'}}">
-      <view class="period-switch"><button class="period-button {{days === 7 ? 'period-active' : ''}}" data-days="7" bindtap="choosePeriod">近 7 天</button><button class="period-button {{days === 30 ? 'period-active' : ''}}" data-days="30" bindtap="choosePeriod">近 30 天</button></view>
-      <view wx:if="{{loading}}" class="loading-note">正在整理报告…</view>
-      <view wx:elif="{{report}}">
-        <view class="report-summary">
-          <view class="summary-metric"><text class="metric-value">{{report.logged_days}}</text><text class="metric-unit">天</text><text class="metric-label">有饮食记录</text></view>
-          <view class="summary-divider"></view>
-          <view class="summary-metric"><text class="metric-value">{{report.meal_count}}</text><text class="metric-unit">餐</text><text class="metric-label">记录条目</text></view>
-        </view>
-        <view class="report-caveat">统计根据你填写的内容整理。未记录不代表未吃；报告不提供营养诊断或医疗建议。</view>
-        <view class="mp-section"><view class="mp-section-title">这段时间的变化</view><view wx:if="{{report.insights.length === 0}}" class="mp-panel report-empty">再记录几餐，就能看到更完整的趋势。</view><view wx:else class="insight-list"><view wx:for="{{report.insights}}" wx:key="*this" class="insight-row"><view class="insight-mark"></view><text>{{item}}</text></view></view></view>
-        <view wx:if="{{report.cuisine_counts.length}}" class="mp-section"><view class="mp-section-title">常吃菜系</view><view class="cuisine-list"><view wx:for="{{report.cuisine_counts}}" wx:key="name" class="cuisine-row"><text>{{item.name}}</text><text class="cuisine-count">{{item.count}} 次</text></view></view></view>
-        <view wx:if="{{report.plan_actions.length}}" class="mp-section"><view class="mp-section-title">接下来可以试试</view><view class="plan-list"><view wx:for="{{report.plan_actions}}" wx:key="*this" class="plan-item"><text class="plan-number">{{index + 1}}</text><text>{{item}}</text></view></view></view>
-        <button class="chat-link" bindtap="goChat">和饮食助手聊聊</button>
+  <view class="tabbar-spacer"></view>
+</view>
+
+<view wx:if="{{view === 'journal' && !loading}}" class="fab" hover-class="tap-active" bindtap="openForm"><icon name="plus" size="46" stroke="2.6" color="white" /></view>
+
+<sheet show="{{showForm}}" title="记录一餐" subtitle="实际吃过的，才进入报告" bind:close="closeForm">
+  <view class="sheet-body form">
+    <view class="form-block">
+      <text class="field-label">日期</text>
+      <picker mode="date" value="{{formDate}}" end="{{today}}" bindchange="onDateChange">
+        <view class="field"><icon name="calendar-days" size="30" stroke="2.2" color="text3" /><text class="field-input picker-val">{{formDate}}</text><icon name="chevron-down" size="28" color="text4" /></view>
+      </picker>
+    </view>
+    <view class="form-block">
+      <text class="field-label">餐次</text>
+      <view class="chips">
+        <view wx:for="{{meals}}" wx:key="value" class="chip g-chip {{formMeal === item.value ? 'chip-solid' : 'chip-ghost'}}" hover-class="tap-active" data-value="{{item.value}}" bindtap="chooseMeal">{{item.emoji}} {{item.label}}</view>
       </view>
-    </block>
+    </view>
+    <view class="form-block">
+      <text class="field-label">吃了什么</text>
+      <view class="field {{focusDish ? 'is-focus' : ''}}"><input class="field-input" value="{{formDish}}" maxlength="100" placeholder="例如：番茄鸡蛋面" placeholder-class="placeholder" data-k="Dish" bindinput="onDishInput" bindfocus="focusOn" bindblur="focusOff" /></view>
+    </view>
+    <view class="form-block">
+      <text class="field-label">菜系 <text class="field-opt">可选</text></text>
+      <view class="field {{focusCuisine ? 'is-focus' : ''}}"><input class="field-input" value="{{formCuisine}}" maxlength="40" placeholder="自己填写或从下方选择" placeholder-class="placeholder" data-k="Cuisine" bindinput="onCuisineInput" bindfocus="focusOn" bindblur="focusOff" /></view>
+      <scroll-view scroll-x class="cuisine-scroll" show-scrollbar="{{false}}" enhanced>
+        <view class="cuisine-row">
+          <view wx:for="{{cuisines}}" wx:key="*this" class="chip chip-sm {{formCuisine === item ? 'chip-primary' : 'chip-ghost'}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseCuisine">{{item}}</view>
+        </view>
+      </scroll-view>
+    </view>
+    <view class="form-block">
+      <text class="field-label">食物类别 <text class="field-opt">可选 · 可多选</text></text>
+      <view class="chips">
+        <view wx:for="{{groupDefs}}" wx:key="value" class="chip g-chip {{item.on ? 'chip-' + item.tone : 'chip-ghost'}}" hover-class="tap-active" data-value="{{item.value}}" bindtap="toggleGroup"><icon name="{{item.icon}}" size="26" stroke="2.2" color="{{item.on ? item.color : 'text3'}}" /><text>{{item.label}}</text></view>
+      </view>
+    </view>
+    <view class="form-block">
+      <text class="field-label">备注 <text class="field-opt">可选</text></text>
+      <textarea class="field-textarea {{focusNotes ? 'is-focus' : ''}}" value="{{formNotes}}" maxlength="500" placeholder="口感、心情、和谁一起吃…" placeholder-class="placeholder" data-k="Notes" bindinput="onNotesInput" bindfocus="focusOn" bindblur="focusOff" auto-height />
+    </view>
   </view>
-</scroll-view>
+  <view slot="footer" class="sheet-foot">
+    <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeForm">取消</view>
+    <view class="btn btn-primary flex-1 {{formDish && !saving ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveEntry"><view wx:if="{{saving}}" class="spinner"></view><text wx:else>保存记录</text></view>
+  </view>
+</sheet>

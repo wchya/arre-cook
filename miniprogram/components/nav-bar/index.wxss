@@ -1,0 +1,19 @@
+:host { position: sticky; top: 0; z-index: 100; display: block; flex-shrink: 0; }
+
+.nav { position: relative; width: 100%; border-bottom: 1px solid rgba(255, 255, 255, .7); background-color: rgba(250, 250, 248, .9); box-shadow: 0 20rpx 56rpx rgba(26, 26, 46, .045); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.nav--fixed { position: fixed; top: 0; right: 0; left: 0; z-index: 100; }
+.nav--transparent { border-bottom-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.nav--plain { border-bottom-color: transparent; box-shadow: none; }
+.nav--dark { border-bottom-color: transparent; background-color: #1A1A2E; box-shadow: none; }
+
+.nav__bar { display: flex; align-items: center; gap: 20rpx; padding-left: 32rpx; }
+.nav__btn { display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; flex-shrink: 0; border: 1px solid var(--border); border-radius: 50%; background: rgba(255, 255, 255, .92); box-shadow: 0 2rpx 6rpx rgba(26, 26, 46, .05), 0 12rpx 36rpx rgba(26, 26, 46, .06); }
+.nav--dark .nav__btn { border-color: rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .1); box-shadow: none; }
+.nav__icon { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex-shrink: 0; border: 1px solid rgba(232, 115, 74, .1); border-radius: 26rpx; background: var(--primary-light); box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, .82), 0 14rpx 36rpx rgba(232, 115, 74, .11); }
+.nav__titles { flex: 1; min-width: 0; }
+.nav__title { overflow: hidden; color: var(--text); font-size: 34rpx; font-weight: 800; line-height: 1.2; letter-spacing: -.5rpx; white-space: nowrap; text-overflow: ellipsis; }
+.nav__accent { color: var(--primary); }
+.nav__subtitle { overflow: hidden; margin-top: 4rpx; color: var(--text3); font-size: 22rpx; font-weight: 500; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
+.nav--dark .nav__title { color: #fff; }
+.nav--dark .nav__subtitle { color: rgba(255, 255, 255, .5); }
+.nav__extra { display: flex; flex-shrink: 0; align-items: center; gap: 12rpx; }

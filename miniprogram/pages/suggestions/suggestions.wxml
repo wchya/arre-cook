@@ -1,0 +1,41 @@
+<nav-bar icon="inbox" title="AI 建议" subtitle="由你决定是否采纳">
+  <view class="toggle" hover-class="tap-active" bindtap="toggleHistory"><icon name="{{history ? 'inbox' : 'history'}}" size="26" stroke="2.4" color="text2" /><text>{{history ? '待处理' : '历史'}}</text></view>
+</nav-bar>
+
+<view class="content anim-fade-up">
+  <view wx:if="{{loading}}" class="skeleton sk"></view>
+  <view wx:elif="{{!items.length}}" class="card">
+    <empty emoji="📬" title="{{history ? '还没有建议记录' : '暂时没有待处理建议'}}" desc="第三方智能体推送的菜单会出现在这里" compact>
+      <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="goAgents">管理 AI 连接</view>
+    </empty>
+  </view>
+  <view wx:for="{{items}}" wx:key="id" class="card sug anim-pop-soft">
+    <view class="sug__head">
+      <view class="flex-1">
+        <view class="sug__title truncate">{{item.title}}</view>
+        <view class="sug__meta">
+          <text>{{item.source}}</text>
+          <view class="sug__date"><icon name="clock-3" size="20" stroke="2.4" color="text3" /><text>{{item.date}}</text></view>
+          <text class="sug__status status-{{item.status}}">{{item.statusLabel}}</text>
+        </view>
+      </view>
+      <view wx:if="{{item.pending}}" class="sug__close" hover-class="tap-active" data-id="{{item.id}}" data-accept="{{false}}" bindtap="resolve" aria-role="button" aria-label="忽略建议"><icon name="x" size="30" stroke="2.4" color="text3" /></view>
+    </view>
+    <view wx:if="{{item.reason}}" class="sug__reason">{{item.reason}}</view>
+    <view wx:if="{{item.dishes.length}}" class="sug__dishes">
+      <view wx:for="{{item.dishes}}" wx:for-item="dish" wx:key="id" class="sug-dish" hover-class="tap-bg" data-id="{{dish.id}}" bindtap="openDish">
+        <view class="sug-dish__thumb"><dish-image src="{{dish.cover}}" emoji="{{dish.emoji}}" emoji-size="40" /></view>
+        <view class="flex-1">
+          <view class="sug-dish__name truncate">{{dish.name}}</view>
+          <view class="sug-dish__meta">{{dish.category}} · {{dish.cookTime || '-'}} 分钟</view>
+        </view>
+        <icon name="chevron-right" size="28" color="text4" />
+      </view>
+    </view>
+    <view wx:if="{{item.pending}}" class="sug__actions">
+      <view class="btn btn-primary {{busyId || !item.dishes.length ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-accept="{{true}}" data-meal="lunch" bindtap="resolve"><icon name="check" size="28" stroke="2.6" color="white" /><text>记为午餐</text></view>
+      <view class="btn btn-mint {{busyId || !item.dishes.length ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-accept="{{true}}" data-meal="dinner" bindtap="resolve"><icon name="check" size="28" stroke="2.6" color="white" /><text>记为晚餐</text></view>
+    </view>
+  </view>
+  <view class="safe-space"></view>
+</view>

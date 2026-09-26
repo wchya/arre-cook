@@ -1,9 +1,102 @@
-<view class="chat-screen">
-  <view class="chat-header"><view><view class="chat-title">饮食助手</view><view class="chat-subtitle">只读取当前账号的数据</view></view><view class="chat-status"><view class="status-dot"></view>在线</view></view>
-  <scroll-view class="message-scroll" scroll-y scroll-with-animation>
-    <view wx:if="{{messages.length === 0}}" class="chat-empty"><view class="assistant-mark">A</view><view class="empty-title">今天想怎么安排？</view><view class="empty-copy">你可以问我吃什么、记录一餐，或者看看最近的饮食趋势。</view><view class="suggestions"><button wx:for="{{suggestions}}" wx:key="*this" class="suggestion" data-text="{{item}}" bindtap="useSuggestion">{{item}}</button></view></view>
-    <view wx:for="{{messages}}" wx:key="index" id="{{'msg-' + index}}" class="message-row {{item.role === 'user' ? 'message-user' : 'message-assistant'}}"><view wx:if="{{item.role !== 'user'}}" class="message-mark">A</view><view class="message-bubble"><text>{{item.content}}</text><view wx:if="{{item.steps.length}}" class="tool-steps"><view wx:for="{{item.steps}}" wx:for-item="step" wx:key="*this" class="tool-step"><view class="step-dot"></view>{{step}}</view></view></view></view>
-    <view wx:if="{{error}}" class="chat-error">{{error}}</view>
+<view class="chat">
+  <nav-bar icon="message-circle" title="AI 饮食助手" subtitle="{{statusText}}" theme="default">
+    <view class="head-btn" hover-class="tap-active" bindtap="openHistory" aria-role="button" aria-label="对话记录"><icon name="history" size="34" stroke="2.2" color="text2" /></view>
+    <view class="head-btn" hover-class="tap-active" bindtap="newChat" aria-role="button" aria-label="新对话"><icon name="square-pen" size="34" stroke="2.2" color="text2" /></view>
+  </nav-bar>
+
+  <scroll-view class="messages" scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{anchor}}" scroll-with-animation>
+    <view class="messages__inner">
+      <view wx:if="{{!llmEnabled}}" class="offline">当前未连接 AI 模型，可获取基础菜谱推荐和已记录的饮食报告。对话写入暂不可用，请使用饮食记录或菜谱页面填写。</view>
+
+      <view wx:if="{{!messages.length && !loadingSession}}" class="welcome anim-fade-up">
+        <view class="welcome__icon"><icon name="sparkles" size="56" stroke="2.2" color="white" /></view>
+        <view class="welcome__title">今天想吃什么？</view>
+        <view class="welcome__desc">从菜谱、实际记录和你的口味出发，帮你点菜、记饮食、排菜单</view>
+        <view class="suggestions">
+          <view wx:for="{{suggestions}}" wx:key="*this" class="suggestion" hover-class="tap-active" data-text="{{item}}" bindtap="useSuggestion">
+            <text class="flex-1">{{item}}</text>
+            <icon name="arrow-up" size="28" stroke="2.4" color="text3" class="tilt" />
+          </view>
+        </view>
+        <view class="shortcuts">
+          <view class="shortcut" hover-class="tap-fade" bindtap="goDiary"><icon name="clock-3" size="28" stroke="2.3" color="primary" /><text>饮食记录</text></view>
+          <view class="shortcut" hover-class="tap-fade" bindtap="goAssistant"><icon name="book-open" size="28" stroke="2.3" color="primary" /><text>选菜工具</text></view>
+        </view>
+      </view>
+
+      <view wx:if="{{loadingSession}}" class="loading-session"><view class="spinner spinner-dark"></view><text>正在读取对话…</text></view>
+
+      <view wx:for="{{messages}}" wx:key="id" class="msg {{item.role === 'user' ? 'msg--user' : 'msg--bot'}}">
+        <view wx:if="{{item.role !== 'user'}}" class="msg__avatar"><icon name="sparkles" size="30" stroke="2.3" color="white" /></view>
+        <view class="bubble" bindlongpress="copyMessage" data-text="{{item.content}}">
+          <text wx:if="{{item.content}}" class="bubble__text" user-select>{{item.content}}</text>
+          <view wx:elif="{{item.streaming && !item.tools.length}}" class="typing"><view class="typing__dot"></view><view class="typing__dot"></view><view class="typing__dot"></view></view>
+
+          <view wx:if="{{item.tools.length}}" class="tools">
+            <view wx:for="{{item.tools}}" wx:for-item="tool" wx:key="id" class="tool">
+              <view wx:if="{{tool.status === 'running'}}" class="spinner spinner-dark tool__spin"></view>
+              <icon wx:elif="{{tool.status === 'ok'}}" name="circle-check" size="26" stroke="2.4" color="mint-ink" />
+              <icon wx:else name="circle-alert" size="26" stroke="2.4" color="red" />
+              <text class="tool__label">{{tool.label}}</text>
+              <text wx:if="{{tool.error}}" class="tool__error truncate">{{tool.error}}</text>
+            </view>
+          </view>
+
+          <view wx:for="{{item.cards}}" wx:for-item="card" wx:for-index="ci" wx:key="ci" class="msg-card">
+            <view wx:if="{{card.type === 'action'}}" class="msg-card__action">{{card.text}}</view>
+            <block wx:else>
+              <view wx:if="{{card.title}}" class="msg-card__title">{{card.title}}</view>
+              <view wx:for="{{card.items}}" wx:for-item="dish" wx:key="id" class="msg-dish" hover-class="tap-bg" data-id="{{dish.id}}" bindtap="openDish">
+                <view class="msg-dish__thumb"><dish-image src="{{dish.cover}}" emoji="🍽" emoji-size="40" /></view>
+                <view class="flex-1">
+                  <view class="msg-dish__name truncate">{{dish.name}}</view>
+                  <view class="msg-dish__desc truncate">{{dish.desc}}</view>
+                </view>
+                <icon name="chevron-right" size="26" color="text4" />
+              </view>
+            </block>
+          </view>
+
+          <view wx:if="{{item.error}}" class="bubble__error"><icon name="circle-alert" size="24" color="red" /><text>{{item.error}}</text></view>
+        </view>
+      </view>
+      <view id="chat-bottom" class="bottom-anchor"></view>
+    </view>
   </scroll-view>
-  <view class="composer"><view wx:if="{{loading}}" class="loading-bar"><view class="loading-pulse"></view><text>助手正在整理你的数据…</text><button bindtap="cancel">停止</button></view><view class="input-row"><textarea class="chat-input" value="{{input}}" maxlength="1000" auto-height placeholder="说说你想吃什么…" bindinput="onInput" confirm-type="send" bindconfirm="send" /><button class="send-button" loading="{{loading}}" disabled="{{loading || !canSend}}" bindtap="send">发送</button></view></view>
+
+  <view class="composer" style="padding-bottom:{{keyboard ? keyboard + 'px' : ''}};">
+    <view wx:if="{{busy}}" class="generating">
+      <view class="generating__dot anim-pulse"></view>
+      <text class="flex-1">助手正在整理你的数据…</text>
+      <view class="stop" hover-class="tap-active" bindtap="stop"><icon name="pause" size="22" stroke="2.4" color="text2" fill /><text>停止</text></view>
+    </view>
+    <view class="composer__box {{inputFocus ? 'is-focus' : ''}}">
+      <textarea class="composer__input" value="{{draft}}" maxlength="1000" auto-height adjust-position="{{false}}" show-confirm-bar="{{false}}" confirm-type="send" placeholder="聊聊今天吃什么" placeholder-class="placeholder" cursor-spacing="20" bindinput="onInput" bindfocus="onFocus" bindblur="onBlur" bindconfirm="sendDraft" bindkeyboardheightchange="onKeyboard" />
+      <view class="send {{draft && !busy && !loadingSession ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="sendDraft" aria-role="button" aria-label="发送">
+        <icon name="arrow-up" size="36" stroke="2.6" color="white" />
+      </view>
+    </view>
+  </view>
+
+  <!-- 对话记录抽屉 -->
+  <view wx:if="{{historyOpen}}" class="drawer-mask" bindtap="closeHistory"></view>
+  <view class="drawer {{historyOpen ? 'is-open' : ''}}" style="padding-top:{{navHeight}}px;">
+    <view class="drawer__head">
+      <text class="drawer__title">对话记录</text>
+      <view class="head-btn" hover-class="tap-active" bindtap="closeHistory"><icon name="x" size="32" stroke="2.4" color="text2" /></view>
+    </view>
+    <scroll-view class="drawer__list" scroll-y enhanced show-scrollbar="{{false}}">
+      <view wx:if="{{!sessions.length}}" class="drawer__empty">还没有对话记录</view>
+      <view wx:for="{{sessions}}" wx:key="id" class="session {{sessionId === item.id ? 'is-active' : ''}}">
+        <view class="flex-1" hover-class="tap-fade" data-id="{{item.id}}" bindtap="openSession">
+          <view class="session__title truncate">{{item.title}}</view>
+          <view class="session__date">{{item.date}}</view>
+        </view>
+        <view class="session__del" hover-class="tap-active" data-id="{{item.id}}" bindtap="deleteSession" aria-role="button" aria-label="删除对话"><icon name="trash-2" size="28" stroke="2.2" color="text3" /></view>
+      </view>
+    </scroll-view>
+    <view class="drawer__foot">
+      <view class="btn btn-block btn-primary" hover-class="tap-active" bindtap="newChat"><icon name="plus" size="32" stroke="2.6" color="white" /><text>新对话</text></view>
+    </view>
+  </view>
 </view>

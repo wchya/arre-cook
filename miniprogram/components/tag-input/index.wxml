@@ -1,0 +1,13 @@
+<view class="tags">
+  <view class="tags__box {{focus ? 'is-focus' : ''}}">
+    <view wx:for="{{value}}" wx:key="*this" class="tag tag--{{tone}}">
+      <text>{{item}}</text>
+      <view class="tag__x" data-text="{{item}}" catchtap="remove" aria-role="button" aria-label="移除 {{item}}"><icon name="x" size="20" stroke="3" color="{{tone === 'red' ? 'red' : 'primary'}}" /></view>
+    </view>
+    <input class="tags__input" value="{{draft}}" placeholder="{{value.length ? '继续添加' : placeholder}}" placeholder-class="tags__ph" confirm-type="done" confirm-hold="{{true}}" cursor-spacing="120" bindinput="onInput" bindconfirm="onConfirm" bindfocus="onFocus" bindblur="onBlur" />
+  </view>
+  <view wx:if="{{rest.length}}" class="tags__suggest">
+    <text class="tags__label">常见：</text>
+    <view wx:for="{{rest}}" wx:key="*this" class="suggest" hover-class="tap-active" data-text="{{item}}" bindtap="pick">+ {{item}}</view>
+  </view>
+</view>

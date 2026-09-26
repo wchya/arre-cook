@@ -1,0 +1,50 @@
+.tabs { margin-bottom: 40rpx; background: var(--card); border: 1px solid var(--border); }
+.tabs .segmented-thumb { background: var(--primary-light); box-shadow: none; }
+.tabs .segmented-item.is-active { color: var(--primary); }
+.tab-badge { min-width: 32rpx; height: 32rpx; padding: 0 8rpx; border-radius: 999rpx; background: var(--primary); color: #fff; font-size: 20rpx; line-height: 32rpx; text-align: center; }
+.ml-8 { margin-left: 8rpx; }
+.spin { animation: spin .8s linear infinite; }
+.day-sk { height: 240rpx; margin-bottom: 20rpx; border-radius: 32rpx; }
+
+.days { display: flex; flex-direction: column; gap: 20rpx; }
+.day { padding: 28rpx 32rpx; transition: transform .15s ease; }
+.day.is-quick { border-color: rgba(232, 115, 74, .18); }
+.day__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
+.day__name { color: var(--text); font-size: 28rpx; font-weight: 700; }
+.day__tag { margin-left: 10rpx; font-size: 22rpx; }
+.day__date { color: var(--text2); font-size: 22rpx; }
+.quick-hint { padding: 2rpx 14rpx; border-radius: 999rpx; background: var(--primary-light); color: var(--primary); font-size: 20rpx; font-weight: 700; }
+.meal-row { display: flex; align-items: flex-start; gap: 12rpx; margin-top: 12rpx; }
+.meal-row__label { width: 64rpx; flex-shrink: 0; padding-top: 8rpx; font-size: 20rpx; font-weight: 700; }
+.meal-row__dishes { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.dish-chip { padding: 8rpx 20rpx; border-radius: 16rpx; font-size: 24rpx; font-weight: 500; }
+.dish-chip--lunch { background: var(--primary-light); color: var(--primary); }
+.dish-chip--dinner { background: var(--mint-light); color: var(--mint-ink); }
+.more-btn { display: flex; align-items: center; justify-content: center; gap: 8rpx; height: 80rpx; margin: 20rpx 0 32rpx; border-radius: 24rpx; background: rgba(232, 248, 245, .6); color: var(--mint-ink); font-size: 26rpx; font-weight: 600; }
+.entry { display: flex; align-items: center; gap: 24rpx; margin-top: 16rpx; padding: 28rpx 32rpx; }
+.entry__icon { display: flex; align-items: center; justify-content: center; width: 80rpx; height: 80rpx; flex-shrink: 0; border-radius: 24rpx; background: linear-gradient(135deg, var(--yellow-light), var(--primary-light)); font-size: 40rpx; }
+
+.progress-card { margin-bottom: 24rpx; padding: 28rpx 32rpx; }
+.progress { height: 16rpx; overflow: hidden; border-radius: 999rpx; background: var(--bg); }
+.progress__bar { height: 100%; border-radius: 999rpx; background: linear-gradient(90deg, var(--mint), #57B8A8); transition: width .35s ease; }
+
+.shop { overflow: hidden; }
+.shop__cat { padding: 24rpx 32rpx; }
+.shop__cat + .shop__cat { border-top: 1px solid var(--border); }
+.shop__cat-name { display: flex; align-items: center; gap: 8rpx; margin-bottom: 12rpx; color: var(--text2); font-size: 26rpx; font-weight: 700; letter-spacing: 1rpx; }
+.shop__item { display: flex; align-items: center; gap: 20rpx; padding: 12rpx 0; transition: opacity .2s ease; }
+.shop__item.is-stock { opacity: .7; }
+.check { display: flex; align-items: center; justify-content: center; width: 44rpx; height: 44rpx; flex-shrink: 0; border: 4rpx solid var(--border2); border-radius: 12rpx; transition: all .2s ease; }
+.check.is-checked { border-color: var(--mint); background: var(--mint); animation: pop .3s ease; }
+.check.is-home { border-color: var(--yellow); background: var(--yellow-light); }
+.check__home { color: var(--yellow-dark); font-size: 20rpx; font-weight: 700; }
+.shop__name { flex: 1; min-width: 0; color: var(--text); font-size: 28rpx; transition: color .2s ease; }
+.shop__name.is-done { color: var(--text3); text-decoration: line-through; }
+.shop__amount { flex-shrink: 0; color: var(--text3); font-size: 24rpx; }
+.stock-btn { flex-shrink: 0; padding: 2rpx 16rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); color: var(--text3); font-size: 20rpx; font-weight: 600; }
+.stock-btn.is-on { border-color: rgba(245, 215, 110, .4); background: var(--yellow-light); color: var(--yellow-dark); }
+.tip-line { margin-top: 20rpx; padding: 0 8rpx; color: var(--text3); font-size: 22rpx; line-height: 1.6; }
+
+.quick { padding: 8rpx 40rpx 24rpx; }
+.quick__label { margin-bottom: 12rpx; font-size: 24rpx; font-weight: 700; }
+.safe-space { height: calc(48rpx + env(safe-area-inset-bottom)); }

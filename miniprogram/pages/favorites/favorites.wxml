@@ -1,0 +1,121 @@
+<nav-bar icon="heart" title="收藏" subtitle="按自己的口味重新整理菜单" />
+
+<view class="content anim-fade-up">
+  <view wx:if="{{loading}}">
+    <view class="skeleton sk-hero"></view>
+    <view wx:for="{{[1, 2, 3, 4]}}" wx:key="*this" class="skeleton sk-row"></view>
+  </view>
+
+  <view wx:elif="{{empty}}" class="empty-card">
+    <view class="empty-card__icon"><icon name="heart" size="76" stroke="2.3" color="primary" /></view>
+    <view class="empty-card__title">还没有收藏</view>
+    <view class="empty-card__desc">先把常吃、想吃、适合复做的菜收进来，这里会自动整理成你的菜单。</view>
+    <view class="btn btn-primary empty-card__btn" hover-class="tap-active" bindtap="goDishes"><text>浏览菜品</text><icon name="arrow-right" size="30" stroke="2.5" color="white" /></view>
+  </view>
+
+  <block wx:else>
+    <!-- 概览 -->
+    <view class="hero">
+      <view class="flex items-start justify-between gap-16 mb-32">
+        <view class="flex-1">
+          <view class="hero__label"><icon name="sparkles" size="24" stroke="2.4" color="primary" /><text>{{label}}</text></view>
+          <view class="hero__title">{{stats.total}} 道收藏菜</view>
+          <view class="hero__sub">{{stats.categories}} 个分类，{{stats.cooked}} 道已经吃过</view>
+        </view>
+        <view class="add-btn" hover-class="tap-active" bindtap="goDishes"><text>加菜</text><icon name="arrow-right" size="26" stroke="2.6" color="bg" /></view>
+      </view>
+      <view class="grid-3">
+        <view class="metric"><view class="metric__head"><text>平均</text><icon name="clock-3" size="28" stroke="2.5" color="text3" /></view><view class="metric__value">{{stats.avg}}</view></view>
+        <view class="metric"><view class="metric__head"><text>待尝试</text><icon name="chef-hat" size="28" stroke="2.5" color="text3" /></view><view class="metric__value">{{stats.never}}</view></view>
+        <view class="metric"><view class="metric__head"><text>分类</text><icon name="tag" size="28" stroke="2.5" color="text3" /></view><view class="metric__value">{{stats.categories}}</view></view>
+      </view>
+      <view wx:if="{{quickDish}}" class="hero-dish" hover-class="tap-active" data-id="{{quickDish.id}}" bindtap="openDish">
+        <view class="hero-dish__icon"><icon name="clock-3" size="34" stroke="2.5" color="primary" /></view>
+        <view class="flex-1"><view class="hero-dish__name truncate">最快可做：{{quickDish.name}}</view><view class="hero-dish__detail">{{quickDish.detail}}</view></view>
+        <icon name="arrow-right" size="30" stroke="2.4" color="primary" />
+      </view>
+      <view wx:if="{{mostDish}}" class="hero-dish" hover-class="tap-active" data-id="{{mostDish.id}}" bindtap="openDish">
+        <view class="hero-dish__icon"><icon name="trophy" size="34" stroke="2.5" color="primary" /></view>
+        <view class="flex-1"><view class="hero-dish__name truncate">复做最多：{{mostDish.name}}</view><view class="hero-dish__detail">{{mostDish.detail}}</view></view>
+        <icon name="arrow-right" size="30" stroke="2.4" color="primary" />
+      </view>
+    </view>
+
+    <!-- 智能分组 -->
+    <view wx:if="{{shelves.length}}" class="mb-32">
+      <view class="block-title">智能分组</view>
+      <view wx:for="{{shelves}}" wx:for-item="shelf" wx:key="key" class="shelf">
+        <view class="flex items-center justify-between mb-16">
+          <text class="shelf__title">{{shelf.title}}</text>
+          <text class="shelf__meta">{{shelf.meta}}</text>
+        </view>
+        <scroll-view class="shelf__strip" scroll-x enhanced show-scrollbar="{{false}}">
+          <view wx:for="{{shelf.items}}" wx:key="id" class="shelf-item" hover-class="tap-active" data-id="{{item.id}}" bindtap="openDish">
+            <view class="shelf-item__thumb"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="36" /></view>
+            <view class="flex-1">
+              <view class="shelf-item__name truncate">{{item.name}}</view>
+              <view class="shelf-item__meta truncate">{{item.meta}}</view>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+
+    <!-- 分类 + 搜索 + 排序 -->
+    <scroll-view class="cats" scroll-x enhanced show-scrollbar="{{false}}">
+      <view wx:for="{{categories}}" wx:key="name" class="cat {{category === item.name ? 'is-active' : ''}}" data-name="{{item.name}}" bindtap="chooseCategory">
+        <text class="cat__name">{{item.name}}</text>
+        <text class="cat__count">{{item.count}}</text>
+      </view>
+    </scroll-view>
+    <view class="card tools">
+      <view class="field input-sm">
+        <icon name="search" size="30" stroke="2.4" color="text3" />
+        <input class="field-input search-input" value="{{keyword}}" placeholder="搜索收藏菜、口味、标签" placeholder-class="placeholder" bindinput="onSearch" />
+        <view wx:if="{{keyword}}" class="clear" bindtap="clearSearch"><icon name="x" size="24" stroke="2.6" color="text3" /></view>
+      </view>
+      <view class="sorts">
+        <view wx:for="{{sorts}}" wx:key="key" class="sort {{sort === item.key ? 'is-active' : ''}}" data-key="{{item.key}}" bindtap="chooseSort">{{item.label}}</view>
+      </view>
+    </view>
+
+    <!-- 收藏清单 -->
+    <view class="flex items-end justify-between list-head">
+      <view>
+        <view class="block-title mb-0">收藏清单</view>
+        <view class="t-xs c-text3">当前显示 {{total}} 道</view>
+      </view>
+      <view wx:if="{{category !== '全部'}}" class="show-all" hover-class="tap-active" bindtap="showAll">查看全部</view>
+    </view>
+    <view wx:if="{{!list.length}}" class="no-match">
+      <text class="no-match__heart">♡</text>
+      <view class="t-base bold mt-16">没有匹配的收藏</view>
+      <view class="t-xs c-text2 mt-8">换个关键词或分类试试</view>
+    </view>
+    <view wx:for="{{list}}" wx:key="id" class="fav" hover-class="tap-active" hover-stay-time="80" data-id="{{item.id}}" bindtap="openDish">
+      <view class="fav__thumb"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="56" /></view>
+      <view class="flex-1">
+        <view class="flex items-start gap-12">
+          <view class="flex-1">
+            <view class="fav__name truncate">{{item.name}}</view>
+            <view class="fav__meta">
+              <text class="truncate">{{item.category || '其他'}}</text>
+              <view class="dot"></view><text>{{item.cookTime || '-'}} 分钟</text>
+              <view class="dot"></view><text>{{item.records ? '吃过 ' + item.records + ' 次' : '还没吃过'}}</text>
+            </view>
+          </view>
+          <view class="fav__heart {{removing === item.id ? 'tap-fade' : ''}}" hover-class="tap-active" hover-stop-propagation data-id="{{item.id}}" catchtap="unfavorite" aria-role="button" aria-label="取消收藏">
+            <icon name="heart" size="30" stroke="2.3" color="primary" fill="{{true}}" />
+          </view>
+        </view>
+        <view class="fav__tags">
+          <text class="chip chip-sm chip-{{item.diffTone}} bold">{{item.diffLabel}}</text>
+          <text wx:if="{{item.taste}}" class="chip chip-sm chip-ghost">{{item.taste}}</text>
+          <text wx:if="{{item.tag}}" class="chip chip-sm chip-ghost c-text3">{{item.tag}}</text>
+        </view>
+        <view class="fav__sub truncate">{{item.sub}}</view>
+      </view>
+    </view>
+  </block>
+  <view class="safe-space"></view>
+</view>

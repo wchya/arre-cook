@@ -1,0 +1,3 @@
+<view wx:if="{{pieces.length}}" class="confetti" aria-hidden="true">
+  <view wx:for="{{pieces}}" wx:key="id" class="piece fall-{{item.variant}} {{item.round ? 'is-round' : ''}}" style="left:{{item.left}}%;width:{{item.width}}rpx;height:{{item.height}}rpx;background:{{item.color}};animation-duration:{{item.duration}}s;animation-delay:{{item.delay}}s;"></view>
+</view>

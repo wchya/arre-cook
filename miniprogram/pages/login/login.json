@@ -1,0 +1,8 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#FAFAF8",
+  "usingComponents": {
+    "icon": "/components/icon/index",
+    "sheet": "/components/sheet/index"
+  }
+}

@@ -1,0 +1,9 @@
+:host { display: block; }
+.empty { display: flex; flex-direction: column; align-items: center; padding: 96rpx 40rpx; text-align: center; }
+.empty--compact { padding: 48rpx 32rpx; }
+.empty__emoji { margin-bottom: 28rpx; font-size: 112rpx; line-height: 1; }
+.empty--compact .empty__emoji { margin-bottom: 16rpx; font-size: 80rpx; }
+.empty__title { margin-bottom: 10rpx; color: var(--text); font-size: 32rpx; font-weight: 600; }
+.empty__desc { max-width: 560rpx; color: var(--text2); font-size: 26rpx; line-height: 1.6; }
+.empty__action { display: flex; justify-content: center; margin-top: 28rpx; }
+.empty__action:empty { display: none; }

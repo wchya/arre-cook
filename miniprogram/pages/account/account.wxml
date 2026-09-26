@@ -1,0 +1,141 @@
+<nav-bar title="账号与安全" subtitle="登录方式、数据导出与账号管理" icon="shield" />
+
+<view class="content anim-fade-up">
+  <view wx:if="{{loading}}" class="skeleton acct-sk"></view>
+
+  <block wx:else>
+    <view class="card identity">
+      <view class="identity__avatar">{{initial}}</view>
+      <view class="flex-1">
+        <view class="identity__name truncate">{{user.nickname || '未命名'}}</view>
+        <view class="identity__sub truncate">{{user.email || user.username || '微信用户'}}</view>
+        <view class="identity__badges">
+          <text wx:if="{{user.role === 'admin'}}" class="chip chip-purple chip-sm">管理员</text>
+          <text wx:if="{{user.wechat_bound}}" class="chip chip-mint chip-sm">已绑定微信</text>
+          <text class="chip {{hasPassword ? 'chip-primary' : 'chip-ghost'}} chip-sm">{{hasPassword ? '已设置密码' : '未设置密码'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="meta-row">
+      <view class="meta-cell"><text class="meta-k">注册于</text><text class="meta-v">{{memberSince || '-'}}</text></view>
+      <view class="meta-cell"><text class="meta-k">上次登录</text><text class="meta-v">{{lastLogin || '-'}}</text></view>
+    </view>
+
+    <view class="group">
+      <view class="group-title">登录与安全</view>
+      <view class="group-body">
+        <view class="row" hover-class="tap-bg" bindtap="openPassword">
+          <view class="row-icon tone-primary"><icon name="key-round" size="34" stroke="2.3" color="primary" /></view>
+          <view class="row-main"><view class="row-title">{{hasPassword ? '修改密码' : '设置密码'}}</view><view class="row-desc">{{hasPassword ? '定期更换，账号更安全' : '设置后可用邮箱 + 密码登录'}}</view></view>
+          <icon name="chevron-right" size="32" stroke="2" color="text4" />
+        </view>
+        <view class="row" hover-class="tap-bg" bindtap="logoutAll">
+          <view class="row-icon tone-muted"><icon name="log-out" size="34" stroke="2.3" color="text2" /></view>
+          <view class="row-main"><view class="row-title">退出所有设备</view><view class="row-desc">让其他设备登录失效，当前设备也会退出</view></view>
+          <view wx:if="{{logoutAllBusy}}" class="spinner"></view>
+          <icon wx:else name="chevron-right" size="32" stroke="2" color="text4" />
+        </view>
+      </view>
+    </view>
+
+    <view class="notice notice-info">
+      <icon name="info" size="30" stroke="2.4" color="primary" />
+      <text>邮箱验证码登录始终可用。{{hasPassword ? '你也可以用邮箱 + 密码登录。' : '设置密码后，也可以用邮箱 + 密码登录。'}}</text>
+    </view>
+
+    <view class="group">
+      <view class="group-title">个人数据</view>
+      <view class="group-body">
+        <view class="row" hover-class="tap-bg" bindtap="exportData">
+          <view class="row-icon tone-mint"><icon name="download" size="34" stroke="2.3" color="mint-ink" /></view>
+          <view class="row-main"><view class="row-title">导出我的数据</view><view class="row-desc">用餐记录、私房菜、偏好、AI 对话与建议</view></view>
+          <view wx:if="{{exportBusy}}" class="spinner"></view>
+          <icon wx:else name="chevron-right" size="32" stroke="2" color="text4" />
+        </view>
+      </view>
+    </view>
+
+    <view class="group">
+      <view class="group-title c-red">危险操作</view>
+      <view class="group-body">
+        <view class="row" hover-class="tap-bg" bindtap="openDelete">
+          <view class="row-icon tone-danger"><icon name="trash-2" size="34" stroke="2.3" color="red" /></view>
+          <view class="row-main"><view class="row-title c-red">注销账号</view><view class="row-desc">永久删除账号和个人数据，公共菜谱不受影响</view></view>
+          <icon name="chevron-right" size="32" stroke="2" color="text4" />
+        </view>
+      </view>
+    </view>
+
+    <view class="foot">NiniMenu · 你的数据只属于你</view>
+  </block>
+
+  <view class="tabbar-spacer"></view>
+</view>
+
+<sheet show="{{pwOpen}}" title="{{hasPassword ? '修改密码' : '设置密码'}}" subtitle="密码至少 8 位" bind:close="closePassword">
+  <view class="sheet-body">
+    <view wx:if="{{hasPassword}}" class="pw-block">
+      <view class="field-label">当前密码</view>
+      <view class="field {{focusKey === 'old' ? 'is-focus' : ''}}">
+        <input class="field-input" password="{{!showOld}}" value="{{oldPw}}" placeholder="输入当前密码" placeholder-class="placeholder" data-key="old" bindfocus="onFocus" bindblur="onBlur" bindinput="onOldInput" />
+        <view class="eye" hover-class="tap-fade" catchtap="toggleOld"><icon name="{{showOld ? 'eye-off' : 'eye'}}" size="32" stroke="2.2" color="text3" /></view>
+      </view>
+    </view>
+    <view class="pw-block">
+      <view class="field-label">新密码</view>
+      <view class="field {{focusKey === 'new' ? 'is-focus' : ''}}">
+        <input class="field-input" password="{{!showNew}}" value="{{newPw}}" placeholder="至少 8 位" placeholder-class="placeholder" data-key="new" bindfocus="onFocus" bindblur="onBlur" bindinput="onNewInput" />
+        <view class="eye" hover-class="tap-fade" catchtap="toggleNew"><icon name="{{showNew ? 'eye-off' : 'eye'}}" size="32" stroke="2.2" color="text3" /></view>
+      </view>
+    </view>
+    <view class="pw-block">
+      <view class="field-label">确认新密码</view>
+      <view class="field {{focusKey === 'confirm' ? 'is-focus' : ''}}">
+        <input class="field-input" password="{{!showNew}}" value="{{confirmPw}}" placeholder="再次输入新密码" placeholder-class="placeholder" data-key="confirm" bindfocus="onFocus" bindblur="onBlur" bindinput="onConfirmInput" bindconfirm="savePassword" />
+      </view>
+    </view>
+    <view wx:if="{{pwError}}" class="pw-error"><icon name="circle-alert" size="26" stroke="2.4" color="red" /><text>{{pwError}}</text></view>
+    <view class="flex gap-20 mt-32">
+      <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closePassword">取消</view>
+      <view class="btn btn-primary flex-1 {{newPw.length >= 8 && newPw === confirmPw && (!hasPassword || oldPw) && !savingPw ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="savePassword">
+        <view wx:if="{{savingPw}}" class="spinner"></view><text wx:else>保存</text>
+      </view>
+    </view>
+  </view>
+</sheet>
+
+<sheet show="{{exportOpen}}" title="导出我的数据" subtitle="{{exportedAt ? '导出时间 ' + exportedAt : '你的完整数据副本'}}" bind:close="closeExport">
+  <view class="sheet-body">
+    <view class="export-grid">
+      <view wx:for="{{exportSummary}}" wx:key="label" class="export-cell">
+        <view class="export-count">{{item.count}}</view>
+        <view class="export-label">{{item.label}}</view>
+      </view>
+    </view>
+    <view class="notice notice-info mt-16">
+      <icon name="info" size="30" stroke="2.4" color="primary" />
+      <text>已生成完整 JSON 数据，点击下方复制到剪贴板，可粘贴保存。</text>
+    </view>
+    <view class="btn btn-primary btn-block mt-24" hover-class="tap-active" bindtap="copyExport"><icon name="copy" size="30" stroke="2.4" color="white" /><text>复制数据（JSON）</text></view>
+  </view>
+</sheet>
+
+<sheet show="{{deleteOpen}}" title="注销账号" subtitle="此操作无法撤销" bind:close="closeDelete">
+  <view class="sheet-body">
+    <view class="notice notice-warn">
+      <icon name="triangle-alert" size="32" stroke="2.4" color="yellow-dark" />
+      <text>账号和个人数据将被永久删除，公共菜谱不会删除。若你是家庭创建者，请先转让或解散家庭。</text>
+    </view>
+    <view class="field-label mt-24">输入“注销”以确认</view>
+    <view class="field {{focusKey === 'del' ? 'is-focus' : ''}} mt-8">
+      <input class="field-input" value="{{deleteConfirm}}" placeholder="注销" placeholder-class="placeholder" data-key="del" bindfocus="onFocus" bindblur="onBlur" bindinput="onDeleteInput" />
+    </view>
+    <view class="flex gap-20 mt-32">
+      <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeDelete">取消</view>
+      <view class="btn btn-danger flex-1 {{deleteConfirm === '注销' && !deleting ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="confirmDelete">
+        <view wx:if="{{deleting}}" class="spinner"></view><text wx:else>永久注销</text>
+      </view>
+    </view>
+  </view>
+</sheet>

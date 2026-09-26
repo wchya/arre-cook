@@ -1,0 +1,10 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#FAFAF8",
+  "backgroundColorTop": "#FFE9DE",
+  "disableScroll": true,
+  "usingComponents": {
+    "icon": "/components/icon/index",
+    "sheet": "/components/sheet/index"
+  }
+}
