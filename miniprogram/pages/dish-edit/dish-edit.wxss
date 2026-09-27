@@ -56,3 +56,12 @@
 .draft-desc { margin-top:12rpx; color:var(--text2); font-size:26rpx; line-height:1.7; }
 .draft-status { margin-bottom:24rpx; color:var(--text2); font-size:24rpx; }
 @media (min-width:400px) { .de-numbers { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.de-import { margin-top:24rpx; padding:24rpx; border:1px solid var(--border); border-radius:24rpx; background:var(--bg); }
+.de-import__title { font-size:26rpx; font-weight:700; color:var(--text); line-height:1.6; }
+.de-import__link { display:block; width:auto; min-height:88rpx; margin:0; padding:16rpx 0; color:var(--primary); background:transparent; text-align:left; font-size:24rpx; font-weight:600; line-height:1.7; }
+.de-import__link::after { border:0; }
+.de-import__actions { display:flex; flex-wrap:wrap; gap:16rpx; margin-top:20rpx; }
+.de-import__actions .btn { margin:0; min-height:88rpx; }
+.de-import__error { margin-top:16rpx; font-size:24rpx; line-height:1.7; color:var(--red, #b83b32); }
+.de-import__result { margin-top:24rpx; }
+.de-import__step { margin-top:16rpx; font-size:26rpx; line-height:1.7; overflow-wrap:anywhere; }

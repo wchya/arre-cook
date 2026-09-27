@@ -6,6 +6,8 @@ const session = require("../../utils/session")
 const dishUtil = require("../../utils/dish")
 const drafts = require("../../utils/recipe-draft")
 const recipeText = require("../../utils/recipe-text")
+const videoRecipe = require("../../utils/video-recipe")
+const recipeImport = require("../../utils/recipe-import")
 
 const CATEGORIES = ["川菜", "湘菜", "贵州菜", "云南菜", "粤菜"]
 const TASTES = ["辣", "麻辣", "香辣", "酸辣", "鲜辣", "酸", "甜", "鲜", "清淡", "咸鲜", "蒜香", "葱香", "酱香", "豉香"]
@@ -38,7 +40,7 @@ Page({
     mealType: "all",
     difficulty: "easy",
     tasteList: [],
-    cookTime: 15,
+    cookTime: 0,
     sortOrder: 0,
     ingredientsText: "",
     seasoningsText: "",
@@ -47,6 +49,20 @@ Page({
     videoUrl: "",
     videoMeta: null,
     videoChecking: false,
+    importedRecipeJSON: "",
+    videoImportBusy: false,
+    videoImportProgress: "",
+    videoImportError: "",
+    videoImportAvailable: false,
+    videoASREnabled: false,
+    videoStatusError: "",
+    videoStatusLoading: true,
+    videoQuotaText: "",
+    videoQuotaBlocked: false,
+    showVideoTranscript: false,
+    videoTranscript: "",
+    videoResult: null,
+    videoResultExpanded: false,
     tags: [],
     imageUrl: "",
     cover: "",
@@ -88,8 +104,10 @@ Page({
     } finally { this.setData({ loading: false }) }
   },
 
-  onHide() { this.flushDraft() },
+  onShow() { if (session.hasSession()) this.loadVideoImportStatus() },
+  onHide() { this.cancelVideoImport(); this.flushDraft() },
   onUnload() {
+    this.cancelVideoImport()
     this.flushDraft()
     this._disposed = true
     clearTimeout(this._draftTimer)
@@ -98,6 +116,10 @@ Page({
   },
   updateForm(patch, callback) {
     if (this._disposed || this.data.recovery) return
+    if (!this._importVersions) this._importVersions = {}
+    recipeImport.importFieldKeys.forEach((key) => {
+      if (patch[key] !== undefined && patch[key] !== this.data[key]) this._importVersions[key] = (this._importVersions[key] || 0) + 1
+    })
     this.setData(patch, () => {
       clearTimeout(this._draftTimer)
       this._draftTimer = setTimeout(() => this.flushDraft(), 450)
@@ -125,7 +147,7 @@ Page({
     if (!this.data.recovery) return
     const value = this.data.recovery.value
     this.setData({
-      ...value,
+        ...value,
       shareFamily: this.data.canShareFamily && value.shareFamily,
       recovery: null,
       cover: media.assetUrl(value.imageUrl),
@@ -173,7 +195,7 @@ Page({
         mealType: dish.meal_type || "all",
         difficulty: dish.difficulty || "easy",
         tasteList: dishUtil.tasteTags(dish.taste),
-        cookTime: dish.cook_time == null ? 15 : dish.cook_time,
+        cookTime: dish.cook_time == null ? 0 : dish.cook_time,
         sortOrder: dish.sort_order || 0,
         ingredientsText: ingredients,
         seasoningsText: seasonings,
@@ -202,6 +224,10 @@ Page({
   onRemark(e) { this.updateForm({ remark: e.detail.value }) },
   onVideo(e) {
     const value = e.detail.value
+    if (value !== this.data.videoUrl) {
+      this.cancelVideoImport()
+      this.setData({ videoResult: null, videoImportError: "", videoMeta: null })
+    }
     this.updateForm({ videoUrl: value })
     if (this._videoTimer) clearTimeout(this._videoTimer)
     if (!value.trim()) {
@@ -232,7 +258,7 @@ Page({
   // 拉取链接预览：仅当输入框仍是同一链接时才回填，避免快速改动时旧结果覆盖。
   async fetchVideoPreview() {
     const url = this.data.videoUrl.trim()
-    if (!url || !/^https?:\/\//i.test(url)) {
+    if (!url || !/https?:\/\//i.test(url)) {
       this.setData({ videoMeta: null, videoChecking: false })
       return
     }
@@ -241,9 +267,9 @@ Page({
     this.setData({ videoChecking: true })
     try {
       const meta = await api.get("/link-preview", { url })
-      if (this.data.videoUrl.trim() === url) this.setData({ videoMeta: this.decorateMeta(meta) })
+      if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoMeta: this.decorateMeta(meta) })
     } catch (_) {
-      if (this.data.videoUrl.trim() === url) this.setData({ videoMeta: null })
+      if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoMeta: null })
     } finally {
       if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoChecking: false })
     }
@@ -254,10 +280,87 @@ Page({
   },
 
   openVideoLink() {
-    const url = this.data.videoUrl.trim()
+    const url = this.data.videoMeta && this.data.videoMeta.url || this.data.videoUrl.trim()
     if (!url) return
     if (!video.open(url, () => ui.toast("链接已复制，请在浏览器中打开"))) {
       ui.toast("目前仅支持抖音和哔哩哔哩视频")
+    }
+  },
+
+  async loadVideoImportStatus() {
+    const request = (this._videoStatusRequest || 0) + 1
+    this._videoStatusRequest = request
+    this.setData({ videoStatusLoading: true, videoStatusError: "" })
+    try {
+      const value = await api.get("/assistant/video-recipe/status")
+      if (this._disposed || this._videoStatusRequest !== request) return
+      this.setData({ videoImportAvailable: Boolean(value.enabled), videoASREnabled: Boolean(value.asr_enabled) })
+      this.applyVideoQuota(value.quota)
+    } catch (error) {
+      if (!this._disposed && this._videoStatusRequest === request) this.setData({ videoStatusError: error.message || "提炼服务状态加载失败", videoImportAvailable: false })
+    } finally { if (!this._disposed && this._videoStatusRequest === request) this.setData({ videoStatusLoading: false }) }
+  },
+  applyVideoQuota(quota) {
+    if (!quota || this._disposed) return
+    const blocked = quota.remaining <= 0 || Boolean(quota.blocked_reason)
+    this.setData({ videoQuotaBlocked: blocked, videoQuotaText: blocked ? "今日 AI 次数已用完或服务已暂停，仍可手动填写。" : `今日剩余 ${quota.remaining} 次，与 AI 助手共用。开始 AI 处理后计 1 次。` })
+  },
+  toggleVideoTranscript() {
+    if (this.data.videoImportBusy) return
+    this.setData({ showVideoTranscript: !this.data.showVideoTranscript, videoImportError: "" })
+  },
+  onVideoTranscript(e) {
+    this.cancelVideoImport()
+    this.setData({ videoTranscript: e.detail.value })
+  },
+  cancelVideoImport() {
+    if (this._videoImport) this._videoImport.abort()
+    this._videoImport = null
+    if (!this._disposed && this.data.videoImportBusy) this.setData({ videoImportBusy: false, videoImportProgress: "" })
+  },
+  toggleVideoResult() { this.setData({ videoResultExpanded: !this.data.videoResultExpanded }) },
+  async extractVideo() {
+    if (this._disposed || this._videoImport || this.data.saving || this.data.recovery || this.data.loading || !this.data.videoImportAvailable || this.data.videoQuotaBlocked) return
+    const url = this.data.videoUrl.trim(), transcript = this.data.showVideoTranscript ? this.data.videoTranscript.trim() : ""
+    if (!url) { ui.toast("请先粘贴视频链接"); return }
+    if (this.data.showVideoTranscript && (transcript.length < 20 || transcript.length > 8000)) { this.setData({ videoImportError: "请粘贴 20–8000 字的字幕或视频文稿" }); return }
+    const start = drafts.snapshot(this.data), versions = { ...this._importVersions }, token = api.token()
+    this._videoStatusRequest = (this._videoStatusRequest || 0) + 1
+    this.setData({ videoImportBusy: true, videoStatusLoading: false, videoImportError: "", videoImportProgress: "正在读取视频内容…", videoResult: null })
+    const request = videoRecipe.extract({ url, ...(transcript ? { transcript } : {}) }, (event) => {
+      if (this._disposed || this._videoImport !== request || token !== api.token()) return
+      if (event.event === "status") this.setData({ videoImportProgress: event.data.message })
+      if (event.event === "quota") this.applyVideoQuota(event.data)
+    })
+    this._videoImport = request
+    try {
+      const result = await request.promise
+      if (this._disposed || this._videoImport !== request || token !== api.token() || this.data.videoUrl.trim() !== url) return
+      const touched = recipeImport.importFieldKeys.filter((key) => (this._importVersions || {})[key] !== versions[key])
+      const patch = recipeImport.recipeImportPatch(start, this.data, result.recipe, touched)
+      const count = recipeImport.importFieldKeys.filter((key) => patch[key] !== undefined).length
+      this._videoImport = null
+      this.updateForm({ ...patch, videoUrl: result.source.url })
+      this.setData({
+        videoResult: {
+          count,
+          name: result.recipe.name,
+          source: ({ subtitle: "视频字幕", audio: "视频语音转写", manual: "你粘贴的字幕 / 文稿" })[result.source.method],
+          ingredients: [...result.recipe.ingredients, ...result.recipe.seasonings].map((item) => `${item.name} ${item.amount || "用量未注明"}`).join("、"),
+          steps: result.recipe.steps,
+        },
+        videoResultExpanded: false,
+        videoImportProgress: "",
+      })
+      this.fetchVideoPreview()
+    } catch (error) {
+      if (!this._disposed && this._videoImport === request && error.name !== "AbortError") this.setData({ videoImportError: error.message || "提炼未完成，请稍后重试" })
+    } finally {
+      if (!this._disposed && (!this._videoImport || this._videoImport === request)) {
+        this._videoImport = null
+        this.setData({ videoImportBusy: false })
+        this.loadVideoImportStatus()
+      }
     }
   },
 
@@ -336,8 +439,9 @@ Page({
   async save() {
     const name = this.data.name.trim()
     if (!name) { ui.toast("请填写菜品名称"); return }
-    if (this.data.saving || this.data.loading || this.data.error || this.data.recovery || this.data.uploadingCover || this.data.uploadingExtra) return
+    if (this.data.saving || this.data.loading || this.data.error || this.data.recovery || this.data.uploadingCover || this.data.uploadingExtra || this.data.videoImportBusy) return
     this.setData({ saving: true })
+    const imported = recipeImport.readImportedRecipe(this.data.importedRecipeJSON)
     const payload = {
       name,
       category: this.data.category,
@@ -345,9 +449,9 @@ Page({
       difficulty: this.data.difficulty,
       taste: this.data.tasteList.join(","),
       cook_time: this.data.cookTime,
-      ingredients: JSON.stringify(recipeText.parseIngredients(this.data.ingredientsText, media.asArray(this._sourceDish && this._sourceDish.ingredients))),
-      seasonings: JSON.stringify(recipeText.parseIngredients(this.data.seasoningsText, media.asArray(this._sourceDish && this._sourceDish.seasonings))),
-      steps: JSON.stringify(recipeText.parseSteps(this.data.stepsText, media.asArray(this._sourceDish && this._sourceDish.steps))),
+      ingredients: JSON.stringify(recipeText.parseIngredients(this.data.ingredientsText, imported.ingredients || media.asArray(this._sourceDish && this._sourceDish.ingredients))),
+      seasonings: JSON.stringify(recipeText.parseIngredients(this.data.seasoningsText, imported.seasonings || media.asArray(this._sourceDish && this._sourceDish.seasonings))),
+      steps: JSON.stringify(recipeText.parseSteps(this.data.stepsText, imported.steps || media.asArray(this._sourceDish && this._sourceDish.steps))),
       remark: this.data.remark.trim(),
       image_url: this.data.imageUrl,
       images: JSON.stringify(this.data.images),

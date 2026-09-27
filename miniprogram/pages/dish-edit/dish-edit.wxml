@@ -58,6 +58,7 @@
           <view class="de-num__btn" hover-class="tap-active" data-delta="5" bindtap="stepCook"><icon name="plus" size="28" stroke="2.6" color="text2" /></view>
           <text class="de-num__unit">分钟</text>
         </view>
+        <view class="field-hint">未注明时保留 0，确认后再填写</view>
       </view>
       <view class="flex-1">
         <view class="field-label">排序权重</view>
@@ -120,6 +121,35 @@
         </view>
       </view>
       <view class="field-hint">仅支持抖音 / 哔哩哔哩，粘贴后自动识别平台、标题与封面</view>
+      <view class="de-import">
+        <view class="de-import__title">从视频提炼做法</view>
+        <view class="field-hint">支持 10 分钟以内的公开视频。{{videoASREnabled ? '字幕或视频将交给 AI 服务提炼。' : '优先读取公开字幕并交给 AI 提炼；无法读取时，可粘贴字幕或文稿。'}}仅填入空白项，核对后再保存。</view>
+        <button class="de-import__link" disabled="{{videoImportBusy}}" bindtap="toggleVideoTranscript">{{showVideoTranscript ? '返回视频自动读取' : '粘贴字幕或视频文稿'}}</button>
+        <view wx:if="{{showVideoTranscript}}">
+          <view class="field-label">字幕 / 视频文稿</view>
+          <textarea class="field-textarea" aria-label="字幕 / 视频文稿" value="{{videoTranscript}}" maxlength="8000" disabled="{{videoImportBusy}}" placeholder="粘贴这道菜的完整做法，不必整理格式（20–8000 字）" placeholder-class="placeholder" bindinput="onVideoTranscript" />
+          <view class="field-hint">{{videoTranscript.length}} / 8000 字 · 文稿将用于 AI 提炼</view>
+        </view>
+        <view wx:if="{{videoStatusError}}" class="field-hint">{{videoStatusError}}<button class="de-import__link" bindtap="loadVideoImportStatus">重新加载</button></view>
+        <view wx:elif="{{!videoStatusLoading && !videoImportAvailable}}" class="field-hint">管理员尚未启用 AI 提炼，可以继续手动填写菜谱。</view>
+        <view wx:if="{{videoQuotaText}}" class="field-hint">{{videoQuotaText}}</view>
+        <view class="de-import__actions">
+          <button class="btn btn-primary" disabled="{{videoImportBusy || saving || !videoUrl || !videoImportAvailable || videoQuotaBlocked}}" bindtap="extractVideo"><view wx:if="{{videoImportBusy}}" class="spinner"></view>{{videoImportBusy ? '提炼中…' : showVideoTranscript ? '从字幕提炼' : '从视频提炼'}}</button>
+          <button wx:if="{{videoImportBusy}}" class="btn btn-ghost" bindtap="cancelVideoImport">取消</button>
+        </view>
+        <view wx:if="{{videoImportBusy}}" class="field-hint" aria-role="status">{{videoImportProgress}}</view>
+        <view wx:if="{{videoImportError}}" class="de-import__error" aria-role="alert">{{videoImportError}}</view>
+        <view wx:if="{{videoResult}}" class="de-import__result">
+          <view class="de-import__title">{{videoResult.count ? '已填入 ' + videoResult.count + ' 项空白内容，核对后保存。' : '已提炼完成。当前字段已有内容，可展开结果核对。'}}</view>
+          <view class="field-hint">依据：{{videoResult.source}}。视频未注明的信息请自行补充。</view>
+          <button class="de-import__link" bindtap="toggleVideoResult">{{videoResultExpanded ? '收起提炼结果' : '查看提炼结果与字幕依据'}}</button>
+          <view wx:if="{{videoResultExpanded}}">
+            <view class="field-label">{{videoResult.name}}</view>
+            <view class="field-hint">食材：{{videoResult.ingredients}}</view>
+            <view wx:for="{{videoResult.steps}}" wx:key="index" class="de-import__step"><view>{{index + 1}}. {{item.text}}</view><view class="field-hint">原句：{{item.evidence}}</view></view>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -171,7 +201,7 @@
 </view>
 
 <view wx:if="{{!loading && !error && !recovery}}" class="de-save">
-  <button class="btn btn-primary btn-lg btn-block" disabled="{{!name || saving || uploadingCover || uploadingExtra}}" hover-class="tap-active" bindtap="save">
+  <button class="btn btn-primary btn-lg btn-block" disabled="{{!name || saving || uploadingCover || uploadingExtra || videoImportBusy}}" hover-class="tap-active" bindtap="save">
     <view wx:if="{{saving}}" class="spinner"></view>
     <block wx:else><icon name="check" size="30" stroke="2.6" color="white" /><text>{{uploadingCover || uploadingExtra ? '图片上传中…' : isNew ? '创建私房菜' : '保存修改'}}</text></block>
   </button>

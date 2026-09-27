@@ -121,6 +121,8 @@ curl -fsS http://127.0.0.1:9925/healthz
 
 v0.10.0 增加持久的每日额度与并发租约表，启动时自动迁移。管理员可配置每账号每日 0–20 次（默认 20）和全站每日 0–10000 次（默认 200）。上线前须备份 MySQL，保留旧镜像，并在升级后检查两个新表及 `/api/assistant/status` 返回的额度。完整规则见 [助手安全与额度](assistant-safety.md)。
 
+视频提炼版本增加 `video_platform_budgets` 表，启动时自动创建，不迁移或重写菜谱数据。发布前仍须备份数据库并保留当前镜像。未配置 `VIDEO_ASR_URL` / `VIDEO_ASR_API_KEY` / `VIDEO_ASR_MODEL` 时只尝试公开字幕，并提供粘贴字幕入口；不要将 CPA 文本模型密钥填作转写密钥。配置与验收项见 [视频做法提炼](video-recipes.md)。
+
 生产环境优先使用线上 Hermes / DSH 已在使用的 CPA 配置。应用容器以只读方式挂载 DSH 的 `llm-override.json`，运行时读取其中的 `baseUrl`、`apiKey`、`model` 和 `completionsPath`，访问同一个 CPA OpenAI 兼容接口；CPA 密钥不会写入菜谱仓库、数据库或日志。服务器 `/home/ubuntu/arre-cook/.env` 应包含：
 
 ```sh

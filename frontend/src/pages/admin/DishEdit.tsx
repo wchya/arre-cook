@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useId, useState } from "react"
+import { cloneElement, isValidElement, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { adminApi, dishesApi, uploadApi, getUploadErrorMessage } from "@/api"
@@ -7,6 +7,9 @@ import { ArrowLeft, Camera, Check, FilePenLine, LoaderCircle } from "lucide-reac
 import PageHeader from "@/components/PageHeader"
 import RequestState from "@/components/RequestState"
 import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
+import VideoRecipeImport from "@/components/VideoRecipeImport"
+import type { VideoRecipeResult } from "@/api/video-recipe"
+import { importFieldKeys, readImportedRecipe, recipeImportPatch, type ImportFieldKey } from "@/lib/recipe-import"
 import { errorMessage } from "@/api/client"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useRecipeDraft } from "@/lib/use-recipe-draft"
@@ -86,7 +89,7 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
   const [mealType, setMealType] = useState(dish?.meal_type || "all")
   const [difficulty, setDifficulty] = useState(dish?.difficulty || "easy")
   const [tasteList, setTasteList] = useState<string[]>((dish?.taste || "").split(",").map((item) => item.trim()).filter(Boolean))
-  const [cookTime, setCookTime] = useState(dish?.cook_time ?? 15)
+  const [cookTime, setCookTime] = useState(dish?.cook_time ?? 0)
   const [sourceDish] = useState(dish)
   const [ingredientsText, setIngredientsText] = useState(formatIngredients(asArray(dish?.ingredients)))
   const [seasoningsText, setSeasoningsText] = useState(formatIngredients(asArray(dish?.seasonings)))
@@ -95,6 +98,8 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
   const [imageUrl, setImageUrl] = useState(dish?.image_url || "")
   const [images, setImages] = useState<string[]>(asArray<string>(dish?.images))
   const [videoUrl, setVideoUrl] = useState(dish?.video_url || "")
+  const [importedRecipeJSON, setImportedRecipeJSON] = useState("")
+  const [videoBusy, setVideoBusy] = useState(false)
   const [tags, setTags] = useState<string[]>(asArray<string>(dish?.tags))
   const [tagInput, setTagInput] = useState("")
   const [sortOrder, setSortOrder] = useState(dish?.sort_order || 0)
@@ -107,16 +112,43 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
   const [pendingDelete, setPendingDelete] = useState<{ type: "category" | "taste"; value: string } | null>(null)
 
   const [uploading, setUploading] = useState(false)
-  const draft = useRecipeDraft(userId, dishId, mode, { name, category, mealType, difficulty, tasteList, cookTime, ingredientsText, seasoningsText, stepsText, remark, imageUrl, images, videoUrl, tags, sortOrder }, (value) => {
+  const draft = useRecipeDraft(userId, dishId, mode, { name, category, mealType, difficulty, tasteList, cookTime, ingredientsText, seasoningsText, stepsText, remark, imageUrl, images, videoUrl, tags, sortOrder, importedRecipeJSON }, (value) => {
     setName(value.name); setCategory(value.category); setMealType(value.mealType); setDifficulty(value.difficulty)
     setTasteList(value.tasteList); setCookTime(value.cookTime); setIngredientsText(value.ingredientsText)
     setSeasoningsText(value.seasoningsText); setStepsText(value.stepsText); setRemark(value.remark)
     setImageUrl(value.imageUrl); setImages(value.images); setVideoUrl(value.videoUrl); setTags(value.tags); setSortOrder(value.sortOrder)
+    setImportedRecipeJSON(value.importedRecipeJSON || "")
   })
+  const importValues = useMemo(() => ({ name, ingredientsText, seasoningsText, stepsText, remark, cookTime, importedRecipeJSON, videoUrl }), [name, ingredientsText, seasoningsText, stepsText, remark, cookTime, importedRecipeJSON, videoUrl])
+  const latestImportValues = useRef(importValues)
+  const importVersions = useRef<Partial<Record<ImportFieldKey, number>>>({})
+  function markImportEdit(key: ImportFieldKey) { importVersions.current[key] = (importVersions.current[key] || 0) + 1 }
+  useLayoutEffect(() => {
+    for (const key of importFieldKeys) if (latestImportValues.current[key] !== importValues[key]) importVersions.current[key] = (importVersions.current[key] || 0) + 1
+    latestImportValues.current = importValues
+  }, [importValues])
+  function startVideoImport() {
+    const start = { ...latestImportValues.current }
+    const versions = { ...importVersions.current }
+    return (result: VideoRecipeResult) => {
+      const touched = importFieldKeys.filter((key) => importVersions.current[key] !== versions[key])
+      const patch = recipeImportPatch(start, latestImportValues.current, result.recipe, touched)
+      if (patch.name !== undefined) setName(patch.name)
+      if (patch.ingredientsText !== undefined) setIngredientsText(patch.ingredientsText)
+      if (patch.seasoningsText !== undefined) setSeasoningsText(patch.seasoningsText)
+      if (patch.stepsText !== undefined) setStepsText(patch.stepsText)
+      if (patch.remark !== undefined) setRemark(patch.remark)
+      if (patch.cookTime !== undefined) setCookTime(patch.cookTime)
+      if (patch.importedRecipeJSON !== undefined) setImportedRecipeJSON(patch.importedRecipeJSON)
+      if (start.videoUrl === latestImportValues.current.videoUrl) setVideoUrl(result.source.url)
+      return importFieldKeys.filter((key) => patch[key] !== undefined).length
+    }
+  }
   const back = () => navigate(mode === "admin" ? "/admin/dishes" : isNew ? "/dishes?scope=mine" : `/dishes/${dishId}`)
 
   const saveMut = useMutation({
     mutationFn: () => {
+      const imported = readImportedRecipe(importedRecipeJSON)
       const data: DishInput = {
         name: name.trim(),
         category,
@@ -124,9 +156,9 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
         difficulty,
         taste: tasteList.join(","),
         cook_time: cookTime,
-        ingredients: JSON.stringify(parseIngredients(ingredientsText, asArray(sourceDish?.ingredients))),
-        seasonings: JSON.stringify(parseIngredients(seasoningsText, asArray(sourceDish?.seasonings))),
-        steps: JSON.stringify(parseSteps(stepsText, asArray(sourceDish?.steps))),
+        ingredients: JSON.stringify(parseIngredients(ingredientsText, imported.ingredients || asArray(sourceDish?.ingredients))),
+        seasonings: JSON.stringify(parseIngredients(seasoningsText, imported.seasonings || asArray(sourceDish?.seasonings))),
+        steps: JSON.stringify(parseSteps(stepsText, imported.steps || asArray(sourceDish?.steps))),
         remark,
         image_url: imageUrl,
         images: JSON.stringify(images),
@@ -249,7 +281,7 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
   const pillClass = (active: boolean) =>
     `inline-flex min-h-11 items-center rounded-full text-sm border-[1.5px] transition-all ${active ? "bg-primary text-white border-primary" : "border-border text-text2"}`
 
-  const disabled = !name.trim() || saveMut.isPending || uploading || Boolean(draft.recovery)
+  const disabled = !name.trim() || saveMut.isPending || uploading || videoBusy || Boolean(draft.recovery)
   return (
     <>
       <PageHeader title={isNew ? (mode === "admin" ? "添加公共菜谱" : "新建私房菜") : "编辑菜谱"}
@@ -264,7 +296,7 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
         <fieldset disabled={Boolean(draft.recovery) || saveMut.isPending} className="min-w-0">
       <Section title="基本信息">
         <Field label="菜品名称 *" hint="必填">
-          <input type="text" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="如：番茄炒蛋" className={inputCls} />
+          <input type="text" maxLength={100} value={name} onChange={(e) => { markImportEdit("name"); setName(e.target.value) }} placeholder="如：番茄炒蛋" className={inputCls} />
         </Field>
 
         <Field label="分类">
@@ -341,8 +373,8 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label="烹饪时间（分钟）">
-            <input type="number" value={cookTime} onChange={(e) => setCookTime(Number(e.target.value))} min={0} max={600} className={inputCls} />
+          <Field label="烹饪时间（分钟）" hint="未注明时可保留 0，确认后再填写">
+            <input type="number" value={cookTime} onChange={(e) => { markImportEdit("cookTime"); setCookTime(Number(e.target.value)) }} min={0} max={600} className={inputCls} />
           </Field>
           <Field label="排序权重" hint="数值越大越靠前">
             <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className={inputCls} />
@@ -388,19 +420,20 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
         <Field label="教程视频链接" hint="仅支持抖音 / 哔哩哔哩，保存后可从详情页直接打开播放">
           <input type="text" maxLength={2048} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="粘贴视频链接" className={inputCls} />
         </Field>
+        <VideoRecipeImport url={videoUrl} userId={userId} disabled={Boolean(draft.recovery) || saveMut.isPending} onStart={startVideoImport} onBusy={setVideoBusy} />
       </Section>
 
       <Section title="食材与步骤">
         <Field label="配料清单" hint="每行：名称 数量，最后一段为数量">
-          <textarea value={ingredientsText} onChange={(e) => setIngredientsText(e.target.value)} rows={4} placeholder={"番茄 2个\n鸡蛋 3个"} className={textareaCls} />
+          <textarea value={ingredientsText} onChange={(e) => { markImportEdit("ingredientsText"); setIngredientsText(e.target.value) }} rows={4} placeholder={"番茄 2个\n鸡蛋 3个"} className={textareaCls} />
         </Field>
 
         <Field label="调料清单" hint="每行：名称 数量">
-          <textarea value={seasoningsText} onChange={(e) => setSeasoningsText(e.target.value)} rows={2} placeholder={"盐 1茶匙\n白糖 1茶匙"} className={textareaCls} />
+          <textarea value={seasoningsText} onChange={(e) => { markImportEdit("seasoningsText"); setSeasoningsText(e.target.value) }} rows={2} placeholder={"盐 1茶匙\n白糖 1茶匙"} className={textareaCls} />
         </Field>
 
         <Field label="制作步骤" hint="每行一步，可选(分钟数)标注时间">
-          <textarea value={stepsText} onChange={(e) => setStepsText(e.target.value)} rows={4} placeholder={"1. 番茄洗净切块 (3分钟)\n2. 倒入蛋液翻炒"} className={textareaCls} />
+          <textarea value={stepsText} onChange={(e) => { markImportEdit("stepsText"); setStepsText(e.target.value) }} rows={4} placeholder={"1. 番茄洗净切块 (3分钟)\n2. 倒入蛋液翻炒"} className={textareaCls} />
         </Field>
       </Section>
 
@@ -425,7 +458,7 @@ function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; m
         </Field>
 
         <Field label="备注" hint="烹饪小贴士、注意事项等">
-          <textarea maxLength={500} value={remark} onChange={(e) => setRemark(e.target.value)} rows={2} placeholder="一些小贴士..." className={`${textareaCls} min-h-[60px]`} />
+          <textarea maxLength={500} value={remark} onChange={(e) => { markImportEdit("remark"); setRemark(e.target.value) }} rows={2} placeholder="一些小贴士..." className={`${textareaCls} min-h-[60px]`} />
         </Field>
       </Section>
 

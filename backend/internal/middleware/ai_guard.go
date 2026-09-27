@@ -16,6 +16,7 @@ import (
 import "github.com/gin-gonic/gin"
 
 var aiIngressLimiter = newWindowLimiter(time.Minute)
+var videoLimiter = newWindowLimiter(time.Minute)
 
 // AIIngress applies before authentication so random tokens cannot cause unbounded
 // database lookups. Origin checks protect browser embedding; credentials, account
@@ -23,7 +24,7 @@ var aiIngressLimiter = newWindowLimiter(time.Minute)
 func AIIngress() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		protected := path == "/mcp" || strings.HasPrefix(path, "/api/agent/") || strings.HasPrefix(path, "/api/assistant/") || strings.HasPrefix(path, "/api/me/agent-") || strings.HasPrefix(path, "/api/auth/")
+		protected := path == "/mcp" || path == "/api/link-preview" || strings.HasPrefix(path, "/api/agent/") || strings.HasPrefix(path, "/api/assistant/") || strings.HasPrefix(path, "/api/me/agent-") || strings.HasPrefix(path, "/api/auth/")
 		if !protected {
 			c.Next()
 			return
@@ -48,6 +49,9 @@ func AIIngress() gin.HandlerFunc {
 		if path == "/api/assistant/chat" || strings.HasPrefix(path, "/api/auth/") {
 			limit = 16 * 1024
 		}
+		if path == "/api/assistant/video-recipe" {
+			limit = 40 * 1024
+		}
 		if c.Request.Body != nil && c.Request.Method != http.MethodGet && c.Request.Method != http.MethodOptions {
 			reader := http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 			body, err := io.ReadAll(reader)
@@ -58,6 +62,18 @@ func AIIngress() gin.HandlerFunc {
 				return
 			}
 			c.Request.Body = io.NopCloser(bytes.NewReader(body))
+		}
+		c.Next()
+	}
+}
+
+func VideoRateLimit(limit int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !videoLimiter.Allow(c.FullPath()+":"+itoa(auth.UID(c)), limit) {
+			c.Header("Retry-After", "60")
+			utils.Error(c, http.StatusTooManyRequests, 42900, "视频请求过于频繁，请稍后重试")
+			c.Abort()
+			return
 		}
 		c.Next()
 	}

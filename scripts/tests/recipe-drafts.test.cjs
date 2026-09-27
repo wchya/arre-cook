@@ -120,7 +120,7 @@ function miniHarness(store = new Map(), userId = 7) {
   vm.runInNewContext(fs.readFileSync(path.join(root, 'miniprogram/utils/recipe-draft.js'), 'utf8'), { module: draftModule, wx })
   const drafts = draftModule.exports
   const api = { get: async () => ({}), post: async () => ({}), put: async () => ({}) }
-  const deps = { api, ui: { toast: msg => messages.push(msg), haptic() {} }, media: { assetUrl: value => value, asArray: value => Array.isArray(value) ? value : [] }, video: {}, session: { requireLogin: () => true, currentUser: async () => ({ id: userId }) }, dish: { tasteTags: value => (value || '').split(',').filter(Boolean) }, 'recipe-draft': drafts, 'recipe-text': require(path.join(root, 'miniprogram/utils/recipe-text.js')) }
+  const deps = { api, ui: { toast: msg => messages.push(msg), haptic() {} }, media: { assetUrl: value => value, asArray: value => Array.isArray(value) ? value : [] }, video: {}, session: { requireLogin: () => true, currentUser: async () => ({ id: userId }) }, dish: { tasteTags: value => (value || '').split(',').filter(Boolean) }, 'recipe-draft': drafts, 'recipe-text': require(path.join(root, 'miniprogram/utils/recipe-text.js')), 'recipe-import': require(path.join(root, 'miniprogram/utils/recipe-import.js')), 'video-recipe': {} }
   let definition
   vm.runInNewContext(fs.readFileSync(path.join(root, 'miniprogram/pages/dish-edit/dish-edit.js'), 'utf8'), {
     Page: value => { definition = value }, require: name => deps[name.split('/').at(-1)], wx,

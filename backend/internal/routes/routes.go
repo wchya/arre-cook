@@ -105,6 +105,8 @@ func Setup(r *gin.Engine) {
 		app.GET("/assistant/status", handlers.GetAssistantStatus)
 		// Short burst protection is separate from the persistent per-account daily quota.
 		app.POST("/assistant/chat", mw.ChatRateLimit(60), handlers.AssistantChat)
+		app.GET("/assistant/video-recipe/status", handlers.GetVideoRecipeStatus)
+		app.POST("/assistant/video-recipe", mw.VideoRateLimit(12), handlers.ExtractVideoRecipe)
 		app.GET("/assistant/sessions", handlers.ListAssistantSessions)
 		app.GET("/assistant/sessions/:id", handlers.GetAssistantMessages)
 		app.DELETE("/assistant/sessions/:id", handlers.DeleteAssistantSession)
@@ -160,7 +162,7 @@ func Setup(r *gin.Engine) {
 		app.GET("/shopping/overview", handlers.GetShoppingOverview)
 		app.POST("/shopping-list/toggle", handlers.ToggleShoppingCheckHandler)
 		app.POST("/shopping-list/inventory", handlers.ToggleHomeInventoryHandler)
-		app.GET("/link-preview", handlers.GetLinkPreview)
+		app.GET("/link-preview", mw.VideoRateLimit(30), handlers.GetLinkPreview)
 		app.GET("/holidays/upcoming", handlers.GetUpcomingHolidays)
 	}
 

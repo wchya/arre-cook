@@ -1,18 +1,14 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
-	"io"
-	"net"
-	"net/http"
 	"net/url"
+	"ninimenu/internal/video"
 	"regexp"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -30,34 +26,42 @@ type LinkPreview struct {
 	Playable     bool   `json:"playable"`
 }
 
-const linkPreviewMaxBody = 512 << 10 // 抓取网页时最多读取 512KB
+var reBiliBV = regexp.MustCompile(`(BV[0-9A-Za-z]{10})`)
 
-var (
-	reBiliBV   = regexp.MustCompile(`(?i)(BV[0-9A-Za-z]{10})`)
-	reMetaTag  = regexp.MustCompile(`(?is)<meta\s+[^>]*?>`)
-	reTitleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-	reAttrKV   = regexp.MustCompile(`(?is)([a-zA-Z:_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')`)
-)
-
-// FetchLinkPreview 解析链接并尽力抓取标题/封面；抓取失败时仍返回按 URL 识别出的平台与嵌入地址。
+// FetchLinkPreview shares the public-video reader with extraction and saving.
+// Unsupported links are identified locally and are never fetched by the server.
 func FetchLinkPreview(raw string) (*LinkPreview, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil, errors.New("请提供链接")
-	}
-	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return nil, errors.New("链接无效，请以 http(s):// 开头")
-	}
-	preview := quickLinkPreview(u)
-	if metas, title, finalURL, err := fetchHTML(raw); err == nil {
-		if finalURL != nil && finalURL.Host != u.Host {
-			applyPlatform(preview, finalURL) // 短链跳转后按最终地址识别平台
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	return FetchLinkPreviewContext(ctx, raw)
+}
+
+func FetchLinkPreviewContext(ctx context.Context, raw string) (*LinkPreview, error) {
+	in, err := video.Parse(raw)
+	if err != nil {
+		u, parseErr := url.Parse(strings.TrimSpace(raw))
+		if parseErr != nil || video.ValidatePublicURL(u) != nil {
+			return nil, errors.New("请提供有效的视频链接")
 		}
-		enrichFromHTML(preview, metas, title)
+		p := quickLinkPreview(u)
+		p.Title = p.PlatformName
+		return p, nil
 	}
-	if preview.Title == "" {
-		preview.Title = preview.PlatformName
+	u, _ := url.Parse(in.URL)
+	preview := quickLinkPreview(u)
+	preview.Title = preview.PlatformName
+	readCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	meta, err := publicVideoReader.Preview(readCtx, in.URL)
+	if err == nil {
+		finalURL, _ := url.Parse(meta.URL)
+		preview.URL = meta.URL
+		applyPlatform(preview, finalURL)
+		preview.Title, preview.Author = clip(meta.Title, 200), clip(meta.Author, 80)
+		preview.Duration = formatDuration(meta.Duration)
+		if cover, err := url.Parse(meta.Cover); err == nil && video.ValidatePublicURL(cover) == nil && cover.Scheme == "https" {
+			preview.Cover = clip(meta.Cover, 600)
+		}
 	}
 	return preview, nil
 }
@@ -108,123 +112,6 @@ func hostMatches(host string, domains ...string) bool {
 		}
 	}
 	return false
-}
-
-// fetchHTML 受控抓取网页：SSRF 防护（禁私网/环回）、限时、限跳转、限大小；返回 meta 表、<title> 与最终 URL。
-func fetchHTML(raw string) (map[string]string, string, *url.URL, error) {
-	dialer := &net.Dialer{Timeout: 4 * time.Second, Control: guardPrivateAddr}
-	client := &http.Client{
-		Timeout: 6 * time.Second,
-		Transport: &http.Transport{
-			DialContext:           dialer.DialContext,
-			TLSHandshakeTimeout:   4 * time.Second,
-			ResponseHeaderTimeout: 4 * time.Second,
-			DisableKeepAlives:     true,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return errors.New("重定向次数过多")
-			}
-			return nil
-		},
-	}
-	req, err := http.NewRequest(http.MethodGet, raw, nil)
-	if err != nil {
-		return nil, "", nil, err
-	}
-	req.Header.Set("User-Agent", "NiniMenuBot/1.0 (+link-preview)")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, "", nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, "", resp.Request.URL, fmt.Errorf("抓取失败：%d", resp.StatusCode)
-	}
-	if ct := strings.ToLower(resp.Header.Get("Content-Type")); ct != "" &&
-		!strings.Contains(ct, "html") && !strings.Contains(ct, "xml") {
-		return nil, "", resp.Request.URL, errors.New("非网页内容")
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, linkPreviewMaxBody))
-	if err != nil {
-		return nil, "", resp.Request.URL, err
-	}
-	metas, title := parseHTMLMeta(string(body))
-	return metas, title, resp.Request.URL, nil
-}
-
-// guardPrivateAddr 在 DNS 解析后、真正拨号前拦截指向私网/环回/链路本地地址的连接，防御 SSRF 与 DNS 重绑定。
-func guardPrivateAddr(network, address string, _ syscall.RawConn) error {
-	if network != "tcp4" && network != "tcp6" && network != "tcp" {
-		return fmt.Errorf("不允许的网络类型：%s", network)
-	}
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return err
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return fmt.Errorf("无法解析地址：%s", host)
-	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return errors.New("拒绝访问内网地址")
-	}
-	return nil
-}
-
-// parseHTMLMeta 从 HTML 中提取 <title> 与所有 <meta>（按 name/property 建表，先到先得）。
-func parseHTMLMeta(body string) (map[string]string, string) {
-	metas := make(map[string]string)
-	for _, tag := range reMetaTag.FindAllString(body, -1) {
-		var key, content string
-		for _, kv := range reAttrKV.FindAllStringSubmatch(tag, -1) {
-			name := strings.ToLower(strings.TrimSpace(kv[1]))
-			val := kv[2]
-			if val == "" {
-				val = kv[3]
-			}
-			switch name {
-			case "property", "name", "itemprop":
-				if key == "" {
-					key = strings.ToLower(strings.TrimSpace(val))
-				}
-			case "content":
-				content = val
-			}
-		}
-		if key != "" && content != "" {
-			if _, exists := metas[key]; !exists {
-				metas[key] = html.UnescapeString(content)
-			}
-		}
-	}
-	title := ""
-	if m := reTitleTag.FindStringSubmatch(body); len(m) > 1 {
-		title = strings.TrimSpace(html.UnescapeString(m[1]))
-	}
-	return metas, title
-}
-
-// enrichFromHTML 用抓取到的 meta/title 补全预览：标题、封面、作者、时长；og 优先，已识别出的 embed 不覆盖。
-func enrichFromHTML(p *LinkPreview, metas map[string]string, title string) {
-	p.Title = firstNonEmpty(p.Title, metas["og:title"], metas["twitter:title"], title)
-	p.Cover = firstNonEmpty(p.Cover, metas["og:image"], metas["og:image:url"], metas["twitter:image"], metas["twitter:image:src"])
-	p.Author = firstNonEmpty(p.Author, metas["author"], metas["og:site_name"])
-	if dur := firstNonEmpty(metas["og:video:duration"], metas["video:duration"]); dur != "" {
-		if secs, err := strconv.Atoi(strings.TrimSpace(dur)); err == nil && secs > 0 {
-			p.Duration = formatDuration(secs)
-		}
-	}
-	if p.Supported && p.EmbedURL == "" {
-		if embed := firstNonEmpty(metas["og:video:secure_url"], metas["og:video:url"], metas["og:video"]); strings.HasPrefix(embed, "https://") {
-			p.EmbedURL = embed
-			p.Playable = true
-		}
-	}
-	p.Title = clip(p.Title, 200)
-	p.Author = clip(p.Author, 80)
-	p.Cover = clip(p.Cover, 600)
 }
 
 func clip(s string, max int) string {

@@ -10,6 +10,7 @@ function snapshot(data) {
   ARRAY_FIELDS.forEach((field) => { value[field] = (data[field] || []).slice() })
   NUMBER_FIELDS.forEach((field) => { value[field] = data[field] })
   value.shareFamily = Boolean(data.shareFamily)
+  if (typeof data.importedRecipeJSON === "string" && data.importedRecipeJSON.length <= 60000) value.importedRecipeJSON = data.importedRecipeJSON
   return value
 }
 function read(userId, recipeId) {

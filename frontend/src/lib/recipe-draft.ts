@@ -14,6 +14,7 @@ export interface RecipeDraftFields {
   videoUrl: string
   tags: string[]
   sortOrder: number
+  importedRecipeJSON?: string
 }
 
 export interface RecipeDraft { version: 1; savedAt: number; value: RecipeDraftFields }
@@ -29,6 +30,7 @@ export function readRecipeDraft(key: string): RecipeDraft | null {
     const draft = raw as Partial<RecipeDraft>
     if (draft.version !== 1 || !Number.isFinite(draft.savedAt) || !draft.value || typeof draft.value !== "object") return null
     const value = draft.value
+    if (value.importedRecipeJSON !== undefined && (typeof value.importedRecipeJSON !== "string" || value.importedRecipeJSON.length > 60000)) return null
     const strings: (keyof RecipeDraftFields)[] = ["name", "category", "mealType", "difficulty", "ingredientsText", "seasoningsText", "stepsText", "remark", "imageUrl", "videoUrl"]
     if (strings.some((field) => typeof value[field] !== "string")) return null
     if (![value.cookTime, value.sortOrder].every(Number.isFinite)) return null

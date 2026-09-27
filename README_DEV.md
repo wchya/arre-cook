@@ -175,6 +175,8 @@ arre-cook/
 |---|---|---|
 | GET/PUT | `/api/me`、`/api/me/preferences` | 当前用户资料与偏好 |
 | GET/POST | `/api/dishes` | 查询可见菜谱、创建私房菜；管理员可显式创建公共菜谱 |
+| GET | `/api/assistant/video-recipe/status` | 视频提炼与语音转写可用状态、共享 AI 额度 |
+| POST | `/api/assistant/video-recipe` | SSE 视频 / 字幕提炼，只返回草稿；边界与配置见 [视频提炼](docs/video-recipes.md) |
 | GET/PUT/DELETE | `/api/dishes/:id` | 详情及按作者/家庭权限校验的修改、删除 |
 | GET | `/api/dishes/category-counts?scope=mine` | 本人个人菜谱分类计数 |
 | GET/POST | `/api/records` | 查询与创建记录；查询支持 `from`、`to`、分页 |

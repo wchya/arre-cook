@@ -67,6 +67,10 @@ type Config struct {
 	CPAConfigPath string
 	CPABaseURL    string
 	CPAModel      string
+	// Optional OpenAI-compatible speech-to-text endpoint; separate from text LLM credentials.
+	VideoASRURL    string
+	VideoASRAPIKey string
+	VideoASRModel  string
 
 	// 嵌入式智能体会话令牌有效期（父页通过 postMessage 交给 iframe 内的智能体）
 	AgentSessionTTL time.Duration
@@ -131,6 +135,9 @@ func Load() {
 		CPAConfigPath:   getEnv("LLM_CPA_CONFIG_PATH", getEnv("CPA_CONFIG_PATH", "")),
 		CPABaseURL:      strings.TrimRight(getEnv("LLM_CPA_BASE_URL", getEnv("CPA_BASE_URL", "")), "/"),
 		CPAModel:        getEnv("LLM_CPA_MODEL", getEnv("CPA_MODEL", "")),
+		VideoASRURL:     getEnv("VIDEO_ASR_URL", ""),
+		VideoASRAPIKey:  getEnv("VIDEO_ASR_API_KEY", ""),
+		VideoASRModel:   getEnv("VIDEO_ASR_MODEL", ""),
 		AgentSessionTTL: getEnvDuration("AGENT_SESSION_TTL", 2*time.Hour),
 		AgentRateLimit:  getEnvInt("AGENT_RATE_LIMIT", 120),
 		PublicURL:       strings.TrimRight(getEnv("PUBLIC_URL", ""), "/"),

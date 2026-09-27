@@ -51,6 +51,7 @@ func main() {
 		&models.AgentToken{}, &models.AgentAuditLog{}, &models.AgentSuggestion{},
 		&models.Notification{}, &models.ChatSession{}, &models.ChatMessage{},
 		&models.AssistantUsage{}, &models.AssistantLease{},
+		&models.VideoPlatformBudget{},
 		&models.Family{}, &models.FamilyMember{}, &models.FamilyInvitation{},
 		&models.FamilyPlanItem{}, &models.FamilyShoppingItem{}, &models.FoodJournalEntry{},
 		&models.Dish{}, &models.MealRecord{}, &models.Favorite{}, &models.Quote{},

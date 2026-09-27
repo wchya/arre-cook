@@ -67,6 +67,7 @@ func Init() error {
 		&models.ChatMessage{},
 		&models.AssistantUsage{},
 		&models.AssistantLease{},
+		&models.VideoPlatformBudget{},
 		&models.Family{},
 		&models.FamilyMember{},
 		&models.FamilyInvitation{},
