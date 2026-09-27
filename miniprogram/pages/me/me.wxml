@@ -100,6 +100,11 @@
             <view class="row-main"><view class="row-title">成就</view><view class="row-desc">已解锁 {{unlocked}}/{{achievementTotal}}</view></view>
             <icon name="chevron-right" size="32" stroke="2" color="text4" />
           </view>
+          <view class="row" hover-class="tap-bg" data-url="/pages/dishes/dishes?scope=mine" bindtap="go">
+            <view class="row-icon tone-purple"><icon name="chef-hat" size="36" stroke="2.3" color="purple" /></view>
+            <view class="row-main"><view class="row-title">我的私房菜</view><view class="row-desc">{{stats && stats.private_dishes ? '已有 ' + stats.private_dishes + ' 道私房菜' : '查看你创建的食谱'}}</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
           <view class="row" hover-class="tap-bg" data-url="/pages/dish-edit/dish-edit" bindtap="go">
             <view class="row-icon tone-purple"><icon name="chef-hat" size="36" stroke="2.3" color="purple" /></view>
             <view class="row-main"><view class="row-title">新建私房菜</view><view class="row-desc">{{stats && stats.private_dishes ? '已有 ' + stats.private_dishes + ' 道私房菜' : '只有你自己看得到'}}</view></view>

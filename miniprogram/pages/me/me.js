@@ -187,7 +187,13 @@ Page({
 
   go(event) {
     const url = event.currentTarget.dataset.url
-    if (url) wx.navigateTo({ url })
+    if (!url) return
+    if (url.indexOf("/pages/dishes/dishes") === 0) {
+      if (url.indexOf("scope=mine") >= 0) wx.setStorageSync("ninimenu_dishes_scope", "mine")
+      wx.switchTab({ url: "/pages/dishes/dishes" })
+      return
+    }
+    wx.navigateTo({ url })
   },
 
   adminTip() {

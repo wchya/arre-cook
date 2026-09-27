@@ -172,7 +172,8 @@ export default function Me() {
           <Row icon={ShoppingBasket} tone="bg-mint-light text-mint" title="一周菜单与买菜清单" onClick={() => navigate("/plan")} />
           <Row icon={Images} tone="bg-primary-light text-primary" title="照片墙" onClick={() => navigate("/photo-wall")} />
           <Row icon={Trophy} tone="bg-yellow-light text-yellow-dark" title="成就" desc={`已解锁 ${unlocked}/${achievements.length}`} onClick={() => navigate("/achievements")} />
-          <Row icon={Bot} tone="bg-purple-light text-purple" title="新建私房菜" desc={stats?.private_dishes ? `已有 ${stats.private_dishes} 道私房菜` : "只有你自己看得到"} onClick={() => navigate("/dishes/new")} />
+          <Row icon={Bot} tone="bg-purple-light text-purple" title="我的私房菜" desc={stats?.private_dishes ? `已有 ${stats.private_dishes} 道私房菜` : "查看你创建的食谱"} onClick={() => navigate("/dishes?scope=mine")} />
+          <Row icon={Bot} tone="bg-purple-light text-purple" title="新建私房菜" desc="只有你自己看得到" onClick={() => navigate("/dishes/new")} />
         </Group>
 
         <Group title="偏好设置">

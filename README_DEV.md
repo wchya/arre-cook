@@ -56,6 +56,7 @@ chmod +x ninimenu
 |------|--------|------|
 | `APP_ENV` | `development` | `production` / `release` 启用生产配置 |
 | `APP_VERSION` | 空 | 容器构建版本或 Git short SHA；每次变更时发布一次系统更新站内信 |
+| `APP_RELEASE_NOTES` | 空 | 面向用户的更新摘要，多条用“；”分隔；为空时使用通用更新文案 |
 | `PORT` | `8080` | 服务端口 |
 | `ADMIN_EMAIL` | 空 | 初始管理员邮箱；旧单用户数据迁移给该管理员 |
 | `ADMIN_USERNAME` | `admin` | 初始管理员用户名 |

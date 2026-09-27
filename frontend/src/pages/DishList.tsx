@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { dishesApi, favoritesApi, settingsApi, recordsApi } from "@/api"
 import { asArray } from "@/lib/utils"
@@ -31,8 +31,10 @@ const PAGE_SIZE = 30
 
 export default function DishList() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const qc = useQueryClient()
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn)
+  const scope = searchParams.get("scope") === "mine" ? "mine" : ""
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState("全部")
   const [activeTaste, setActiveTaste] = useState("全部")
@@ -74,8 +76,9 @@ export default function DishList() {
     if (activeCategory !== "全部") params.category = activeCategory
     if (activeTaste !== "全部") params.taste = activeTaste
     if (search) params.search = search
+    if (scope) params.scope = scope
     return params
-  }, [activeCategory, activeTaste, search])
+  }, [activeCategory, activeTaste, search, scope])
 
   const { data: dishesData, isLoading } = useQuery({
     queryKey: ["dishes", queryParams],
@@ -88,7 +91,7 @@ export default function DishList() {
   const [pages, setPages] = useState<Dish[][]>([])
   const [nextPageNum, setNextPageNum] = useState(2)
   const [currentParamsKey, setCurrentParamsKey] = useState("")
-  const paramsKey = `${activeCategory}|${activeTaste}|${search}`
+  const paramsKey = `${scope}|${activeCategory}|${activeTaste}|${search}`
 
   if (currentParamsKey !== paramsKey) {
     setCurrentParamsKey(paramsKey)
@@ -293,8 +296,8 @@ export default function DishList() {
   return (
     <div className="animate-fadeUp flex flex-col h-full">
       <PageHeader
-        title="菜品"
-        subtitle="选菜加餐，一键搞定"
+        title={scope === "mine" ? "我的私房菜" : "菜品"}
+        subtitle={scope === "mine" ? "只显示你创建的食谱" : "选菜加餐，一键搞定"}
         icon={UtensilsCrossed}
         actions={
            <HeaderIconButton onClick={() => navigate(isLoggedIn ? "/admin/dashboard" : "/admin/login")} aria-label="管理设置">

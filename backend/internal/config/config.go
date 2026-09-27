@@ -14,6 +14,7 @@ type Config struct {
 	Port           string
 	Env            string // development / production
 	AppVersion     string // deployment/build identifier used for release notifications
+	ReleaseNotes   string // user-facing release summary included in deployment notifications
 	AdminUsername  string
 	AdminPassword  string
 	JWTSecret      string
@@ -87,6 +88,7 @@ func Load() {
 		Port:            getEnv("PORT", "8080"),
 		Env:             strings.ToLower(getEnv("APP_ENV", getEnv("GIN_MODE", "development"))),
 		AppVersion:      strings.TrimSpace(getEnv("APP_VERSION", "")),
+		ReleaseNotes:    strings.TrimSpace(getEnv("APP_RELEASE_NOTES", "")),
 		AdminUsername:   getEnv("ADMIN_USERNAME", "admin"),
 		AdminPassword:   adminPassword,
 		JWTSecret:       getEnv("JWT_SECRET", defaultJWTSecret),

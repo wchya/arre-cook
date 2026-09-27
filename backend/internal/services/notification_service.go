@@ -123,10 +123,42 @@ func PublishNotification(uid uint, kind, title, content, link string) (int64, er
 	return int64(len(ids)), err
 }
 
+const defaultDeploymentNotes = "本次更新了一些内容，并修复了一些 bug。"
+
+// deploymentNoticeContent turns deployment notes into a short, readable notice. Notes
+// are supplied by the deployment environment so the server never exposes commit
+// messages or internal file names to end users.
+func deploymentNoticeContent(version, rawNotes string) string {
+	lines := strings.FieldsFunc(strings.TrimSpace(rawNotes), func(r rune) bool {
+		return r == '\n' || r == '\r' || r == ';' || r == '；'
+	})
+	notes := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(strings.TrimLeft(line, "-*• "))
+		if line != "" {
+			notes = append(notes, line)
+		}
+		if len(notes) == coalescedNoticeMaxParts {
+			break
+		}
+	}
+	if len(notes) == 0 {
+		return fmt.Sprintf("系统已更新到版本 %s。\n\n%s", version, defaultDeploymentNotes)
+	}
+	return fmt.Sprintf("系统已更新到版本 %s。\n\n本次更新：\n- %s", version, strings.Join(notes, "\n- "))
+}
+
 // AnnounceDeployment publishes one system notice per build identifier. The version is
 // supplied by the container build (APP_VERSION); missing/placeholder values are ignored
 // so local development restarts do not spam every account.
 func AnnounceDeployment(version string) error {
+	return AnnounceDeploymentWithNotes(version, "")
+}
+
+// AnnounceDeploymentWithNotes publishes a deployment notice with an optional user-facing
+// summary. The marker remains keyed by version, so restarting the same container never
+// sends duplicate notices.
+func AnnounceDeploymentWithNotes(version, releaseNotes string) error {
 	version = strings.TrimSpace(version)
 	if version == "" || strings.EqualFold(version, "unknown") || strings.EqualFold(version, "dev") {
 		return nil
@@ -147,7 +179,7 @@ func AnnounceDeployment(version string) error {
 		if err := tx.Model(&models.User{}).Where("disabled = ?", false).Pluck("id", &ids).Error; err != nil {
 			return err
 		}
-		content := fmt.Sprintf("系统已更新到版本 %s，最新功能和修复已经部署完成。", version)
+		content := deploymentNoticeContent(version, releaseNotes)
 		rows := make([]models.Notification, 0, len(ids))
 		for _, id := range ids {
 			rows = append(rows, models.Notification{

@@ -59,12 +59,16 @@ Page({
     pending: {},
   },
 
-  onLoad() {
+  onLoad(options) {
     this._offTheme = theme.bindRefresher(this)
     this._page = 1
     this._items = []
     this._dishMap = {}
     this._requestId = 0
+    const requestedScope = options && options.scope === "mine" ? "mine" : ""
+    if (requestedScope) {
+      this.setData({ scope: requestedScope, scopeLabel: "私房" })
+    }
   },
 
   onUnload() {
@@ -74,9 +78,15 @@ Page({
   onShow() {
     session.syncTabBar(this, 1)
     if (!session.requireLogin()) return
+    const requestedScope = wx.getStorageSync("ninimenu_dishes_scope") === "mine" ? "mine" : ""
+    if (requestedScope) wx.removeStorageSync("ninimenu_dishes_scope")
+    const scopeChanged = requestedScope && requestedScope !== this.data.scope
+    if (scopeChanged) this.setData({ scope: requestedScope, scopeLabel: "私房", category: "全部", taste: "全部", keyword: "" })
     if (!this._booted) {
       this._booted = true
       this.loadMeta()
+      this.reload()
+    } else if (scopeChanged) {
       this.reload()
     } else {
       this.loadToday()

@@ -34,3 +34,40 @@ func TestAnnounceDeploymentIsIdempotent(t *testing.T) {
 		t.Fatalf("new deployment notification count = %d, want 2", count)
 	}
 }
+
+func TestAnnounceDeploymentWithNotesUsesReadableSummary(t *testing.T) {
+	user, _, err := testutil.NewUser("deploy-notes@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := AnnounceDeploymentWithNotes("notes-build", "优化站内信详情查看体验；修复头像选择无响应问题"); err != nil {
+		t.Fatal(err)
+	}
+	var notice models.Notification
+	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Order("id DESC").First(&notice).Error; err != nil {
+		t.Fatal(err)
+	}
+	want := "系统已更新到版本 notes-build。\n\n本次更新：\n- 优化站内信详情查看体验\n- 修复头像选择无响应问题"
+	if notice.Content != want {
+		t.Fatalf("notice content = %q, want %q", notice.Content, want)
+	}
+}
+
+func TestAnnounceDeploymentWithNotesFallsBackWhenEmpty(t *testing.T) {
+	user, _, err := testutil.NewUser("deploy-fallback@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := AnnounceDeploymentWithNotes("fallback-build", "\n ; "); err != nil {
+		t.Fatal(err)
+	}
+	var notice models.Notification
+	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Order("id DESC").First(&notice).Error; err != nil {
+		t.Fatal(err)
+	}
+	if notice.Content != "系统已更新到版本 fallback-build。\n\n本次更新了一些内容，并修复了一些 bug。" {
+		t.Fatalf("fallback notice content = %q", notice.Content)
+	}
+}

@@ -45,10 +45,11 @@ docker run --rm --network web-arrebyte_default \
 
 ```sh
 APP_VERSION="$(git rev-parse --short HEAD)" \
+APP_RELEASE_NOTES="优化站内信详情查看体验；修复头像选择无响应问题；新增我的私房菜入口" \
 docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --build
 ```
 
-服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络，通过 `http://garage:3900` 访问对象存储。若博客项目名改变，在 `.env` 中调整 `BLOG_DOCKER_NETWORK`。每次部署都要把当前 Git short SHA 传给 `APP_VERSION`：服务首次以新版本启动时会向所有未停用用户各写入一条系统更新站内信，同一版本重启不会重复发送。
+服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络，通过 `http://garage:3900` 访问对象存储。若博客项目名改变，在 `.env` 中调整 `BLOG_DOCKER_NETWORK`。每次部署都要把当前 Git short SHA 传给 `APP_VERSION`，并把面向用户的变更摘要传给 `APP_RELEASE_NOTES`（多条可用“；”分隔）：服务首次以新版本启动时会向所有未停用用户各写入一条系统更新站内信，同一版本重启不会重复发送。摘要为空时使用“本次更新了一些内容，并修复了一些 bug。”。
 
 ## Garage 单机运行与备份
 

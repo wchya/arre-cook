@@ -31,7 +31,7 @@ func main() {
 	if err := database.Init(); err != nil {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}
-	if err := services.AnnounceDeployment(config.C.AppVersion); err != nil {
+	if err := services.AnnounceDeploymentWithNotes(config.C.AppVersion, config.C.ReleaseNotes); err != nil {
 		log.Printf("发布版本更新站内信失败: %v", err)
 	}
 
