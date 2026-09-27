@@ -166,7 +166,7 @@
       <view class="field-hint">可以直接使用微信昵称</view>
       <view class="flex gap-20 mt-32 nickname-actions">
         <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeName">取消</view>
-        <view class="btn btn-primary flex-1 {{nickname && !savingName ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveName">
+        <view class="btn btn-primary flex-1 nickname-save {{nickname && !savingName ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveName">
           <view wx:if="{{savingName}}" class="spinner"></view><text wx:else>保存</text>
         </view>
       </view>

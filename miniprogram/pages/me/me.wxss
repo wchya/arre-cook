@@ -10,10 +10,11 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .avatar__cam { position: absolute; right: -8rpx; bottom: -8rpx; display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; border-radius: 50%; background: var(--card); box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, .12); }
 .avatar__spin { width: 24rpx; height: 24rpx; }
 .nickname-input { display: block; width: 100%; min-height: 88rpx; box-sizing: border-box; line-height: 44rpx; }
-.nickname-actions { position: relative; z-index: 1; }
-.nickname-actions .btn-ghost { border: 2rpx solid var(--border2); background: var(--card); color: var(--text); }
-.nickname-actions .btn-primary { background: var(--primary); color: #fff; }
-.nickname-actions .btn-primary.is-disabled { background: var(--border2); color: var(--text3); opacity: 1; }
+.nickname-actions { position: relative; z-index: 10; display: flex; min-height: 88rpx; }
+.nickname-actions .btn { position: relative; z-index: 10; display: flex; visibility: visible; opacity: 1; }
+.nickname-actions .btn-ghost { border: 3rpx solid var(--border2); background: #fff; color: var(--text); }
+.nickname-actions .nickname-save { background: var(--primary); color: #fff; }
+.nickname-actions .nickname-save.is-disabled { background: var(--border2); color: var(--text3); opacity: 1; }
 .profile__info { flex: 1; min-width: 0; }
 .profile__name { display: flex; align-items: center; gap: 10rpx; max-width: 100%; color: var(--text); font-size: 42rpx; font-weight: 900; letter-spacing: -.5rpx; }
 .profile__email { margin-top: 2rpx; color: var(--text2); font-size: 24rpx; }
