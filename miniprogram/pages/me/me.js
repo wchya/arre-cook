@@ -92,6 +92,13 @@ Page({
 
   // ---------- 头像 / 昵称 ----------
 
+  // 使用系统图片选择器，兼容不支持 chooseAvatar 事件的基础库和开发者工具。
+  async chooseAvatar() {
+    const [path] = await ui.chooseImages(1)
+    if (path) await this.uploadAvatar(path)
+  },
+
+  // 保留微信原生 chooseAvatar 回调，已支持该能力的客户端仍可直接使用。
   async onChooseAvatar(event) {
     const path = event.detail && event.detail.avatarUrl
     if (path) await this.uploadAvatar(path)

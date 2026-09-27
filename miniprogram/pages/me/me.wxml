@@ -4,7 +4,7 @@
     <view class="hero" style="padding-top:{{topPad}}px;">
       <view class="hero__glow"></view>
       <view class="profile">
-        <button class="btn-reset avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" hover-class="tap-active" aria-label="更换头像">
+        <button class="btn-reset avatar-btn" bindtap="chooseAvatar" hover-class="tap-active" aria-label="更换头像">
           <image wx:if="{{avatar}}" class="avatar" src="{{avatar}}" mode="aspectFill" webp />
           <view wx:else class="avatar avatar--initial">{{initial}}</view>
           <view class="avatar__cam">

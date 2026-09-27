@@ -1,8 +1,10 @@
+import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Bell, ChevronRight, ShieldCheck, Sparkles, Wrench, HeartPulse, UsersRound } from "lucide-react"
+import { Bell, ChevronRight, ShieldCheck, Sparkles, Wrench, HeartPulse, UsersRound, X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
 import PageHeader from "@/components/PageHeader"
+import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
 import { errorMessage, notificationsApi } from "@/api"
 import type { Notification } from "@/types"
 
@@ -27,6 +29,7 @@ function timeLabel(raw: string) {
 export default function Notifications() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [selected, setSelected] = useState<Notification | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["notifications"], queryFn: () => notificationsApi.list({ pageSize: 50 }) })
   const readMut = useMutation({
     mutationFn: (id: number) => notificationsApi.markRead(id),
@@ -43,8 +46,9 @@ export default function Notifications() {
     <div className="min-h-dvh bg-bg pb-8">
       <PageHeader title="站内信" subtitle={data?.unread ? `${data.unread} 条未读消息` : "消息与服务提醒"} icon={Bell} onBack={() => navigate(-1)} actions={data?.unread ? <button onClick={() => allMut.mutate()} disabled={allMut.isPending} className="rounded-md px-2 py-1 text-xs font-semibold text-text2 hover:bg-card">全部已读</button> : undefined} />
       <main className="mx-auto max-w-[640px] space-y-2 px-5 py-4">
-        {isLoading ? <div className="h-24 animate-pulse rounded-lg bg-card" /> : isError ? <div className="rounded-lg border border-border bg-card p-5 text-sm text-text2">消息暂时无法加载，请稍后重试。</div> : items.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-card px-5 py-12 text-center"><Bell size={28} className="mx-auto text-text3" /><p className="mt-3 text-sm font-semibold">暂无站内信</p><p className="mt-1 text-xs text-text3">系统更新、健康提醒和安全事件会显示在这里</p></div> : items.map((item) => <NotificationRow key={item.id} item={item} onRead={() => !item.read_at && readMut.mutate(item.id)} onOpen={() => { if (item.link) navigate(item.link) }} />)}
+        {isLoading ? <div className="h-24 animate-pulse rounded-lg bg-card" /> : isError ? <div className="rounded-lg border border-border bg-card p-5 text-sm text-text2">消息暂时无法加载，请稍后重试。</div> : items.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-card px-5 py-12 text-center"><Bell size={28} className="mx-auto text-text3" /><p className="mt-3 text-sm font-semibold">暂无站内信</p><p className="mt-1 text-xs text-text3">系统更新、健康提醒和安全事件会显示在这里</p></div> : items.map((item) => <NotificationRow key={item.id} item={item} onRead={() => !item.read_at && readMut.mutate(item.id)} onOpen={() => setSelected(item)} />)}
       </main>
+      {selected && <NotificationDetail item={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }
@@ -55,4 +59,20 @@ function NotificationRow({ item, onRead, onOpen }: { item: Notification; onRead:
   return <button onClick={() => { onRead(); onOpen() }} className={`flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-card ${item.read_at ? "border-border bg-card" : "border-primary/25 bg-primary-light/30"}`}>
     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] ${info.tone}`}><Icon size={17} /></span>
     <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className={`truncate text-sm font-bold ${item.read_at ? "text-text" : "text-text"}`}>{item.title}</span>{!item.read_at && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}</span><span className="mt-1 block whitespace-pre-wrap text-[13px] leading-6 text-text2">{item.content}</span><span className="mt-2 block text-[11px] text-text3">{info.label} · {timeLabel(item.created_at)}</span></span>{item.link && <ChevronRight size={16} className="mt-2 shrink-0 text-text4" />}</button>
+}
+
+function NotificationDetail({ item, onClose }: { item: Notification; onClose: () => void }) {
+  const info = meta[item.type] || meta.system_update
+  const Icon = info.icon
+  return <AnimatedBottomSheet onClose={onClose} className="max-h-[82dvh] rounded-t-3xl p-5 pb-8">
+    <div className="mb-4 flex items-start gap-3">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${info.tone}`}><Icon size={19} /></span>
+      <div className="min-w-0 flex-1">
+        <div className="text-base font-extrabold leading-6 text-text">{item.title}</div>
+        <div className="mt-1 text-xs text-text3">{info.label} · {timeLabel(item.created_at)}</div>
+      </div>
+      <button onClick={onClose} aria-label="关闭详情" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg text-text2"><X size={16} /></button>
+    </div>
+    <div className="max-h-[52dvh] overflow-y-auto whitespace-pre-wrap break-words rounded-2xl bg-bg px-4 py-4 text-sm leading-7 text-text2">{item.content}</div>
+  </AnimatedBottomSheet>
 }
