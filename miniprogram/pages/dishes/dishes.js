@@ -80,17 +80,22 @@ Page({
     if (!session.requireLogin()) return
     const requestedScope = wx.getStorageSync("ninimenu_dishes_scope") === "mine" ? "mine" : ""
     if (requestedScope) wx.removeStorageSync("ninimenu_dishes_scope")
-    const scopeChanged = requestedScope && requestedScope !== this.data.scope
-    if (scopeChanged) this.setData({ scope: requestedScope, scopeLabel: "私房", category: "全部", taste: "全部", keyword: "" })
-    if (!this._booted) {
-      this._booted = true
-      this.loadMeta()
-      this.reload()
-    } else if (scopeChanged) {
-      this.reload()
-    } else {
-      this.loadToday()
+    const start = () => {
+      if (!this._booted) {
+        this._booted = true
+        this.loadMeta()
+        this.reload()
+      } else {
+        this.loadToday()
+      }
     }
+    const scopeChanged = requestedScope && requestedScope !== this.data.scope
+    if (scopeChanged) {
+      // setData is asynchronous; wait for the new scope before building the request.
+      this.setData({ scope: requestedScope, scopeLabel: "私房", category: "全部", taste: "全部", keyword: "" }, start)
+      return
+    }
+    start()
   },
 
   onShareAppMessage() {
