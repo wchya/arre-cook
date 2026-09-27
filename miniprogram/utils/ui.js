@@ -76,17 +76,7 @@ function chooseImages(count) {
         toast("需要同意隐私授权后才能选择图片")
         return done([])
       }
-      if (typeof wx.chooseMedia === "function") {
-        wx.chooseMedia({
-          count: count || 1,
-          mediaType: ["image"],
-          sourceType: ["album", "camera"],
-          sizeType: ["compressed"],
-          success: (result) => done((result.tempFiles || []).map((file) => file.tempFilePath)),
-          fail: onFail,
-        })
-        return
-      }
+      // 本小程序只上传图片，不采集视频；使用 chooseImage 让隐私用途与实际业务保持一致。
       wx.chooseImage({
         count: count || 1,
         sizeType: ["compressed"],

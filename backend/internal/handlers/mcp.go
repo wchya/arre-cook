@@ -159,7 +159,7 @@ func dispatchMCP(c *gin.Context, req rpcRequest) (any, *rpcError) {
 			},
 			"serverInfo": gin.H{
 				"name":    "ninimenu",
-				"title":   database.GetSetting("app_name", "NiniMenu") + " 食谱助手",
+				"title":   database.GetSetting("app_name", "ss-menu") + " 食谱助手",
 				"version": agentAPIVersion,
 			},
 			"instructions": mcpInstructions(p),

@@ -88,7 +88,18 @@ function upload(filePath) {
         }
         resolve(body.data.url)
       },
-      fail() { reject(new Error("图片上传失败，请检查网络")) },
+      fail(error) {
+        const raw = String((error && error.errMsg) || "")
+        if (/domain list|域名|url not in domain/i.test(raw)) {
+          reject(new Error("图片上传失败：请在微信公众平台把 cook.arrebyte.top 加入 request 合法域名"))
+          return
+        }
+        if (/timeout|超时/i.test(raw)) {
+          reject(new Error("图片上传超时，请检查网络后重试"))
+          return
+        }
+        reject(new Error(raw ? `图片上传失败：${raw.replace(/^uploadFile:fail\s*/i, "")}` : "图片上传失败，请检查网络"))
+      },
     })
   })
 }

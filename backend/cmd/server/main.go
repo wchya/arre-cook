@@ -31,6 +31,9 @@ func main() {
 	if err := database.Init(); err != nil {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}
+	if err := services.AnnounceDeployment(config.C.AppVersion); err != nil {
+		log.Printf("发布版本更新站内信失败: %v", err)
+	}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -53,8 +56,8 @@ func main() {
 	go housekeeping(ctx)
 
 	go func() {
-		log.Printf("NiniMenu 启动成功：http://localhost:%s（存储：%s，邮件：%v，微信登录：%v）",
-			config.C.Port, storage.Backend(), config.C.SMTPEnabled(), config.C.WechatEnabled())
+		log.Printf("ss-menu 启动成功：http://localhost:%s（版本：%s，存储：%s，邮件：%v，微信登录：%v）",
+			config.C.Port, config.C.AppVersion, storage.Backend(), config.C.SMTPEnabled(), config.C.WechatEnabled())
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("启动失败: %v", err)
 		}

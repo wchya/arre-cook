@@ -76,13 +76,11 @@ export default function Home() {
   const [recMeal, setRecMeal] = useState<"lunch" | "dinner" | null>(null)
   const [profileSummary, setProfileSummary] = useState("")
   const [selectedMood, setSelectedMood] = useState<string | null>(todayRating?.home_mood || null)
-  const [blindRevealed, setBlindRevealed] = useState(false)
   const [spinning, setSpinning] = useState(false)
   const [changing, setChanging] = useState(false)
   const wheelDegRef = useRef(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wheelRef = useRef<HTMLDivElement>(null)
-  const blindBoxRef = useRef<HTMLDivElement>(null)
   const confettiRef = useRef<HTMLDivElement>(null)
   const recCardRef = useRef<HTMLDivElement>(null)
 
@@ -111,10 +109,6 @@ export default function Home() {
       qc.invalidateQueries({ queryKey: ["achievements"] })
     }
   }, [moodPick, qc])
-
-  const blindBoxMut = useMutation({
-    mutationFn: () => pickApi.blindBox(),
-  })
 
   // 午/晚餐推荐：走智能推荐引擎，带推荐理由，结果写入当前推荐卡并滚动过去
   const pickMealMut = useMutation({
@@ -233,29 +227,6 @@ export default function Home() {
     })
   }
 
-  function handleConfetti() {
-    launchConfetti(confettiRef.current)
-  }
-
-  function finishBlindBoxReveal() {
-    setBlindRevealed(true)
-    handleConfetti()
-  }
-
-  function animateBlindBox() {
-    gsap.fromTo(blindBoxRef.current, { rotationY: 0 }, { rotationY: 180, duration: motionDuration(0.5), ease: "power2.inOut" })
-  }
-
-  function showBlindBoxResult() {
-    requestAnimationFrame(animateBlindBox)
-  }
-
-  function resetBlindBox() {
-    blindBoxMut.reset()
-    setBlindRevealed(false)
-    gsap.set(blindBoxRef.current, { rotationY: 0 })
-  }
-
   function handlePickMeal(mealType: "lunch" | "dinner") {
     if (!currentRec) return
     const today = todayKey
@@ -279,18 +250,6 @@ export default function Home() {
     homeMoodMut.mutate(mood)
     const label = moods.find(m => m.key === mood)?.label || mood
     toast.success(`心情：${label}，已保存并调整推荐~`)
-  }
-
-  function handleBlindBox() {
-    if (blindRevealed) return
-    blindBoxMut.mutate(undefined, {
-      onSuccess: () => {
-        finishBlindBoxReveal()
-        showBlindBoxResult()
-        qc.invalidateQueries({ queryKey: ["achievements"] })
-      },
-      onError: () => toast.error("暂无盲盒菜品"),
-    })
   }
 
   // 换一个：先在本批推荐里翻页，翻完了按已看过的菜排除后再要一批；被跳过的菜记一条 reject 事件
@@ -488,33 +447,6 @@ export default function Home() {
             <canvas ref={canvasRef} width={212} height={212} className="w-full h-full" />
           </div>
           <button onClick={spinWheel} disabled={spinning} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-card shadow-md z-2 flex items-center justify-center text-sm font-bold text-primary active:scale-90 transition-transform disabled:opacity-70">{spinning ? "🎰" : "转"}</button>
-        </div>
-
-        <SectionHeader title="🎁 惊喜盲盒" />
-        <div onClick={!blindRevealed ? handleBlindBox : undefined} className="mb-6 cursor-pointer" style={{ perspective: 800 }}>
-          <div ref={blindBoxRef} className="relative will-change-transform" style={{ transformStyle: "preserve-3d", height: 220 }}>
-            <div className={`absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-card border-[1.5px] border-border2 ${cardShadow}`} style={{ backfaceVisibility: "hidden" }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-purple-light/6 to-transparent bg-[length:300%_300%] animate-[shimmer_3s_infinite]" />
-              <span className="text-[40px] mb-2 animate-float">🎁</span>
-              <div className="text-base font-bold mb-0.5">今日惊喜</div>
-              <div className="text-xs text-text3 italic">"点我揭晓~"</div>
-            </div>
-            {blindRevealed && blindBoxMut.data && (
-              <div onClick={(e) => e.stopPropagation()} className={`absolute inset-0 flex flex-col rounded-2xl bg-card border-[1.5px] border-border2 ${cardShadow} overflow-hidden`} style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
-                <DishImage dish={blindBoxMut.data.dish} className="flex-1 min-h-0 bg-gradient-to-br from-primary-light to-pink-light" emojiSize="text-[48px] animate-pop" />
-                <div className="p-4 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-base font-bold mb-0.5">{blindBoxMut.data.dish.name}</div>
-                    <div className="text-xs text-text2">{blindBoxMut.data.dish.category} · {blindBoxMut.data.dish.cook_time}分钟 · {diffLabel(blindBoxMut.data.dish.difficulty)}</div>
-                  </div>
-                  <div className="flex flex-col gap-1.5 flex-shrink-0">
-                    <button onClick={(e) => { e.stopPropagation(); setPickedRec(blindBoxMut.data!.dish); handlePickMeal("dinner"); resetBlindBox() }} className="py-1.5 px-3.5 rounded-full text-xs font-semibold bg-primary text-white">🍲 今晚吃这个</button>
-                    <button onClick={(e) => { e.stopPropagation(); resetBlindBox() }} className="py-1.5 px-3.5 rounded-full text-xs font-semibold border-[1.5px] border-border2">换一个</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
         <button onClick={() => navigate("/tomorrow")} className={`w-full bg-card rounded-2xl p-4 ${cardShadow} border border-border flex items-center gap-3.5 transition-all active:scale-98`}>

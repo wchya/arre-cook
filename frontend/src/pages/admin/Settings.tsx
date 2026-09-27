@@ -52,7 +52,7 @@ export default function AdminSettings() {
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["settings"] })
       if (variables.app_name !== undefined) {
-        updateAppName(variables.app_name || "NiniMenu")
+        updateAppName(variables.app_name || "ss-menu")
       }
       if (variables.agent_embed_url !== undefined) {
         updateAgentEmbedUrl(variables.agent_embed_url)
@@ -120,11 +120,11 @@ export default function AdminSettings() {
               type="text"
               value={appName !== null ? appName : asString(settings?.app_name, storedAppName)}
               onChange={(e) => setAppName(e.target.value)}
-              placeholder="NiniMenu"
+              placeholder="ss-menu"
               className="w-28 py-2 px-3 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none transition-all focus:border-primary text-right"
             />
             <button
-              onClick={() => updateMut.mutate({ app_name: (appName !== null ? appName : asString(settings?.app_name, "NiniMenu")) || "NiniMenu" })}
+              onClick={() => updateMut.mutate({ app_name: (appName !== null ? appName : asString(settings?.app_name, "ss-menu")) || "ss-menu" })}
               disabled={updateMut.isPending}
               className="px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
             >
@@ -165,12 +165,6 @@ export default function AdminSettings() {
           />
         </SettingRow>
 
-        <SettingRow label="盲盒功能">
-          <Toggle
-            value={settings?.blind_box_enabled !== "0"}
-            onChange={() => updateMut.mutate({ blind_box_enabled: settings?.blind_box_enabled === "1" ? "0" : "1" })}
-          />
-        </SettingRow>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">

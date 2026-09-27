@@ -21,6 +21,7 @@ type LinkPreview struct {
 	URL          string `json:"url"`
 	Platform     string `json:"platform"`
 	PlatformName string `json:"platform_name"`
+	Supported    bool   `json:"supported"`
 	Title        string `json:"title"`
 	Cover        string `json:"cover"`
 	Author       string `json:"author"`
@@ -32,11 +33,10 @@ type LinkPreview struct {
 const linkPreviewMaxBody = 512 << 10 // 抓取网页时最多读取 512KB
 
 var (
-	reBiliBV    = regexp.MustCompile(`(?i)(BV[0-9A-Za-z]{10})`)
-	reYouTubeID = regexp.MustCompile(`(?i)(?:v=|/embed/|youtu\.be/|/shorts/)([0-9A-Za-z_-]{11})`)
-	reMetaTag   = regexp.MustCompile(`(?is)<meta\s+[^>]*?>`)
-	reTitleTag  = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-	reAttrKV    = regexp.MustCompile(`(?is)([a-zA-Z:_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')`)
+	reBiliBV   = regexp.MustCompile(`(?i)(BV[0-9A-Za-z]{10})`)
+	reMetaTag  = regexp.MustCompile(`(?is)<meta\s+[^>]*?>`)
+	reTitleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	reAttrKV   = regexp.MustCompile(`(?is)([a-zA-Z:_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')`)
 )
 
 // FetchLinkPreview 解析链接并尽力抓取标题/封面；抓取失败时仍返回按 URL 识别出的平台与嵌入地址。
@@ -79,40 +79,35 @@ func BuildVideoMeta(rawURL string) string {
 }
 
 func quickLinkPreview(u *url.URL) *LinkPreview {
-	p := &LinkPreview{URL: u.String(), Platform: "web", PlatformName: "网页链接"}
+	p := &LinkPreview{URL: u.String(), Platform: "unsupported", PlatformName: "暂不支持的平台"}
 	applyPlatform(p, u)
 	return p
 }
 
-// applyPlatform 按域名识别平台，并尽量生成可嵌入播放的 embed_url。
+// applyPlatform 只识别当前支持的外部播放平台。视频链接在客户端通过原始地址打开，
+// B 站同时提供播放器地址供 Web 端后续扩展使用；抖音不提供稳定的公开 iframe 地址。
 func applyPlatform(p *LinkPreview, u *url.URL) {
-	host := strings.ToLower(u.Host)
+	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
 	switch {
-	case strings.Contains(host, "bilibili.com") || strings.Contains(host, "b23.tv"):
+	case hostMatches(host, "bilibili.com", "b23.tv"):
 		p.Platform, p.PlatformName = "bilibili", "哔哩哔哩"
+		p.Supported, p.Playable = true, true
 		if m := reBiliBV.FindStringSubmatch(u.String()); len(m) > 1 {
 			p.EmbedURL = "https://player.bilibili.com/player.html?bvid=" + m[1] + "&autoplay=0&high_quality=1"
-			p.Playable = true
 		}
-	case strings.Contains(host, "youtube.com") || strings.Contains(host, "youtu.be"):
-		p.Platform, p.PlatformName = "youtube", "YouTube"
-		if m := reYouTubeID.FindStringSubmatch(u.String()); len(m) > 1 {
-			p.EmbedURL = "https://www.youtube.com/embed/" + m[1]
-			p.Playable = true
-		}
-	case strings.Contains(host, "douyin.com") || strings.Contains(host, "iesdouyin.com"):
+	case hostMatches(host, "douyin.com", "iesdouyin.com"):
 		p.Platform, p.PlatformName = "douyin", "抖音"
-	case strings.Contains(host, "xiaohongshu.com") || strings.Contains(host, "xhslink.com"):
-		p.Platform, p.PlatformName = "xiaohongshu", "小红书"
-	case strings.Contains(host, "weixin.qq.com"): // 必须在 qq.com 之前判断
-		p.Platform, p.PlatformName = "weixin", "微信"
-	case strings.Contains(host, "v.qq.com") || strings.Contains(host, "qq.com"):
-		p.Platform, p.PlatformName = "tencent", "腾讯视频"
-	default:
-		if p.Platform == "" {
-			p.Platform, p.PlatformName = "web", "网页链接"
+		p.Supported, p.Playable = true, true
+	}
+}
+
+func hostMatches(host string, domains ...string) bool {
+	for _, domain := range domains {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return true
 		}
 	}
+	return false
 }
 
 // fetchHTML 受控抓取网页：SSRF 防护（禁私网/环回）、限时、限跳转、限大小；返回 meta 表、<title> 与最终 URL。
@@ -221,7 +216,7 @@ func enrichFromHTML(p *LinkPreview, metas map[string]string, title string) {
 			p.Duration = formatDuration(secs)
 		}
 	}
-	if p.EmbedURL == "" {
+	if p.Supported && p.EmbedURL == "" {
 		if embed := firstNonEmpty(metas["og:video:secure_url"], metas["og:video:url"], metas["og:video"]); strings.HasPrefix(embed, "https://") {
 			p.EmbedURL = embed
 			p.Playable = true

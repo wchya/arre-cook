@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Port           string
 	Env            string // development / production
+	AppVersion     string // deployment/build identifier used for release notifications
 	AdminUsername  string
 	AdminPassword  string
 	JWTSecret      string
@@ -85,6 +86,7 @@ func Load() {
 	C = Config{
 		Port:            getEnv("PORT", "8080"),
 		Env:             strings.ToLower(getEnv("APP_ENV", getEnv("GIN_MODE", "development"))),
+		AppVersion:      strings.TrimSpace(getEnv("APP_VERSION", "")),
 		AdminUsername:   getEnv("ADMIN_USERNAME", "admin"),
 		AdminPassword:   adminPassword,
 		JWTSecret:       getEnv("JWT_SECRET", defaultJWTSecret),
@@ -110,7 +112,7 @@ func Load() {
 		SMTPPort:        getEnvInt("SMTP_PORT", 465),
 		SMTPUser:        getEnv("SMTP_USER", getEnv("SMTP_USERNAME", "")),
 		SMTPPassword:    getEnv("SMTP_PASSWORD", getEnv("SMTP_PASS", "")),
-		SMTPFromName:    getEnv("SMTP_FROM_NAME", "NiniMenu"),
+		SMTPFromName:    getEnv("SMTP_FROM_NAME", "ss-menu"),
 		EmailCodeTTL:    getEnvDuration("EMAIL_CODE_TTL", 10*time.Minute),
 		EmailDomains:    splitList(strings.ToLower(getEnv("EMAIL_DOMAINS", ""))),
 		S3Endpoint:      strings.TrimRight(getEnv("S3_ENDPOINT", "http://127.0.0.1:3900"), "/"),

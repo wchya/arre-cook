@@ -53,12 +53,6 @@ Page({
     wheelDeg: 0,
     spinning: false,
 
-    blindEnabled: true,
-    blindFlipped: false,
-    blindLoading: false,
-    blindDish: null,
-    blindHint: "",
-
     refreshing: false,
     error: "",
   },
@@ -101,11 +95,10 @@ Page({
       api.post("/pick/smart", { count: 3, mode: "home_auto" }),
       api.get("/dishes", { enabled: "true", pageSize: 12, sort: "random" }),
       api.get("/day-rating", { date: today }),
-      api.get("/settings"),
       this.loadToday(),
       this.loadUnread(),
     ])
-    const [pick, wheel, rating, settings] = results
+    const [pick, wheel, rating] = results
     if (pick.status === "fulfilled" && pick.value && pick.value.items && pick.value.items.length) {
       this.setRecommendations(pick.value, "")
     }
@@ -120,9 +113,6 @@ Page({
     if (rating.status === "fulfilled" && rating.value && rating.value.home_mood) {
       this.setData({ mood: rating.value.home_mood })
       this.loadMoodDishes(rating.value.home_mood)
-    }
-    if (settings.status === "fulfilled" && settings.value) {
-      this.setData({ blindEnabled: String(settings.value.blind_box_enabled || "1") !== "0" })
     }
     if (pick.status === "rejected" && wheel.status === "rejected") this.setData({ error: "暂时无法加载推荐，下拉重试" })
     this.setData({ loadingRec: false })
@@ -325,43 +315,6 @@ Page({
       ui.toast(`🎯 转到了：${dish.name}！`)
       this.scrollToRec()
     }, SPIN_MS + 80)
-  },
-
-  // ---------- 盲盒 ----------
-
-  async openBlindBox() {
-    if (this.data.blindFlipped || this.data.blindLoading) return
-    this.setData({ blindLoading: true })
-    try {
-      const result = await api.post("/pick/blind-box")
-      if (!result || !result.dish) throw new Error("暂无盲盒菜品")
-      this.setData({ blindDish: dishUtil.toCard(result.dish), blindHint: result.hint || result.quote || "", blindFlipped: true })
-      ui.haptic("medium")
-      const confetti = this.selectComponent("#confetti")
-      if (confetti) confetti.fire()
-    } catch (error) {
-      ui.toast(error.message || "暂无盲盒菜品")
-    } finally {
-      this.setData({ blindLoading: false })
-    }
-  },
-
-  async eatBlindDish() {
-    const dish = this.data.blindDish
-    if (!dish) return
-    this.showSingle(dish, false)
-    await this.record(dish, "dinner", "home_blind_box")
-    this.resetBlindBox()
-  },
-
-  openBlindDish() {
-    const dish = this.data.blindDish
-    if (dish) wx.navigateTo({ url: `/pages/dish/dish?id=${dish.id}` })
-  },
-
-  resetBlindBox() {
-    this.setData({ blindFlipped: false })
-    setTimeout(() => this.setData({ blindDish: null, blindHint: "" }), 500)
   },
 
   // ---------- 导航 ----------

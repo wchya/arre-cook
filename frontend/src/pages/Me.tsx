@@ -105,7 +105,6 @@ export default function Me() {
   if (!user) return null
   const unlocked = achievements.filter((a) => a.is_unlocked).length
   const voiceOn = asString(settings?.voice_enabled, "1") !== "0"
-  const blindOn = asString(settings?.blind_box_enabled, "1") !== "0"
   const repeatDays = asString(settings?.repeat_days, "3")
 
   const statTiles = [
@@ -179,7 +178,6 @@ export default function Me() {
         <Group title="偏好设置">
           <Row icon={Sparkles} tone="bg-bg text-text2" title="推荐去重" desc={`近 ${repeatDays} 天吃过的菜不优先推荐`} onClick={() => setRepeatSheet(true)} right={<span className="text-[13px] font-semibold text-text3">{repeatDays} 天 ›</span>} />
           <Row icon={Bot} tone="bg-bg text-text2" title="语音播报" desc="做菜时朗读步骤" onClick={() => settingsMut.mutate({ voice_enabled: voiceOn ? "0" : "1" })} right={<Switch on={voiceOn} />} />
-          <Row icon={Sparkles} tone="bg-bg text-text2" title="惊喜盲盒" desc="首页显示盲盒" onClick={() => settingsMut.mutate({ blind_box_enabled: blindOn ? "0" : "1" })} right={<Switch on={blindOn} />} />
         </Group>
 
         <Group>

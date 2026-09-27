@@ -1,6 +1,7 @@
 const api = require("../../utils/api")
 const ui = require("../../utils/ui")
 const media = require("../../utils/media")
+const video = require("../../utils/video")
 const session = require("../../utils/session")
 const dishUtil = require("../../utils/dish")
 
@@ -158,15 +159,17 @@ Page({
   // 把服务端 link-preview / video_meta 转成视图模型；封面转成可加载的绝对地址。
   decorateMeta(meta) {
     if (!meta || typeof meta !== "object") return null
+    const knownPlatform = meta.platform === "bilibili" || meta.platform === "douyin"
     return {
       url: meta.url || "",
       platform: meta.platform || "web",
       platformName: meta.platform_name || "链接",
+      supported: Boolean(meta.supported || knownPlatform),
       title: meta.title || "",
       cover: media.assetUrl(meta.cover),
       author: meta.author || "",
       duration: meta.duration || "",
-      playable: Boolean(meta.playable),
+      playable: Boolean(meta.playable && (meta.supported || knownPlatform)),
     }
   },
 
@@ -194,10 +197,12 @@ Page({
     if (this.data.videoMeta) this.setData({ "videoMeta.cover": "" })
   },
 
-  copyVideoLink() {
+  openVideoLink() {
     const url = this.data.videoUrl.trim()
     if (!url) return
-    wx.setClipboardData({ data: url, success: () => ui.toast("链接已复制") })
+    if (!video.open(url, () => ui.toast("链接已复制，请在浏览器中打开"))) {
+      ui.toast("目前仅支持抖音和哔哩哔哩视频")
+    }
   },
 
   toggleShareFamily() {

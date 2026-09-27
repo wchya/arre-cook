@@ -17,9 +17,10 @@ const APP_NAME_KEY = "ninimenu_app_name"
 
 function getStoredName(): string {
   try {
-    return localStorage.getItem(APP_NAME_KEY) || "NiniMenu"
+    const stored = localStorage.getItem(APP_NAME_KEY)
+    return stored && stored.toLowerCase() !== "ninimenu" ? stored : "ss-menu"
   } catch {
-    return "NiniMenu"
+		return "ss-menu"
   }
 }
 
@@ -33,7 +34,7 @@ export const useAppInfoStore = create<AppInfoState>((set) => ({
   fetch: async () => {
     try {
       const data = await appInfoApi.get()
-      const name = (data.app_name || "").trim() || "NiniMenu"
+		const name = (data.app_name || "").trim() || "ss-menu"
       try {
         localStorage.setItem(APP_NAME_KEY, name)
       } catch {

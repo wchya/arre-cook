@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-unknown}
     image: arre-cook/ninimenu:latest
     container_name: arre-cook-ninimenu
     restart: unless-stopped
@@ -38,7 +40,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-${MAIL_PORT:-587}}
       SMTP_USER: ${SMTP_USER:-${MAIL_USERNAME:-}}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-${MAIL_PASSWORD:-}}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-NiniMenu}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-ss-menu}
       S3_ENDPOINT: ${S3_ENDPOINT:-http://garage:3900}
       S3_REGION: ${S3_REGION:-garage}
       S3_BUCKET: ${S3_BUCKET:-cook-uploads}

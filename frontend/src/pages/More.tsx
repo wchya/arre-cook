@@ -409,15 +409,6 @@ export default function More() {
                   <div className={`absolute top-[2px] w-5 h-5 rounded-full bg-white shadow-sm transition-all ${settings?.voice_enabled !== "0" ? "left-[22px]" : "left-[2px]"}`} />
                 </div>
               </button>
-              <button onClick={() => toggleSetting("blind_box_enabled", asString(settings?.blind_box_enabled, "1"))} className="w-full flex items-center justify-between px-4 py-3.5 border-b border-border transition-all active:bg-bg text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-[10px] bg-purple-light flex items-center justify-center text-base">🎁</div>
-                  <div><div className="text-sm font-medium">惊喜盲盒</div><div className="text-[11px] text-text2">首页显示盲盒推荐</div></div>
-                </div>
-                <div className={`w-11 h-6 rounded-xl relative cursor-pointer transition-all ${settings?.blind_box_enabled !== "0" ? "bg-primary" : "bg-border2"}`}>
-                  <div className={`absolute top-[2px] w-5 h-5 rounded-full bg-white shadow-sm transition-all ${settings?.blind_box_enabled !== "0" ? "left-[22px]" : "left-[2px]"}`} />
-                </div>
-              </button>
                <button onClick={() => navigate(isLoggedIn ? "/admin/dashboard" : "/admin/login")} className="w-full flex items-center justify-between px-4 py-3.5 transition-all active:bg-bg text-left">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-[10px] bg-pink-light flex items-center justify-center text-base">🔒</div>

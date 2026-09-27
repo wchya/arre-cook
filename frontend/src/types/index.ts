@@ -9,6 +9,19 @@ export interface DishStep {
   image?: string
 }
 
+export interface DishVideoMeta {
+  url: string
+  platform: "bilibili" | "douyin" | "unsupported" | string
+  platform_name: string
+  supported: boolean
+  title: string
+  cover: string
+  author: string
+  duration: string
+  embed_url: string
+  playable: boolean
+}
+
 export interface Dish {
   id: number
   name: string
@@ -16,6 +29,7 @@ export interface Dish {
   // 后端返回真正的 JSON 数组；历史数据可能是字符串数组或对象数组，统一用 asArray 消费
   images: string[]
   video_url: string
+  video_meta?: DishVideoMeta | null
   category: string
   meal_type: string
   taste: string
@@ -139,12 +153,6 @@ export interface MealRecord {
 
 export interface PickResult {
   dishes: Dish[]
-  quote: string
-}
-
-export interface BlindBoxResult {
-  hint: string
-  dish: Dish
   quote: string
 }
 

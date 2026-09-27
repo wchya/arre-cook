@@ -404,7 +404,7 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
           )}
         </Field>
 
-        <Field label="教程视频链接" hint="B站/抖音/YouTube 视频链接，点击可跳转">
+        <Field label="教程视频链接" hint="仅支持抖音 / 哔哩哔哩，保存后可从详情页直接打开播放">
           <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="粘贴视频链接" className={inputCls} />
         </Field>
       </Section>

@@ -84,7 +84,7 @@ func GetAgentCapabilities(c *gin.Context) {
 	p := principal(c)
 	base := baseURL(c)
 	utils.Success(c, gin.H{
-		"app_name":    database.GetSetting("app_name", "NiniMenu"),
+		"app_name":    database.GetSetting("app_name", "ss-menu"),
 		"api_version": agentAPIVersion,
 		"user":        gin.H{"id": p.UserID(), "nickname": p.User.DisplayName()},
 		"credential":  gin.H{"kind": p.Kind, "actor": p.Actor, "scopes": p.Scopes.List()},
@@ -201,7 +201,7 @@ func GetAgentOpenAPI(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"openapi": "3.1.0",
 		"info": gin.H{
-			"title":       database.GetSetting("app_name", "NiniMenu") + " Agent API",
+			"title":       database.GetSetting("app_name", "ss-menu") + " Agent API",
 			"version":     agentAPIVersion,
 			"description": "食谱与饮食数据工具集。令牌只能访问签发者本人的数据。",
 		},

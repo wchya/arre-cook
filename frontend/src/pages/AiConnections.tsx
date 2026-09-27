@@ -91,12 +91,12 @@ export default function AiConnections() {
     mcp: {
       label: "MCP 通用",
       note: "Claude Desktop / Cursor / Cherry Studio 等支持远程 MCP（Streamable HTTP）的客户端",
-      code: JSON.stringify({ mcpServers: { ninimenu: { type: "http", url: mcpURL, headers: { Authorization: `Bearer ${token}` } } } }, null, 2),
+      code: JSON.stringify({ mcpServers: { "ss-menu": { type: "http", url: mcpURL, headers: { Authorization: `Bearer ${token}` } } } }, null, 2),
     },
     hermes: {
       label: "Hermes",
       note: "Hermes Agent：写入 ~/.hermes/config.yaml 的 mcp_servers（参考配置，以所用版本文档为准）",
-      code: `mcp_servers:\n  ninimenu:\n    url: "${mcpURL}"\n    headers:\n      Authorization: "Bearer ${token}"`,
+      code: `mcp_servers:\n  ss-menu:\n    url: "${mcpURL}"\n    headers:\n      Authorization: "Bearer ${token}"`,
     },
     deepseek: {
       label: "DeepSeek 函数调用",

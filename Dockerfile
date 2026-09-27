@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+ARG APP_VERSION=unknown
 
 # ---------- Stage 1: build frontend ----------
 FROM node:20-alpine AS frontend-build
@@ -13,6 +14,7 @@ RUN npm run build
 
 # ---------- Stage 2: build backend ----------
 FROM golang:1.25-alpine AS backend-build
+ARG APP_VERSION
 # goproxy.cn：境内拉 Go 模块，proxy.golang.org 直连基本不可用
 ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /src
@@ -31,6 +33,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # ---------- Stage 3: runtime ----------
 FROM alpine:3.20
+ARG APP_VERSION
 # apk 换腾讯云内网镜像，避免 dl-cdn.alpinelinux.org 境外下载卡住
 RUN sed -i 's#https://dl-cdn.alpinelinux.org#https://mirrors.cloud.tencent.com#g' /etc/apk/repositories \
     && apk add --no-cache ca-certificates tzdata \
@@ -42,7 +45,7 @@ COPY --from=backend-build /out/dbmigrate ./dbmigrate
 COPY --from=backend-build /src/static ./static
 # 种子菜品图片；首次挂载空具名卷时由 Docker 自动拷贝进卷
 COPY backend/uploads ./uploads
-ENV PORT=8080 GIN_MODE=release TZ=Asia/Shanghai
+ENV PORT=8080 GIN_MODE=release TZ=Asia/Shanghai APP_VERSION=$APP_VERSION
 EXPOSE 8080
 USER ninimenu
 VOLUME ["/app/data", "/app/uploads"]

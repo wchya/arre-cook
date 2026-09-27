@@ -207,7 +207,7 @@ var userSettingKeys = map[string]bool{
 func GetAppInfo(c *gin.Context) {
 	llmOn := llm.Resolve().Enabled()
 	utils.Success(c, gin.H{
-		"app_name":        database.GetSetting("app_name", "NiniMenu"),
+		"app_name":        database.GetSetting("app_name", "ss-menu"),
 		"agent_embed_url": database.GetSetting("agent_embed_url", ""),
 		"announcement":    database.GetSetting("announcement", ""),
 		"ai_enabled":      llmOn,

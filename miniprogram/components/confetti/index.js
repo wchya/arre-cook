@@ -1,4 +1,4 @@
-// 彩纸庆祝：对应 Web 端 lib/confetti（记录成功、盲盒揭晓时触发）。
+// 彩纸庆祝：对应 Web 端 lib/confetti，用于记录成功等即时反馈。
 // 页面放 <confetti id="confetti" />，调用 this.selectComponent("#confetti").fire()
 const COLORS = ["#E8734A", "#6EC6B8", "#F5D76E", "#F4A8A0", "#8B5CF6", "#FFB38A"]
 

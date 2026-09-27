@@ -173,7 +173,7 @@ func systemPrompt(p *auth.Principal) string {
 6. 回答控制在 200 字以内，菜品列表不必重复卡片里已有的细节（界面会自动展示菜品卡片）。
 7. 用户问饮食报告或规划时调用 get_health_report；只按实际记录陈述，未记录不等于未吃，不推测热量或给医疗诊断。
 8. 与饮食无关的问题，礼貌地拉回到吃饭这件事上。`,
-		database.GetSetting("app_name", "NiniMenu"), p.User.DisplayName(),
+		database.GetSetting("app_name", "ss-menu"), p.User.DisplayName(),
 		now.Format("2006-01-02"), []string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}[now.Weekday()], now.Format("15:04"),
 		meal, profile.Summary)
 }

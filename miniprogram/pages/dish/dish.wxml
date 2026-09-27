@@ -101,7 +101,7 @@
     </view>
 
     <!-- 教程视频 -->
-    <view wx:if="{{videoMeta}}" class="video-card" hover-class="tap-active" bindtap="copyVideo">
+    <view wx:if="{{videoMeta}}" class="video-card" hover-class="tap-active" bindtap="openVideo">
       <view class="video-card__media">
         <image wx:if="{{videoMeta.cover}}" class="video-card__cover" src="{{videoMeta.cover}}" mode="aspectFill" binderror="onVideoCoverError" webp />
         <view wx:else class="video-card__cover video-card__cover--ph"><icon name="video" size="52" stroke="2" color="pink-ink" /></view>
@@ -114,13 +114,13 @@
         </view>
         <view class="video-card__title">{{videoMeta.title || '教程视频'}}</view>
         <view wx:if="{{videoMeta.author}}" class="video-card__author">{{videoMeta.author}}</view>
-        <view class="video-card__hint"><icon name="copy" size="22" stroke="2.4" color="text3" /><text>复制链接，在浏览器打开观看</text></view>
+        <view class="video-card__hint"><icon name="external-link" size="22" stroke="2.4" color="text3" /><text>{{videoMeta.supported ? '点击打开平台播放' : '仅支持抖音和哔哩哔哩'}}</text></view>
       </view>
     </view>
-    <view wx:elif="{{dish.videoUrl}}" class="video-btn" hover-class="tap-active" bindtap="copyVideo">
+    <view wx:elif="{{dish.videoUrl}}" class="video-btn" hover-class="tap-active" bindtap="openVideo">
       <icon name="video" size="32" stroke="2.3" color="pink-ink" />
-      <text>观看教程视频</text>
-      <text class="video-btn__hint">复制链接</text>
+      <text>打开教程视频</text>
+      <text class="video-btn__hint">抖音 / 哔哩哔哩</text>
     </view>
 
     <!-- 食材 -->

@@ -89,26 +89,27 @@
     <view class="de-field">
       <view class="field-label">教程视频链接</view>
       <view class="field {{focusKey === 'video' ? 'is-focus' : ''}}">
-        <input class="field-input" value="{{videoUrl}}" placeholder="B站 / 抖音 / YouTube 链接" placeholder-class="placeholder" data-key="video" bindfocus="onFocus" bindblur="onBlur" bindinput="onVideo" />
+        <input class="field-input" value="{{videoUrl}}" placeholder="B站 / 抖音链接" placeholder-class="placeholder" data-key="video" bindfocus="onFocus" bindblur="onBlur" bindinput="onVideo" />
       </view>
       <view wx:if="{{videoChecking}}" class="de-vp de-vp--loading">
         <view class="spinner"></view><text>正在获取链接预览…</text>
       </view>
-      <view wx:elif="{{videoMeta}}" class="de-vp" hover-class="tap-fade" bindtap="copyVideoLink">
+      <view wx:elif="{{videoMeta}}" class="de-vp" hover-class="tap-fade" bindtap="openVideoLink">
         <image wx:if="{{videoMeta.cover}}" class="de-vp__cover" src="{{videoMeta.cover}}" mode="aspectFill" binderror="onCoverError" webp />
         <view wx:else class="de-vp__cover de-vp__cover--ph"><icon name="video" size="44" stroke="2" color="text3" /></view>
         <view class="de-vp__body">
           <view class="de-vp__badges">
             <text class="chip chip-sm chip-primary">{{videoMeta.platformName}}</text>
-            <text wx:if="{{videoMeta.playable}}" class="chip chip-sm chip-mint">可播放</text>
+            <text wx:if="{{videoMeta.supported}}" class="chip chip-sm chip-mint">可播放</text>
+            <text wx:else class="chip chip-sm chip-pink">暂不支持</text>
             <text wx:if="{{videoMeta.duration}}" class="de-vp__dur">{{videoMeta.duration}}</text>
           </view>
           <view class="de-vp__title">{{videoMeta.title || '已识别链接'}}</view>
           <view wx:if="{{videoMeta.author}}" class="de-vp__author">{{videoMeta.author}}</view>
-          <view class="de-vp__hint"><icon name="copy" size="22" stroke="2.4" color="text3" /><text>点击复制链接</text></view>
+          <view class="de-vp__hint"><icon name="external-link" size="22" stroke="2.4" color="text3" /><text>{{videoMeta.supported ? '点击打开平台播放' : '目前仅支持抖音和哔哩哔哩'}}</text></view>
         </view>
       </view>
-      <view class="field-hint">粘贴链接后自动识别平台、标题与封面</view>
+      <view class="field-hint">仅支持抖音 / 哔哩哔哩，粘贴后自动识别平台、标题与封面</view>
     </view>
   </view>
 

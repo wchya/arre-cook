@@ -1,4 +1,4 @@
-# NiniMenu 开发指南
+# ss-menu 开发指南
 
 ## 环境要求
 
@@ -55,6 +55,7 @@ chmod +x ninimenu
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `APP_ENV` | `development` | `production` / `release` 启用生产配置 |
+| `APP_VERSION` | 空 | 容器构建版本或 Git short SHA；每次变更时发布一次系统更新站内信 |
 | `PORT` | `8080` | 服务端口 |
 | `ADMIN_EMAIL` | 空 | 初始管理员邮箱；旧单用户数据迁移给该管理员 |
 | `ADMIN_USERNAME` | `admin` | 初始管理员用户名 |
@@ -94,6 +95,8 @@ PNG 截图转 JPG quality=85 通常减少 70-90% 体积，视觉几乎无损。
 - 配置项：`backend/internal/config/config.go`
 
 上传失败时前端会展示后端返回的具体错误信息（如"图片大小不能超过5MB"），而非通用提示。
+
+小程序端还必须在微信公众平台配置 request 合法域名和隐私保护指引（见 [微信小程序指南](docs/miniprogram.md)）；代码无法绕过这两个平台开关。
 
 ## 图片工具脚本
 
@@ -197,7 +200,7 @@ NiniMenu/
 | GET/POST/PUT/DELETE | `/api/records` | 用餐记录 CRUD |
 | POST | `/api/records/batch` | 批量创建记录 |
 | GET/POST | `/api/favorites/:dishId` | 收藏/取消收藏 |
-| POST | `/api/pick/lunch\|dinner\|mood\|tomorrow\|blind-box` | 各类推荐（午/晚餐与心情推荐已接入推荐引擎） |
+| POST | `/api/pick/lunch\|dinner\|mood\|tomorrow` | 各类推荐（午/晚餐与心情推荐已接入推荐引擎） |
 | POST | `/api/pick/smart` | 智能推荐：口味画像 + 约束打分，返回带理由的结果 |
 | GET | `/api/profile` | 口味画像 |
 | POST | `/api/behavior` | 前端行为埋点（view / accept / reject …） |

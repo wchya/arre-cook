@@ -139,37 +139,6 @@
         </view>
       </view>
 
-      <!-- 惊喜盲盒 -->
-      <view wx:if="{{blindEnabled}}" class="section">
-        <view class="section-head"><view class="section-title">🎁 惊喜盲盒</view></view>
-        <view class="blind">
-          <view class="blind__inner {{blindFlipped ? 'is-flipped' : ''}}">
-            <view class="blind__face blind__front card" hover-class="tap-active" bindtap="openBlindBox">
-              <view class="blind__shine"></view>
-              <text class="blind__gift anim-float">🎁</text>
-              <view class="blind__title">今日惊喜</view>
-              <view class="blind__tip">{{blindLoading ? '拆盒中…' : '“点我揭晓~”'}}</view>
-            </view>
-            <view class="blind__face blind__back card">
-              <block wx:if="{{blindDish}}">
-                <view class="blind__media" bindtap="openBlindDish"><dish-image src="{{blindDish.cover}}" emoji="{{blindDish.emoji}}" emoji-size="96" lazy="{{false}}" /></view>
-                <view class="blind__body">
-                  <view class="flex-1" bindtap="openBlindDish">
-                    <view class="blind__name truncate">{{blindDish.name}}</view>
-                    <view class="blind__meta truncate">{{blindDish.category}} · {{blindDish.cookTime}}分钟 · {{blindDish.diffLabel}}</view>
-                    <view wx:if="{{blindHint}}" class="blind__hint truncate">{{blindHint}}</view>
-                  </view>
-                  <view class="blind__actions">
-                    <view class="btn btn-xs btn-primary" hover-class="tap-active" bindtap="eatBlindDish">🍲 今晚吃这个</view>
-                    <view class="btn btn-xs btn-ghost" hover-class="tap-active" bindtap="resetBlindBox">换一个</view>
-                  </view>
-                </view>
-              </block>
-            </view>
-          </view>
-        </view>
-      </view>
-
       <!-- 明天吃什么 -->
       <view class="card entry" hover-class="tap-active" hover-stay-time="80" bindtap="goTomorrow">
         <view class="entry__icon entry__icon--moon">🌙</view>

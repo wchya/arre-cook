@@ -2,6 +2,7 @@ const api = require("../../utils/api")
 const session = require("../../utils/session")
 const ui = require("../../utils/ui")
 const media = require("../../utils/media")
+const video = require("../../utils/video")
 const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
 
@@ -176,13 +177,17 @@ Page({
   // video_meta（服务端抓取的链接预览）转视图模型；封面转成可加载地址。
   decorateMeta(meta) {
     if (!meta || typeof meta !== "object") return null
+    const knownPlatform = meta.platform === "bilibili" || meta.platform === "douyin"
     return {
+      url: meta.url || "",
+      platform: meta.platform || "unsupported",
       platformName: meta.platform_name || "链接",
+      supported: Boolean(meta.supported || knownPlatform),
       title: meta.title || "",
       cover: media.assetUrl(meta.cover),
       author: meta.author || "",
       duration: meta.duration || "",
-      playable: Boolean(meta.playable),
+      playable: Boolean(meta.playable && (meta.supported || knownPlatform)),
     }
   },
 
@@ -385,13 +390,12 @@ Page({
     wx.navigateTo({ url: `/pages/cook/cook?id=${this.data.id}&step=${step}` })
   },
 
-  copyVideo() {
+  openVideo() {
     const url = this.data.dish && this.data.dish.videoUrl
     if (!url) return
-    wx.setClipboardData({
-      data: url,
-      success: () => ui.toast("视频链接已复制，可在浏览器中打开"),
-    })
+    if (!video.open(url, () => ui.toast("链接已复制，请在浏览器中打开"))) {
+      ui.toast("目前仅支持抖音和哔哩哔哩视频")
+    }
   },
 
   editDish() {

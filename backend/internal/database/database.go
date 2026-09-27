@@ -339,6 +339,7 @@ func seedData() {
 	ensureSetting("lunch_dishes_per_day", "1")
 	ensureSetting("dinner_dishes_per_day", "1")
 	ensureSetting("allow_register", "1")
+	ensureLegacyBrandName()
 
 	upsertManagedStringArraySetting("categories", dishes.DefaultCategories())
 	upsertStringArraySetting("tastes", dishes.DefaultTastes())
@@ -350,6 +351,19 @@ func ensureSetting(key, value string) {
 	if n == 0 {
 		DB.Create(&models.Setting{Key: key, Value: value})
 	}
+}
+
+// ensureLegacyBrandName migrates the old default only; administrator-customized names
+// remain untouched while new installs and legacy defaults use the mini-program brand.
+func ensureLegacyBrandName() {
+	var setting models.Setting
+	if err := DB.Where("`key` = ?", "app_name").First(&setting).Error; err == nil {
+		if strings.TrimSpace(setting.Value) == "" || strings.EqualFold(strings.TrimSpace(setting.Value), "NiniMenu") {
+			_ = DB.Model(&setting).Update("value", "ss-menu").Error
+		}
+		return
+	}
+	_ = DB.Create(&models.Setting{Key: "app_name", Value: "ss-menu"}).Error
 }
 
 // GetSetting 读取站点级设置，不存在返回 fallback。

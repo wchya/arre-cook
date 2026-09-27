@@ -44,10 +44,11 @@ docker run --rm --network web-arrebyte_default \
 博客服务器 `/home/ubuntu/web-arrebyte/.env` 已有 QQ 邮箱的 `MAIL_HOST`、`MAIL_PORT`、`MAIL_USERNAME` 和 `MAIL_PASSWORD`。在本仓库根目录运行 Compose 时，让它读取博客和应用两份环境文件；博客 SMTP 变量会传给菜谱容器，博客数据库等变量不会传入。菜谱的 Garage 凭据必须填写 `COOK_S3_ACCESS_KEY` / `COOK_S3_SECRET_KEY`，Compose 不会复用博客的 `S3_ACCESS_KEY`。博客当前使用 `smtp.qq.com:587`（STARTTLS），`.env.example` 已对齐：
 
 ```sh
+APP_VERSION="$(git rev-parse --short HEAD)" \
 docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --build
 ```
 
-服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络，通过 `http://garage:3900` 访问对象存储。若博客项目名改变，在 `.env` 中调整 `BLOG_DOCKER_NETWORK`。Compose 文件或环境配置变更后使用 `docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --build` 重建容器。
+服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络，通过 `http://garage:3900` 访问对象存储。若博客项目名改变，在 `.env` 中调整 `BLOG_DOCKER_NETWORK`。每次部署都要把当前 Git short SHA 传给 `APP_VERSION`：服务首次以新版本启动时会向所有未停用用户各写入一条系统更新站内信，同一版本重启不会重复发送。
 
 ## Garage 单机运行与备份
 

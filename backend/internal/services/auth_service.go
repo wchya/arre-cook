@@ -120,7 +120,7 @@ func SendEmailCode(rawEmail, purpose, ip string) (int, error) {
 		return 0, err
 	}
 
-	appName := database.GetSetting("app_name", "NiniMenu")
+	appName := database.GetSetting("app_name", "ss-menu")
 	subject := fmt.Sprintf("【%s】登录验证码 %s", appName, code)
 	html := mailer.CodeEmailHTML(appName, code, int(config.C.EmailCodeTTL.Minutes()))
 	if err := mailer.Send(email, subject, html); err != nil {
@@ -191,7 +191,8 @@ func LoginWithEmailCode(rawEmail, code, wechatCode string) (*models.User, bool, 
 		if err := database.DB.Create(&u).Error; err != nil {
 			return nil, false, err
 		}
-		_, _ = CreateNotification(u.ID, "system_update", "欢迎来到 NiniMenu", "你可以记录每天吃的菜、生成健康饮食报告，并在 AI 连接中为 Hermes、DSH 等 Agent 创建独立凭证。", "/")
+		appName := database.GetSetting("app_name", "ss-menu")
+		_, _ = CreateNotification(u.ID, "system_update", "欢迎来到 "+appName, "你可以记录每天吃的菜、生成健康饮食报告，并在 AI 连接中为 Hermes、DSH 等 Agent 创建独立凭证。", "/")
 		created = true
 	} else if err != nil {
 		return nil, false, err

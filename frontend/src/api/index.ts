@@ -1,13 +1,14 @@
 import { api, getToken, getUploadErrorMessage, errorMessage, ApiError } from "./client"
 import defaultClient from "./client"
 import type {
-  Dish, DishInput, PaginatedData, PickResult, BlindBoxResult, MealRecord, DashboardData, Achievement, WeekPlan,
+  Dish, DishInput, PaginatedData, PickResult, MealRecord, DashboardData, Achievement, WeekPlan,
   ShoppingCategory, ShoppingCategoryOverride, Holiday, Quote, DayRating, PhotoWall, DishRecordsResponse, DishCategoryCounts,
   FavoriteOverview, SmartPickRequest, SmartPickResult, TasteProfile, BehaviorEventInput, AuthOptions, LoginResult, User,
   Preferences, UserStats, AgentTokenList, AgentToken, AgentAuditLog, AgentSession, Suggestion, ChatSession, ChatMessage,
   ChatCard, AssistantStatus, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
   FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport,
   NotificationPage,
+  DishVideoMeta,
 } from "@/types"
 
 export { getUploadErrorMessage, errorMessage, ApiError }
@@ -22,6 +23,7 @@ export const authApi = {
   emailLogin: (email: string, code: string, wechatCode?: string) =>
     api<LoginResult>("POST", "/auth/email/login", { email, code, wechat_code: wechatCode }),
   passwordLogin: (account: string, password: string) => api<LoginResult>("POST", "/auth/login", { account, password }),
+  wechatLogin: (code: string) => api<LoginResult & { need_bind?: boolean }>("POST", "/auth/wechat", { code }),
 }
 
 export const meApi = {
@@ -183,13 +185,16 @@ export const dishesApi = {
   batchCategory: (ids: number[], category: string) => api<null>("POST", "/dishes/batch-category", { ids, category }),
 }
 
+export const linkPreviewApi = {
+  get: (url: string) => api<DishVideoMeta>("GET", "/link-preview", { url }),
+}
+
 export const pickApi = {
   lunch: (count?: number) => api<PickResult>("POST", `/pick/lunch${count ? `?count=${count}` : ""}`),
   dinner: (count?: number) => api<PickResult>("POST", `/pick/dinner${count ? `?count=${count}` : ""}`),
   mood: (mood: string) => api<PickResult>("POST", "/pick/mood", { mood }),
   tomorrow: (data: { meal_type: string; profile: string; count: number; exclude_ids?: number[] }) =>
     api<PickResult>("POST", "/pick/tomorrow", data),
-  blindBox: () => api<BlindBoxResult>("POST", "/pick/blind-box"),
   // 智能推荐：口味画像 + 约束打分，返回带理由的结果
   smart: (data: SmartPickRequest) => api<SmartPickResult>("POST", "/pick/smart", data),
 }
@@ -286,7 +291,7 @@ export const photoWallApi = {
   get: () => api<PhotoWall>("GET", "/photo-wall"),
 }
 
-// 个人设置（语音、盲盒、去重天数、每日道数）
+// 个人设置（语音、去重天数、每日道数）
 export const settingsApi = {
   get: () => api<Record<string, unknown>>("GET", "/settings"),
   update: (settings: Record<string, string>) => api<null>("PUT", "/settings", { settings }),

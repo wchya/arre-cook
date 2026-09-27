@@ -2,6 +2,8 @@ package services
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -10,6 +12,8 @@ import (
 
 	"gorm.io/gorm"
 )
+
+const deploymentVersionSetting = "notifications_last_deployment_version"
 
 var notificationTypes = map[string]bool{
 	"system_update":  true,
@@ -117,6 +121,55 @@ func PublishNotification(uid uint, kind, title, content, link string) (int64, er
 		return tx.Create(&rows).Error
 	})
 	return int64(len(ids)), err
+}
+
+// AnnounceDeployment publishes one system notice per build identifier. The version is
+// supplied by the container build (APP_VERSION); missing/placeholder values are ignored
+// so local development restarts do not spam every account.
+func AnnounceDeployment(version string) error {
+	version = strings.TrimSpace(version)
+	if version == "" || strings.EqualFold(version, "unknown") || strings.EqualFold(version, "dev") {
+		return nil
+	}
+
+	var sent int
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var marker models.Setting
+		markerErr := tx.Where("`key` = ?", deploymentVersionSetting).First(&marker).Error
+		if markerErr == nil && strings.TrimSpace(marker.Value) == version {
+			return nil
+		}
+		if markerErr != nil && !errors.Is(markerErr, gorm.ErrRecordNotFound) {
+			return markerErr
+		}
+
+		var ids []uint
+		if err := tx.Model(&models.User{}).Where("disabled = ?", false).Pluck("id", &ids).Error; err != nil {
+			return err
+		}
+		content := fmt.Sprintf("系统已更新到版本 %s，最新功能和修复已经部署完成。", version)
+		rows := make([]models.Notification, 0, len(ids))
+		for _, id := range ids {
+			rows = append(rows, models.Notification{
+				UserID: id, Type: "system_update", Title: "ss-menu 已更新",
+				Content: content, Link: "/notifications",
+			})
+		}
+		if len(rows) > 0 {
+			if err := tx.Create(&rows).Error; err != nil {
+				return err
+			}
+			sent = len(rows)
+		}
+		if markerErr == nil {
+			return tx.Model(&marker).Update("value", version).Error
+		}
+		return tx.Create(&models.Setting{Key: deploymentVersionSetting, Value: version}).Error
+	})
+	if err == nil && sent > 0 {
+		log.Printf("已发布版本更新站内信：%s（%d 位用户）", version, sent)
+	}
+	return err
 }
 
 type NotificationPage struct {
