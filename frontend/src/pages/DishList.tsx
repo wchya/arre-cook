@@ -29,19 +29,38 @@ function dateKey(d = new Date()) {
 }
 
 const PAGE_SIZE = 30
+const RECIPE_SCOPES = [
+  { value: "", label: "全部菜谱" },
+  { value: "mine", label: "我的私房菜" },
+  { value: "family", label: "家庭菜谱" },
+  { value: "public", label: "公共菜谱" },
+]
 
 export default function DishList() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const requestedScope = searchParams.get("scope") || ""
+  const scope = RECIPE_SCOPES.some((item) => item.value === requestedScope) ? requestedScope : ""
+  // A navigation from the personal entry to the main tab starts a fresh view.
+  return <DishCatalogue key={scope} scope={scope} />
+}
+
+function DishCatalogue({ scope }: { scope: string }) {
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const isAdmin = useAuthStore((s) => s.user?.role === "admin")
-  const scope = searchParams.get("scope") === "mine" ? "mine" : ""
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState("全部")
   const [activeTaste, setActiveTaste] = useState("全部")
   const [showTodayModal, setShowTodayModal] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const today = dateKey()
+
+  function changeScope(value: string) {
+    setSearch("")
+    setActiveCategory("全部")
+    setActiveTaste("全部")
+    navigate(value ? `/dishes?scope=${value}` : "/dishes")
+  }
 
   const { data: settings } = useQuery({
     queryKey: ["settings"],
@@ -78,7 +97,7 @@ export default function DishList() {
     if (activeTaste !== "全部") params.taste = activeTaste
     if (search) params.search = search
     if (scope) params.scope = scope
-    else params.enabled = "true"
+    if (scope !== "mine") params.enabled = "true"
     return params
   }, [activeCategory, activeTaste, search, scope])
 
@@ -269,8 +288,8 @@ export default function DishList() {
   return (
     <div className="animate-fadeUp flex flex-col h-full">
       <PageHeader
-        title={scope === "mine" ? "我的私房菜" : "菜品"}
-        subtitle={scope === "mine" ? "只显示你创建的食谱" : "选菜加餐，一键搞定"}
+        title={RECIPE_SCOPES.find((item) => item.value === scope)?.label}
+        subtitle={scope === "mine" ? "仅自己可见，共享食谱在家庭查看" : "选菜加餐，一键搞定"}
         icon={UtensilsCrossed}
         actions={
            <HeaderIconButton onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/me/preferences")} aria-label={isAdmin ? "管理设置" : "饮食偏好"}>
@@ -301,6 +320,12 @@ export default function DishList() {
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col">
+            <div className="px-3 pt-3">
+              <label htmlFor="recipe-scope" className="sr-only">菜谱范围</label>
+              <select id="recipe-scope" value={scope} onChange={(event) => changeScope(event.target.value)} className="min-h-11 w-full rounded-xl border border-border bg-card px-3 text-sm text-text">
+                {RECIPE_SCOPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </div>
             <div className="px-3 pt-3 pb-2">
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text3 text-sm">🔍</span>
@@ -348,9 +373,15 @@ export default function DishList() {
               ) : listError && allDishes.length === 0 ? <RequestState error={listError} onRetry={() => { void refetch() }} compact /> : allDishes.length === 0 ? (
                 <div className="text-center py-16">
                   <span className="text-[56px] block mb-4 animate-float">🍽</span>
-                  <div className="text-base font-semibold mb-1.5">没有找到菜品</div>
-                  <div className="text-[13px] text-text2">{scope === "mine" ? "在这里收藏自己的做法，随时回来编辑。" : "试试调整分类或搜索关键词。"}</div>
-                  {scope === "mine" && <button type="button" className="btn-secondary mt-4" onClick={() => navigate("/dishes/new")}>创建第一道私房菜</button>}
+                  <div className="text-base font-semibold mb-1.5">{scope === "mine" && !search && activeCategory === "全部" && activeTaste === "全部" ? "还没有个人私房菜" : "当前范围没有找到菜品"}</div>
+                  <div className="text-[13px] text-text2">{scope === "mine" ? "已共享的做法在家庭菜谱中，公共菜谱可切换到全部查看。" : "可以清除筛选，重新查看全部菜谱。"}</div>
+                  <div className="mt-4 flex flex-col items-center gap-2">
+                    <button type="button" className="btn-secondary" onClick={() => changeScope("")}>查看全部菜谱</button>
+                    {scope === "mine" && <>
+                      <button type="button" className="btn-secondary" onClick={() => changeScope("family")}>查看家庭菜谱</button>
+                      <button type="button" className="btn-secondary" onClick={() => navigate("/dishes/new")}>创建第一道私房菜</button>
+                    </>}
+                  </div>
                 </div>
               ) : showGrouped ? (
                 Array.from(groupedByCategory.entries()).map(([cat, dishes]) => (

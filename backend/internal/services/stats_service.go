@@ -46,7 +46,9 @@ func BuildUserStats(uid uint) UserStats {
 	db := database.DB
 	db.Model(&models.MealRecord{}).Scopes(own).Count(&s.TotalRecords)
 	db.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true).Count(&s.TotalDishes)
-	db.Model(&models.Dish{}).Where("owner_id = ?", uid).Count(&s.PrivateDishes)
+	// Match scope=mine: shared family recipes have a separate entry and must not
+	// make an empty personal collection appear to contain missing recipes.
+	db.Model(&models.Dish{}).Where("owner_id = ? AND family_id = 0", uid).Count(&s.PrivateDishes)
 	db.Model(&models.MealRecord{}).Scopes(own).Where("meal_type = ?", "lunch").Count(&s.LunchCount)
 	db.Model(&models.MealRecord{}).Scopes(own).Where("meal_type = ?", "dinner").Count(&s.DinnerCount)
 	db.Model(&models.Favorite{}).Scopes(own).Count(&s.FavoriteCount)

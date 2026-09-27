@@ -1,5 +1,5 @@
 <view class="screen">
-  <nav-bar icon="utensils-crossed" title="菜品" subtitle="选菜加餐，一键搞定" theme="plain">
+  <nav-bar icon="utensils-crossed" title="{{scope === 'mine' ? '我的私房菜' : scope === 'family' ? '家庭菜谱' : scope === 'public' ? '公共菜谱' : '全部菜谱'}}" subtitle="{{scope === 'mine' ? '仅自己可见，共享食谱在家庭查看' : '选菜加餐，一键搞定'}}" theme="plain">
     <view class="nav-add" hover-class="tap-active" bindtap="createDish" aria-role="button" aria-label="新建私房菜">
       <icon name="plus" size="34" stroke="2.4" color="primary" />
     </view>
@@ -65,8 +65,12 @@
         </view>
 
         <view wx:elif="{{!groups.length}}" class="list-state">
-          <empty emoji="🍽" title="没有找到菜品" desc="{{keyword ? '换个关键词试试？' : scope === 'mine' ? '还没有私房菜，点右上角“＋”新建一道' : '这个分类暂时没有菜品'}}" compact>
-            <view wx:if="{{scope === 'mine'}}" class="btn btn-primary btn-sm" hover-class="tap-active" bindtap="createDish">新建私房菜</view>
+          <empty emoji="🍽" title="{{scope === 'mine' && !keyword && category === '全部' && taste === '全部' ? '还没有个人私房菜' : '当前范围没有找到菜品'}}" desc="{{scope === 'mine' ? '已共享的做法在家庭菜谱中，公共菜谱可切换到全部查看。' : '可以清除筛选，重新查看全部菜谱。'}}" compact>
+            <view class="scope-actions">
+              <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="showAllDishes" aria-role="button">查看全部菜谱</view>
+              <view wx:if="{{scope === 'mine'}}" class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="openFamilyRecipes" aria-role="button">查看家庭菜谱</view>
+              <view wx:if="{{scope === 'mine'}}" class="btn btn-primary btn-sm" hover-class="tap-active" bindtap="createDish" aria-role="button">新建私房菜</view>
+            </view>
           </empty>
         </view>
 

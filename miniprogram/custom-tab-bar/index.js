@@ -27,7 +27,19 @@ Component({
     switchTab(event) {
       const index = Number(event.currentTarget.dataset.index)
       const tab = TABS[index]
-      if (!tab || index === this.data.selected) return
+      if (!tab) return
+      // The main catalog tab always opens the full catalog. A private-recipe
+      // deep link must not leave this tab stuck in an empty filtered view.
+      if (index === 1) {
+        if (index === this.data.selected) {
+          const pages = getCurrentPages()
+          const page = pages[pages.length - 1]
+          if (page && typeof page.showAllDishes === "function") page.showAllDishes()
+          return
+        }
+        wx.setStorageSync("ninimenu_dishes_scope", "all")
+      }
+      if (index === this.data.selected) return
       if (typeof wx.vibrateShort === "function") wx.vibrateShort({ type: "light", fail: () => {} })
       wx.switchTab({ url: tab.path })
     },

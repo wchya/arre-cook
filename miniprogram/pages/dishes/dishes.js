@@ -72,22 +72,25 @@ Page({
   },
 
   onUnload() {
+    clearTimeout(this._searchTimer)
     if (this._offTheme) this._offTheme()
   },
 
   onShow() {
     session.syncTabBar(this, 1)
     if (!session.requireLogin()) return
-    const requestedScope = wx.getStorageSync("ninimenu_dishes_scope") === "mine" ? "mine" : ""
-    if (requestedScope) wx.removeStorageSync("ninimenu_dishes_scope")
+    const scopeRequest = wx.getStorageSync("ninimenu_dishes_scope")
+    const hasScopeRequest = scopeRequest === "mine" || scopeRequest === "all"
+    const requestedScope = scopeRequest === "mine" ? "mine" : ""
+    if (hasScopeRequest) wx.removeStorageSync("ninimenu_dishes_scope")
     const start = () => {
-      this.reload({ preserveScroll: Boolean(this._booted && !scopeChanged) })
+      this.reload({ preserveScroll: Boolean(this._booted && !hasScopeRequest) })
       this._booted = true
     }
-    const scopeChanged = requestedScope && requestedScope !== this.data.scope
-    if (scopeChanged) {
+    if (hasScopeRequest) {
       // setData is asynchronous; wait for the new scope before building the request.
-      this.setData({ scope: requestedScope, scopeLabel: "私房", category: "全部", taste: "全部", keyword: "" }, start)
+      clearTimeout(this._searchTimer)
+      this.setData({ scope: requestedScope, scopeLabel: requestedScope ? "私房" : "全部", category: "全部", taste: "全部", keyword: "", highlight: "" }, start)
       return
     }
     start()
@@ -275,7 +278,17 @@ Page({
     if (index < 0) return
     const scope = SCOPES[index].key
     if (scope === this.data.scope) return
-    this.setData({ scope, scopeLabel: SCOPES[index].short, category: "全部", taste: "全部", keyword: "" }, () => this.reload())
+    clearTimeout(this._searchTimer)
+    this.setData({ scope, scopeLabel: SCOPES[index].short, category: "全部", taste: "全部", keyword: "", highlight: "" }, () => this.reload())
+  },
+
+  showAllDishes() {
+    clearTimeout(this._searchTimer)
+    this.setData({ scope: "", scopeLabel: "全部", category: "全部", taste: "全部", keyword: "", highlight: "" }, () => this.reload())
+  },
+
+  openFamilyRecipes() {
+    wx.navigateTo({ url: "/pages/family/family" })
   },
 
   // ---------- 搜索 ----------
