@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"ninimenu/internal/agent"
 	"ninimenu/internal/auth"
 	"ninimenu/internal/llm"
@@ -115,16 +116,34 @@ func reviewContent(ctx context.Context, settings llm.Settings, stage, text strin
 	}
 	reviewCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
+	maxTokens := 512
+	if stage == "video-output" {
+		// Checking every structured field against its source needs more reasoning
+		// than topic classification. Keep the same deadline and strict verdict.
+		maxTokens = 1536
+	}
 	result, err := llm.Stream(reviewCtx, settings, llm.Request{
 		Messages: []llm.Message{{Role: "system", Content: reviewSystemPrompt}, {Role: "user", Content: string(payload)}},
 		// Reasoning providers may charge internal reasoning to this budget even
 		// when the visible verdict is one word. A 32-token cap truncates verdicts.
-		MaxTokens: 512, Temperature: 0,
+		MaxTokens: maxTokens, Temperature: 0,
 	}, nil)
 	if err != nil {
+		reason := "upstream"
+		if errors.Is(reviewCtx.Err(), context.DeadlineExceeded) {
+			reason = "timeout"
+		} else if errors.Is(reviewCtx.Err(), context.Canceled) {
+			reason = "canceled"
+		}
+		logReviewFailure(stage, reason, maxTokens, nil)
 		return false, errors.New("内容检查暂时不可用，请稍后重试")
 	}
-	if len(result.ToolCalls) > 0 || result.FinishReason != "stop" {
+	if len(result.ToolCalls) > 0 {
+		logReviewFailure(stage, "unexpected_tools", maxTokens, result)
+		return false, errors.New("内容检查未完成，请稍后重试")
+	}
+	if result.FinishReason != "stop" {
+		logReviewFailure(stage, "incomplete", maxTokens, result)
 		return false, errors.New("内容检查未完成，请稍后重试")
 	}
 	switch strings.TrimSpace(result.Content) {
@@ -133,8 +152,31 @@ func reviewContent(ctx context.Context, settings llm.Settings, stage, text strin
 	case "BLOCK":
 		return false, nil
 	default:
+		logReviewFailure(stage, "invalid_verdict", maxTokens, result)
 		return false, errors.New("内容检查未完成，请稍后重试")
 	}
+}
+
+// Log only bounded metadata: never subtitle text, model output, tool arguments,
+// credentials or raw upstream errors, including unexpected finish_reason values.
+func logReviewFailure(stage, reason string, maxTokens int, result *llm.Result) {
+	switch stage {
+	case "input", "tool", "output", "video-output":
+	default:
+		stage = "other"
+	}
+	finish, contentBytes, toolCalls := "missing", 0, 0
+	if result != nil {
+		contentBytes, toolCalls = len(result.Content), len(result.ToolCalls)
+		switch result.FinishReason {
+		case "stop", "length", "tool_calls", "function_call", "content_filter":
+			finish = result.FinishReason
+		case "":
+		default:
+			finish = "other"
+		}
+	}
+	log.Printf("[assistant-review] stage=%s reason=%s finish=%s max_tokens=%d content_bytes=%d tool_calls=%d", stage, reason, finish, maxTokens, contentBytes, toolCalls)
 }
 
 var negativeWriteIntent = regexp.MustCompile(`(不要|不许|禁止|无需|不用|不必|别)[^，。！？；\n]{0,6}(保存|新建|添加|收录|记下|记录|修改|更新|调整|收藏|重排|重新生成|设置|打分|评分)`)

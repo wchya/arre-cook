@@ -82,3 +82,48 @@ func TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult(t *testing.T) {
 		})
 	}
 }
+
+func TestVideoRecipeSupportsReasoningBeforeSourceReviewVerdict(t *testing.T) {
+	var calls, outputReviews atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var request llm.Request
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil || len(request.Messages) != 2 {
+			t.Error("invalid model request")
+			return
+		}
+		if len(request.Tools) != 0 {
+			t.Error("video extraction enabled tools")
+		}
+		if request.Messages[0].Content == videoRecipePrompt {
+			respondText(w, recipeJSON)
+			return
+		}
+		var payload struct {
+			Stage string `json:"stage"`
+		}
+		if json.Unmarshal([]byte(request.Messages[1].Content), &payload) != nil {
+			t.Error("invalid review payload")
+			return
+		}
+		if payload.Stage == "video-output" {
+			outputReviews.Add(1)
+			// This provider fixture needs 768 reasoning tokens before it can emit
+			// a verdict. The old 512-token limit ended with no visible answer.
+			fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"checking each field against the transcript\"}}]}\n\n")
+			if request.MaxTokens < 768 {
+				fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\ndata: [DONE]\n\n")
+				return
+			}
+			if request.MaxTokens > 1536 {
+				t.Error("source review exceeded its bounded reasoning budget")
+			}
+		}
+		respondText(w, "ALLOW")
+	}))
+	defer server.Close()
+	result, err := ExtractVideoRecipe(context.Background(), llm.Settings{BaseURL: server.URL, APIKey: "fixture", Model: "fixture"}, video.Source{Method: "manual", Text: recipeTranscript}, func(string) {})
+	if err != nil || result.Recipe.Name != "番茄炒蛋" || calls.Load() != 3 || outputReviews.Load() != 1 {
+		t.Fatalf("source review did not complete: error=%v calls=%d reviews=%d", err, calls.Load(), outputReviews.Load())
+	}
+}

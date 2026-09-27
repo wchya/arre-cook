@@ -242,7 +242,8 @@ func healthz(c *gin.Context) {
 	if err != nil || sqlDB.Ping() != nil {
 		status, code = "DOWN", http.StatusServiceUnavailable
 	}
-	c.JSON(code, gin.H{"status": status, "storage": storage.Backend(), "time": time.Now().Format(time.RFC3339)})
+	c.Header("Cache-Control", "no-store")
+	c.JSON(code, gin.H{"status": status, "storage": storage.Backend(), "version": config.C.AppVersion, "time": time.Now().Format(time.RFC3339)})
 }
 
 // spaHandler 前端构建产物：带 hash 的资源强缓存，index.html 不缓存，其余路径回落到 index.html。

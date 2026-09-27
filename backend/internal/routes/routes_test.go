@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"ninimenu/internal/config"
 	"ninimenu/internal/routes"
 	"ninimenu/internal/services"
 	"ninimenu/internal/testutil"
@@ -442,6 +443,9 @@ func TestPreferencesDriveRecommendations(t *testing.T) {
 }
 
 func TestOpenAPIAndHealth(t *testing.T) {
+	previousVersion := config.C.AppVersion
+	config.C.AppVersion = "0.11.1"
+	t.Cleanup(func() { config.C.AppVersion = previousVersion })
 	req := httptest.NewRequest("GET", "/api/agent/openapi.json", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -453,6 +457,13 @@ func TestOpenAPIAndHealth(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != 200 {
 		t.Fatalf("healthz = %d", w.Code)
+	}
+	var health struct {
+		Status  string `json:"status"`
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(w.Body.Bytes(), &health) != nil || health.Status != "UP" || health.Version != config.C.AppVersion || w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("healthz omitted the current deployment version: %s", w.Body.String())
 	}
 	req = httptest.NewRequest("GET", "/api/does-not-exist", nil)
 	w = httptest.NewRecorder()
