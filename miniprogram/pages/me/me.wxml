@@ -155,7 +155,7 @@
       </view>
       <view class="foot">ss-menu · 你的数据只属于你</view>
     </view>
-    <view class="tabbar-spacer"></view>
+    <view wx:if="{{!nameOpen}}" class="tabbar-spacer"></view>
   </scroll-view>
 
   <sheet show="{{nameOpen}}" title="修改昵称" bind:close="closeName">
