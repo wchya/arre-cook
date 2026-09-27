@@ -7,8 +7,6 @@ import { asArray } from "@/lib/utils"
 import DishImage from "@/components/DishImage"
 import PageHeader from "@/components/PageHeader"
 import { cardShadow } from "@/components/Card"
-import { useAppInfoStore } from "@/store/useAppInfoStore"
-import { useAuthStore } from "@/store/useAuthStore"
 import toast from "react-hot-toast"
 import { Bot, Clock, Flame, Leaf, RefreshCw, Sparkles, ThumbsDown, Zap, type LucideIcon } from "lucide-react"
 
@@ -191,8 +189,6 @@ function RecommendRow({ item, onEat, onReject, disabled }: {
 export default function Assistant() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn)
-  const agentEmbedUrl = useAppInfoStore((s) => s.agentEmbedUrl)
 
   const [meal, setMeal] = useState<MealChoice>("")
   const [mood, setMood] = useState("")
@@ -382,24 +378,10 @@ export default function Assistant() {
                 <div className="mt-0.5 text-[11px] font-medium text-text3">问做法、排一周菜单、按冰箱食材配菜</div>
               </div>
             </div>
-            {agentEmbedUrl ? (
-              <iframe
-                src={agentEmbedUrl}
-                title="食谱小助手"
-                className="block h-[560px] w-full border-0 bg-transparent"
-                allow="clipboard-write"
-                referrerPolicy="strict-origin-when-cross-origin"
-                loading="lazy"
-              />
-            ) : (
-              <div className="px-4 py-8 text-center">
-                <div className="text-sm font-bold text-text2">对话助手还没接入</div>
-                <div className="mt-1 text-[12px] text-text3">在管理后台「设置 → AI 助手嵌入地址」填入智能体嵌入页地址即可显示</div>
-                {isLoggedIn && (
-                  <button onClick={() => navigate("/admin/settings")} className="mt-3 rounded-full bg-primary px-4 py-2 text-[12px] font-extrabold text-white active:scale-95">去设置</button>
-                )}
-              </div>
-            )}
+            <div className="px-4 py-6">
+              <p className="text-sm leading-relaxed text-text2">告诉助手你的口味、手边食材或想花的时间，直接获得适合自己的建议。两端共用每日提问次数，可在对话页查看剩余额度。</p>
+              <button onClick={() => navigate("/assistant/chat")} className="mt-4 min-h-11 rounded-full bg-primary px-5 text-sm font-semibold text-white active:scale-95">开始对话</button>
+            </div>
           </section>
         </div>
       </main>

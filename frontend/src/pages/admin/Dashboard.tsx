@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { dashboardApi } from "@/api"
@@ -17,10 +18,12 @@ function diffLabel(d: string) { return d === "easy" ? "简单" : d === "medium" 
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const { data: d, isLoading } = useQuery({
+  const { data: d, isLoading , error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: () => dashboardApi.get(),
   })
+
+  if (loadError) return <div><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   if (isLoading) return <div className="p-8 text-center text-text2">加载中...</div>
 

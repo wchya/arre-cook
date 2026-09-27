@@ -3,7 +3,7 @@
 // 从这里取值，并通过 subscribe 在系统切换深浅色时刷新。取值与 app.wxss / theme.json 保持一致。
 const PALETTES = {
   light: { theme: "light", bg: "#FAFAF8", warm: "#FFE9DE", refresher: "black" },
-  dark: { theme: "dark", bg: "#121016", warm: "#45291D", refresher: "white" },
+  dark: { theme: "dark", bg: "#131316", warm: "#45291D", refresher: "white" },
 }
 
 const listeners = new Set()

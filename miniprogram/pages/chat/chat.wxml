@@ -11,9 +11,9 @@
       <view wx:if="{{!messages.length && !loadingSession}}" class="welcome anim-fade-up">
         <view class="welcome__icon"><icon name="sparkles" size="56" stroke="2.2" color="white" /></view>
         <view class="welcome__title">今天想吃什么？</view>
-        <view class="welcome__desc">从菜谱、实际记录和你的口味出发，帮你点菜、记饮食、排菜单</view>
+        <view class="welcome__desc">只聊食谱与日常饮食，回复会先核对再展示</view>
         <view class="suggestions">
-          <view wx:for="{{suggestions}}" wx:key="*this" class="suggestion" hover-class="tap-active" data-text="{{item}}" bindtap="useSuggestion">
+          <view wx:for="{{suggestions}}" wx:key="*this" class="suggestion {{canSend && !busy ? '' : 'is-disabled'}}" aria-role="button" aria-disabled="{{!canSend || busy}}" hover-class="tap-active" data-text="{{item}}" bindtap="useSuggestion">
             <text class="flex-1">{{item}}</text>
             <icon name="arrow-up" size="28" stroke="2.4" color="text3" class="tilt" />
           </view>
@@ -65,14 +65,19 @@
   </scroll-view>
 
   <view class="composer" style="padding-bottom:{{keyboard ? keyboard + 'px' : ''}};">
+    <request-state wx:if="{{statusError}}" error="{{statusError}}" bindretry="loadStatus" />
+    <view wx:else class="quota-row">
+      <view class="flex-1 quota-copy"><view class="quota-count">{{quotaText}}</view><view>两端共用 · 北京时间 00:00 重置</view></view>
+      <view class="head-btn" bindtap="loadStatus" aria-role="button" aria-label="刷新助手次数"><view wx:if="{{statusLoading}}" class="spinner spinner-dark"></view><icon wx:else name="refresh-cw" size="30" color="text3" /></view>
+    </view>
     <view wx:if="{{busy}}" class="generating">
       <view class="generating__dot anim-pulse"></view>
-      <text class="flex-1">助手正在整理你的数据…</text>
+      <text class="flex-1">{{progressText}}</text>
       <view class="stop" hover-class="tap-active" bindtap="stop"><icon name="pause" size="22" stroke="2.4" color="text2" fill /><text>停止</text></view>
     </view>
     <view class="composer__box {{inputFocus ? 'is-focus' : ''}}">
       <textarea class="composer__input" value="{{draft}}" maxlength="1000" auto-height adjust-position="{{false}}" show-confirm-bar="{{false}}" confirm-type="send" placeholder="聊聊今天吃什么" placeholder-class="placeholder" cursor-spacing="20" bindinput="onInput" bindfocus="onFocus" bindblur="onBlur" bindconfirm="sendDraft" bindkeyboardheightchange="onKeyboard" />
-      <view class="send {{draft && !busy && !loadingSession ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="sendDraft" aria-role="button" aria-label="发送">
+      <view class="send {{draft && !busy && !loadingSession && canSend ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="sendDraft" aria-role="button" aria-label="发送" aria-disabled="{{!draft || busy || loadingSession || !canSend}}">
         <icon name="arrow-up" size="36" stroke="2.6" color="white" />
       </view>
     </view>
@@ -86,7 +91,8 @@
       <view class="head-btn" hover-class="tap-active" bindtap="closeHistory"><icon name="x" size="32" stroke="2.4" color="text2" /></view>
     </view>
     <scroll-view class="drawer__list" scroll-y enhanced show-scrollbar="{{false}}">
-      <view wx:if="{{!sessions.length}}" class="drawer__empty">还没有对话记录</view>
+      <request-state wx:if="{{sessionsError || loadingSessions}}" error="{{sessionsError}}" loading="{{loadingSessions}}" bindretry="loadSessions" />
+      <view wx:elif="{{!sessions.length}}" class="drawer__empty">还没有对话记录</view>
       <view wx:for="{{sessions}}" wx:key="id" class="session {{sessionId === item.id ? 'is-active' : ''}}">
         <view class="flex-1" hover-class="tap-fade" data-id="{{item.id}}" bindtap="openSession">
           <view class="session__title truncate">{{item.title}}</view>

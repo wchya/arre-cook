@@ -5,6 +5,7 @@ import { errorMessage, meApi, settingsApi } from "@/api"
 import { asArray } from "@/lib/utils"
 import PageHeader from "@/components/PageHeader"
 import TagInput from "@/components/TagInput"
+import RequestState from "@/components/RequestState"
 import type { Preferences as Prefs } from "@/types"
 import toast from "react-hot-toast"
 import { Salad } from "lucide-react"
@@ -37,7 +38,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 export default function Preferences() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { data, isLoading } = useQuery({ queryKey: ["preferences"], queryFn: () => meApi.preferences() })
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["preferences"], queryFn: () => meApi.preferences() })
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: () => settingsApi.get() })
   const tasteOptions = useMemo(() => {
     const list = asArray<string>(settings?.tastes).filter((x) => typeof x === "string")
@@ -47,13 +48,13 @@ export default function Preferences() {
   const [form, setForm] = useState<Prefs>(empty)
   const [dirty, setDirty] = useState(false)
   useEffect(() => {
-    if (data) {
+    if (data && !dirty) {
       // Hydrate the editable form after the server preference query resolves.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({ ...empty, ...data })
       setDirty(false)
     }
-  }, [data])
+  }, [data, dirty])
 
   const patch = (p: Partial<Prefs>) => {
     setForm((f) => ({ ...f, ...p }))
@@ -78,7 +79,7 @@ export default function Preferences() {
   return (
     <div className="animate-fadeUp pb-28">
       <PageHeader title="饮食偏好" subtitle="推荐引擎和 AI 助手都会遵守" icon={Salad} onBack={() => navigate(-1)} />
-      {isLoading ? (
+      {error ? <RequestState error={error} onRetry={() => { void refetch() }} /> : isLoading ? (
         <div className="mx-auto max-w-[640px] space-y-3 px-5 py-4">
           {[1, 2, 3].map((i) => <div key={i} className="skeleton h-32 rounded-[22px]" />)}
         </div>
@@ -88,7 +89,7 @@ export default function Preferences() {
             <TagInput value={form.allergies} onChange={(v) => patch({ allergies: v })} placeholder="如：花生、虾" suggestions={COMMON_ALLERGY} tone="red" />
           </Section>
 
-          <Section title="🙅 忌口" hint="尽量避开；实在没得选时才会放宽">
+          <Section title="🙅 忌口" hint="推荐会避开这些食材；没有合适的菜时会提示你调整条件">
             <TagInput value={form.avoid_ingredients} onChange={(v) => patch({ avoid_ingredients: v })} placeholder="如：香菜、内脏" suggestions={COMMON_AVOID} />
           </Section>
 
@@ -115,7 +116,8 @@ export default function Preferences() {
                   <button
                     key={t}
                     onClick={() => patch({ favorite_tastes: on ? form.favorite_tastes.filter((x) => x !== t) : [...form.favorite_tastes, t] })}
-                    className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all active:scale-95 ${on ? "border-pink bg-pink text-white" : "border-border bg-bg text-text2"}`}
+                    aria-pressed={on}
+                    className={`min-h-11 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all active:scale-95 ${on ? "border-pink bg-pink text-white" : "border-border bg-bg text-text2"}`}
                   >
                     {t}
                   </button>
@@ -140,9 +142,9 @@ export default function Preferences() {
 
           <Section title="👨‍👩‍👧 几个人吃饭">
             <div className="flex items-center gap-3">
-              <button onClick={() => patch({ household_size: Math.max(0, form.household_size - 1) })} className="h-10 w-10 rounded-full border border-border bg-bg text-lg font-bold active:scale-95">−</button>
+              <button onClick={() => patch({ household_size: Math.max(0, form.household_size - 1) })} aria-label="减少用餐人数" className="h-11 w-11 rounded-full border border-border bg-bg text-lg font-bold active:scale-95">−</button>
               <div className="min-w-[72px] text-center text-[18px] font-black">{form.household_size === 0 ? "未设置" : `${form.household_size} 人`}</div>
-              <button onClick={() => patch({ household_size: Math.min(20, form.household_size + 1) })} className="h-10 w-10 rounded-full border border-border bg-bg text-lg font-bold active:scale-95">+</button>
+              <button onClick={() => patch({ household_size: Math.min(20, form.household_size + 1) })} aria-label="增加用餐人数" className="h-11 w-11 rounded-full border border-border bg-bg text-lg font-bold active:scale-95">+</button>
             </div>
           </Section>
 
@@ -154,7 +156,8 @@ export default function Preferences() {
                   <button
                     key={g}
                     onClick={() => patch({ goals: (on ? goalList.filter((x) => x !== g) : [...goalList, g]).join("、") })}
-                    className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all active:scale-95 ${on ? "border-purple bg-purple-light text-purple" : "border-border bg-bg text-text2"}`}
+                    aria-pressed={on}
+                    className={`min-h-11 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all active:scale-95 ${on ? "border-purple bg-purple-light text-purple" : "border-border bg-bg text-text2"}`}
                   >
                     {g}
                   </button>
@@ -165,6 +168,7 @@ export default function Preferences() {
 
           <Section title="📝 给 AI 的补充说明" hint="例如：孩子不吃辣、周末喜欢做硬菜、最近在控油">
             <textarea
+              aria-label="给 AI 的补充说明"
               value={form.notes}
               maxLength={500}
               onChange={(e) => patch({ notes: e.target.value })}
@@ -178,7 +182,7 @@ export default function Preferences() {
       <div className="fixed inset-x-0 bottom-0 z-[120] border-t border-glass-border glass px-5 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
         <button
           onClick={() => saveMut.mutate()}
-          disabled={!dirty || saveMut.isPending}
+          disabled={!dirty || saveMut.isPending || isLoading || Boolean(error)}
           className="mx-auto block h-12 w-full max-w-[640px] rounded-2xl bg-primary text-[15px] font-extrabold text-white shadow-[0_10px_24px_rgba(232,115,74,.3)] transition-all active:scale-[.98] disabled:opacity-40 disabled:shadow-none"
         >
           {saveMut.isPending ? "保存中…" : dirty ? "保存偏好" : "已保存"}

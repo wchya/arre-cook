@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"ninimenu/internal/services"
@@ -340,7 +341,11 @@ func limitFavoriteItems(items []FavoriteOverviewItem, limit int) []FavoriteOverv
 func AddFavorite(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("dishId"))
 	if err := services.SetFavorite(uid(c), uint(id), true); err != nil {
-		utils.NotFound(c, "菜品不存在")
+		if errors.Is(err, services.ErrDishNotFound) {
+			utils.NotFound(c, "菜品不存在")
+		} else {
+			utils.InternalError(c, "收藏失败，请重试")
+		}
 		return
 	}
 	utils.SuccessMsg(c, "收藏成功")
@@ -348,6 +353,9 @@ func AddFavorite(c *gin.Context) {
 
 func RemoveFavorite(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("dishId"))
-	_ = services.SetFavorite(uid(c), uint(id), false)
+	if err := services.SetFavorite(uid(c), uint(id), false); err != nil {
+		utils.InternalError(c, "取消收藏失败，请重试")
+		return
+	}
 	utils.SuccessMsg(c, "取消收藏成功")
 }

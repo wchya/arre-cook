@@ -126,6 +126,7 @@ func UserAuth() gin.HandlerFunc {
 			return
 		}
 		auth.SetPrincipal(c, p)
+		c.Header("Cache-Control", "no-store")
 		c.Next()
 	}
 }
@@ -159,13 +160,14 @@ func AgentAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if p.IsAgent() && !agentLimiter.Allow(agentLimitKey(p), config.C.AgentRateLimit) {
+		if p.IsAgent() && !ReserveAgentRequests(p, 1) {
 			c.Header("Retry-After", "60")
 			utils.Error(c, http.StatusTooManyRequests, 42900, "请求过于频繁，请稍后再试")
 			c.Abort()
 			return
 		}
 		auth.SetPrincipal(c, p)
+		c.Header("Cache-Control", "no-store")
 		c.Next()
 	}
 }
@@ -183,10 +185,7 @@ func RequireScope(scope string) gin.HandlerFunc {
 }
 
 func agentLimitKey(p *auth.Principal) string {
-	if p.TokenID > 0 {
-		return "pat:" + itoa(p.TokenID)
-	}
-	return "session:" + itoa(p.UserID())
+	return "agent-user:" + itoa(p.UserID())
 }
 
 func itoa(n uint) string {
@@ -224,6 +223,13 @@ func newWindowLimiter(window time.Duration) *windowLimiter {
 }
 
 func (l *windowLimiter) Allow(key string, limit int) bool {
+	return l.AllowN(key, limit, 1)
+}
+
+func (l *windowLimiter) AllowN(key string, limit, units int) bool {
+	if units <= 0 {
+		return true
+	}
 	if limit <= 0 {
 		return true
 	}
@@ -231,14 +237,17 @@ func (l *windowLimiter) Allow(key string, limit int) bool {
 	defer l.mu.Unlock()
 	now := time.Now()
 	b := l.buckets[key]
-	if b == nil || now.Sub(b.start) > l.window {
-		l.buckets[key] = &bucket{start: now, count: 1}
-		return true
-	}
-	if b.count >= limit {
+	if units > limit {
 		return false
 	}
-	b.count++
+	if b == nil || now.Sub(b.start) > l.window {
+		l.buckets[key] = &bucket{start: now, count: units}
+		return true
+	}
+	if b.count > limit-units {
+		return false
+	}
+	b.count += units
 	return true
 }
 
@@ -304,10 +313,12 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
-// SecurityHeaders 基础安全响应头。不设置 X-Frame-Options，以便站点作为小程序 web-view 页面加载。
+// SecurityHeaders blocks third-party iframe embedding; native mini-program requests are unaffected.
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
+		c.Header("Content-Security-Policy", "frame-ancestors 'self'")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Next()
 	}

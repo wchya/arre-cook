@@ -24,6 +24,7 @@ Page({
   },
 
   async load() {
+    this.setData({ loadError: "", loading: true })
     try {
       const raw = await api.get("/achievements")
       const list = (Array.isArray(raw) ? raw : []).slice().sort((a, b) => (a.is_unlocked !== b.is_unlocked ? (a.is_unlocked ? -1 : 1) : a.id - b.id))
@@ -48,6 +49,7 @@ Page({
       })
       this.applyFilter()
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       ui.toast(error.message || "成就加载失败")
     } finally {
       this.setData({ loading: false })
@@ -73,6 +75,6 @@ Page({
   closeDetail() { this.setData({ detailOpen: false }) },
 
   onShareAppMessage() {
-    return { title: `我在 ss-menu 解锁了 ${this.data.unlocked} 个美食成就 🏆`, path: "/pages/home/home" }
+    return { title: `我在 arre食谱推荐小助手 解锁了 ${this.data.unlocked} 个美食成就 🏆`, path: "/pages/home/home" }
   },
 })

@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useState, useMemo, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { useParams, useNavigate } from "react-router-dom"
@@ -32,7 +33,7 @@ interface Step { text: string; time?: number; image?: string }
 function normalizeIngredients(raw: unknown[]): Ingredient[] {
   return raw.map((item) => {
     if (typeof item === "string") return { name: item, amount: "" }
-    if (typeof item === "object" && item !== null) return { name: (item as Record<string, unknown>).name as string || "", amount: (item as Record<string, unknown>).amount as string || "" }
+    if (typeof item === "object" && item !== null) return { name: String((item as Record<string, unknown>).name || ""), amount: String((item as Record<string, unknown>).amount || "") }
     return { name: String(item), amount: "" }
   })
 }
@@ -61,11 +62,11 @@ function IngredientCard({ ing, scale }: { ing: Ingredient; scale: number }) {
       <div className="font-semibold mb-0.5">{ing.name}</div>
       {parsed ? (
         <div className="flex items-center justify-center gap-1.5 mt-0.5">
-          <button onClick={() => setNum((n) => Math.max(0, Math.round((n - 1) * 100) / 100))}
-            className="w-5 h-5 rounded-full bg-bg border border-border text-text2 flex items-center justify-center text-xs leading-none active:bg-primary-light">−</button>
-          <span className="text-[11px] text-text2 min-w-[28px]">{scale === 1 ? num : displayNum}{parsed.unit}</span>
-          <button onClick={() => setNum((n) => Math.round((n + 1) * 100) / 100)}
-            className="w-5 h-5 rounded-full bg-bg border border-border text-text2 flex items-center justify-center text-xs leading-none active:bg-primary-light">+</button>
+          <button onClick={() => setNum((n) => Math.max(0, Math.round((n - 1) * 100) / 100))} aria-label={`减少${ing.name}用量`}
+            className="w-11 h-11 shrink-0 rounded-full bg-bg border border-border text-text2 flex items-center justify-center text-sm leading-none active:bg-primary-light">−</button>
+          <span className="text-[12px] text-text2 min-w-0 break-words">{scale === 1 ? num : displayNum}{parsed.unit}</span>
+          <button onClick={() => setNum((n) => Math.round((n + 1) * 100) / 100)} aria-label={`增加${ing.name}用量`}
+            className="w-11 h-11 shrink-0 rounded-full bg-bg border border-border text-text2 flex items-center justify-center text-sm leading-none active:bg-primary-light">+</button>
         </div>
       ) : (
         ing.amount && <div className="text-[11px] text-text2">{scale === 1 ? ing.amount : ing.amount}</div>
@@ -124,14 +125,14 @@ export default function DishDetail() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const dishId = Number(id)
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn)
+  const user = useAuthStore((s) => s.user)
 
   const [portionScale, setPortionScale] = useState(1)
   const [viewerPhotos, setViewerPhotos] = useState<string[]>([])
   const [viewerIdx, setViewerIdx] = useState(0)
   const [showViewer, setShowViewer] = useState(false)
 
-  const { data: dish, isLoading } = useQuery({
+  const { data: dish, isLoading , error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["dish", dishId],
     queryFn: () => dishesApi.get(dishId),
     enabled: !!dishId,
@@ -155,14 +156,14 @@ export default function DishDetail() {
     enabled: !!dishId,
     staleTime: 0,
   })
-  const dishRecords = dishRecordsData?.records || []
+  const dishRecords = useMemo(() => dishRecordsData?.records || [], [dishRecordsData])
   const dishStats: DishRecordsStats = dishRecordsData?.stats || { total_count: 0, lunch_count: 0, dinner_count: 0, yum_percent: 0, ok_percent: 0, no_percent: 0, avg_rating: 0, last_date: "", avg_interval: 0 }
 
   const { data: dishesData } = useQuery({
     queryKey: ["dishes", "all"],
     queryFn: () => dishesApi.list({ pageSize: "100" }),
   })
-  const allDishes = dishesData?.items || []
+  const allDishes = useMemo(() => dishesData?.items || [], [dishesData])
   const sameCategoryDishes = useMemo(() => allDishes.filter((d: Dish) => d.category === dish?.category && d.id !== dishId).slice(0, 6), [allDishes, dish?.category, dishId])
 
   const favMut = useMutation({
@@ -208,6 +209,8 @@ export default function DishDetail() {
     return photos
   }, [dishRecords])
 
+  if (loadError) return <div><PageHeader title="菜品详情" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
+
   if (isLoading) return <div className="p-8 text-center text-text2">加载中...</div>
   if (!dish) return <div className="p-8 text-center text-text2">菜品不存在</div>
 
@@ -227,8 +230,8 @@ export default function DishDetail() {
         subtitle={dish.name}
         onBack={() => navigate(-1)}
         actions={
-          isLoggedIn && (
-            <HeaderIconButton onClick={() => navigate(`/admin/dishes/${dishId}`)} aria-label="编辑菜品">
+          dish.access?.can_edit && (
+            <HeaderIconButton onClick={() => navigate(user?.role === "admin" && dish.owner_id === 0 && dish.family_id === 0 ? `/admin/dishes/${dishId}` : `/dishes/${dishId}/edit`)} aria-label="编辑菜品">
               <Pencil size={17} strokeWidth={2.3} />
             </HeaderIconButton>
           )
@@ -349,12 +352,12 @@ export default function DishDetail() {
 
         {(ingredients.length > 0 || seasonings.length > 0) && (
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
               <div className="text-[15px] font-bold flex items-center gap-2"><span className="text-base">🥬</span> 食材</div>
               <div className="flex items-center gap-1 bg-bg rounded-full px-1 py-0.5 border border-border">
                 {[1, 2, 3, 4].map((s) => (
-                  <button key={s} onClick={() => setPortionScale(s)}
-                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all ${portionScale === s ? "bg-primary text-white" : "text-text3 active:bg-primary-light"}`}>
+                  <button key={s} onClick={() => setPortionScale(s)} aria-pressed={portionScale === s}
+                    className={`min-h-11 min-w-11 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all ${portionScale === s ? "bg-primary text-white" : "text-text3 active:bg-primary-light"}`}>
                     {s}人份
                   </button>
                 ))}
@@ -363,7 +366,7 @@ export default function DishDetail() {
             {ingredients.length > 0 && (
               <div className="mb-3">
                 <div className="text-[12px] text-text3 font-semibold mb-1.5">配料</div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 min-[480px]:grid-cols-3 gap-2">
                   {ingredients.map((ing, i) => (
                     <IngredientCard key={`ing-${i}`} ing={ing} scale={portionScale} />
                   ))}
@@ -373,7 +376,7 @@ export default function DishDetail() {
             {seasonings.length > 0 && (
               <div>
                 <div className="text-[12px] text-text3 font-semibold mb-1.5">调料</div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 min-[480px]:grid-cols-3 gap-2">
                   {seasonings.map((s, i) => (
                     <IngredientCard key={`sea-${i}`} ing={s} scale={portionScale} />
                   ))}
@@ -409,7 +412,8 @@ export default function DishDetail() {
                         toast("🔊 正在播报...")
                       }
                     }}
-                    className="flex-shrink-0 w-8 h-8 rounded-full bg-mint-light text-mint flex items-center justify-center text-sm active:bg-mint active:text-white transition-all mt-1"
+                    aria-label={`朗读第${i + 1}步`}
+                    className="flex-shrink-0 w-11 h-11 rounded-full bg-mint-light text-mint flex items-center justify-center text-sm active:bg-mint active:text-white transition-all mt-1"
                   >▶</button>
                 </div>
               ))}

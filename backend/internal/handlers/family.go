@@ -97,7 +97,7 @@ func InviteFamilyMember(c *gin.Context) {
 	link := strings.TrimRight(base, "/") + "/family#invite=" + token
 	var family models.Family
 	database.DB.First(&family, invite.FamilyID)
-	appName := database.GetSetting("app_name", "ss-menu")
+	appName := database.GetSetting("app_name", "arre食谱推荐小助手")
 	message := fmt.Sprintf(
 		"<p>%s 邀请你加入「%s」家庭，一起安排菜单、管理买菜清单。</p><p><a href=\"%s\">接受邀请</a></p><p>邀请 7 天内有效，只能由 %s 登录后接受。</p>",
 		html.EscapeString(appName), html.EscapeString(family.Name), html.EscapeString(link), html.EscapeString(invite.Email),

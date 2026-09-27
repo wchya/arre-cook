@@ -1,0 +1,23 @@
+.about-content { padding-bottom: calc(40rpx + env(safe-area-inset-bottom)); }
+.about-hero { padding: 56rpx 0; border-bottom: 1px solid var(--border); }
+.about-logo { display: block; width: 128rpx; height: 128rpx; margin-bottom: 40rpx; }
+.about-name { color: var(--primary); font-size: 28rpx; font-weight: 600; }
+.about-title { max-width: 580rpx; margin-top: 24rpx; color: var(--text); font-size: 54rpx; font-weight: 800; line-height: 1.4; }
+.about-intro { margin-top: 28rpx; color: var(--text2); font-size: 28rpx; line-height: 1.9; }
+.about-section { padding: 48rpx 0; }
+.about-heading { margin-bottom: 32rpx; color: var(--text); font-size: 36rpx; font-weight: 700; }
+.about-feature { display: flex; align-items: flex-start; gap: 28rpx; }
+.about-feature + .about-feature { margin-top: 40rpx; }
+.about-icon { display: flex; align-items: center; justify-content: center; width: 88rpx; height: 88rpx; flex-shrink: 0; border-radius: 28rpx; background: var(--primary-light); }
+.about-label { color: var(--text); font-size: 28rpx; font-weight: 600; line-height: 1.5; }
+.about-text { margin-top: 10rpx; color: var(--text2); font-size: 27rpx; line-height: 1.8; }
+.about-start { padding: 32rpx; }
+.about-start .about-heading { margin-bottom: 8rpx; }
+.about-step { display: flex; align-items: center; gap: 24rpx; min-height: 44px; padding: 28rpx 0; }
+.about-step + .about-step { border-top: 1px solid var(--border); }
+.about-number { align-self: flex-start; padding-top: 4rpx; color: var(--primary); font-size: 28rpx; font-weight: 600; }
+.about-step-desc { margin-top: 8rpx; color: var(--text2); font-size: 24rpx; line-height: 1.6; }
+.about-question + .about-question { margin-top: 32rpx; }
+.about-footer { padding-top: 28rpx; border-top: 1px solid var(--border); color: var(--text3); font-size: 24rpx; line-height: 1.7; }
+.about-links { display: flex; flex-wrap: wrap; gap: 0 36rpx; color: var(--primary); }
+.about-links > view { display: flex; align-items: center; min-height: 44px; text-decoration: underline; }

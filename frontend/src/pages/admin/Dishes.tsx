@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from "react"
+import RequestState from "@/components/RequestState"
+import { useMemo, useState, useCallback, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { dishesApi, settingsApi } from "@/api"
@@ -47,11 +48,11 @@ export default function AdminDishes() {
   if (filterDifficulty) params.difficulty = filterDifficulty
   if (filterEnabled) params.enabled = filterEnabled
 
-  const { data: dishesData, isLoading } = useQuery({
+  const { data: dishesData, isLoading , error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["admin", "dishes", params],
     queryFn: () => dishesApi.list(params),
   })
-  const dishes = dishesData?.items || []
+  const dishes = useMemo(() => dishesData?.items || [], [dishesData])
   const total = dishesData?.total || 0
   const totalPages = Math.ceil(total / pageSize)
 
@@ -125,6 +126,8 @@ export default function AdminDishes() {
     { key: "true", label: "启用" },
     { key: "false", label: "禁用" },
   ]
+
+  if (loadError) return <div><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   return (
     <div className="py-4 max-w-[640px] mx-auto pb-20">

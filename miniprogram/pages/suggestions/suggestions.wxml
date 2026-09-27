@@ -1,8 +1,9 @@
 <nav-bar icon="inbox" title="AI 建议" subtitle="由你决定是否采纳">
   <view class="toggle" hover-class="tap-active" bindtap="toggleHistory"><icon name="{{history ? 'inbox' : 'history'}}" size="26" stroke="2.4" color="text2" /><text>{{history ? '待处理' : '历史'}}</text></view>
 </nav-bar>
+<request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
-<view class="content anim-fade-up">
+<view wx:if="{{!loadError}}" class="content anim-fade-up">
   <view wx:if="{{loading}}" class="skeleton sk"></view>
   <view wx:elif="{{!items.length}}" class="card">
     <empty emoji="📬" title="{{history ? '还没有建议记录' : '暂时没有待处理建议'}}" desc="第三方智能体推送的菜单会出现在这里" compact>

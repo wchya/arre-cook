@@ -41,9 +41,19 @@ func SpiceLevelLabel(level int) string {
 }
 
 func GetPreferences(uid uint) Preferences {
+	preferences, _ := LoadPreferences(uid)
+	return preferences
+}
+
+// LoadPreferences distinguishes missing preferences from storage failures for guarded AI requests.
+func LoadPreferences(uid uint) (Preferences, error) {
 	var row models.UserPreference
 	if err := database.DB.Where("user_id = ?", uid).First(&row).Error; err != nil {
-		return Preferences{AvoidIngredients: []string{}, Allergies: []string{}, FavoriteTastes: []string{}, SpiceLevel: -1}
+		fallback := Preferences{AvoidIngredients: []string{}, Allergies: []string{}, FavoriteTastes: []string{}, SpiceLevel: -1}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fallback, nil
+		}
+		return fallback, err
 	}
 	return Preferences{
 		AvoidIngredients: parseStringArray(row.AvoidIngredients),
@@ -55,7 +65,7 @@ func GetPreferences(uid uint) Preferences {
 		Goals:            row.Goals,
 		Notes:            row.Notes,
 		UpdatedAt:        row.UpdatedAt,
-	}
+	}, nil
 }
 
 // PreferencesPatch 部分更新：nil 字段保持不变（智能体可以只改其中一项）。
@@ -186,7 +196,7 @@ func MarkFavorite(uid uint, dish *models.Dish) {
 // FindVisibleDish 按 ID 取当前用户可见的菜品（公共或本人私有）。
 func FindVisibleDish(uid uint, id any) (models.Dish, error) {
 	var dish models.Dish
-	err := database.DB.Scopes(database.VisibleDishes(uid)).First(&dish, id).Error
+	err := database.DB.Scopes(database.VisibleDishes(uid)).Where("id = ?", id).First(&dish).Error
 	return dish, err
 }
 

@@ -1,6 +1,7 @@
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 import { gsap, motionDuration, useGSAP } from "@/lib/gsap"
+import { useDialog } from "@/lib/use-dialog"
 
 type BottomSheetControls = { close: () => void }
 
@@ -9,6 +10,7 @@ interface AnimatedBottomSheetProps {
   onClose: () => void
   className?: string
   zIndexClass?: string
+  label?: string
 }
 
 export default function AnimatedBottomSheet({
@@ -16,6 +18,7 @@ export default function AnimatedBottomSheet({
   onClose,
   className = "",
   zIndexClass = "z-[200]",
+  label = "操作面板",
 }: AnimatedBottomSheetProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -42,13 +45,32 @@ export default function AnimatedBottomSheet({
       .to(rootRef.current, { autoAlpha: 0, duration: motionDuration(0.18) }, 0)
   })
 
+  useDialog(sheetRef, close)
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const root = rootRef.current
+    if (!viewport || !root) return
+    const resize = () => {
+      root.style.height = `${viewport.height}px`
+      root.style.top = `${viewport.offsetTop}px`
+    }
+    resize()
+    viewport.addEventListener("resize", resize)
+    viewport.addEventListener("scroll", resize)
+    return () => { viewport.removeEventListener("resize", resize); viewport.removeEventListener("scroll", resize) }
+  }, [])
+
   return createPortal(
-    <div ref={rootRef} className={`fixed inset-0 ${zIndexClass} flex items-end justify-center`} onClick={close}>
+    <div ref={rootRef} data-dialog-root className={`fixed inset-0 ${zIndexClass} flex items-end justify-center`} onClick={close}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[3px]" />
       <div
         ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-[640px] border-t border-glass-border glass-strong shadow-[0_-12px_40px_rgba(26,26,46,.14)] will-change-transform ${className}`}
+        className={`app-sheet relative w-full max-w-[640px] border-t border-border bg-card shadow-[0_-12px_40px_rgba(26,26,46,.14)] will-change-transform ${className}`}
       >
         {typeof children === "function" ? children({ close }) : children}
       </div>

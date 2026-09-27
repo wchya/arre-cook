@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { achievementsApi } from "@/api"
@@ -14,7 +15,7 @@ function formatUnlockedAt(value?: string | null) {
 export default function Achievements() {
   const navigate = useNavigate()
 
-  const { data: rawAchievements } = useQuery({ queryKey: ["achievements"], queryFn: () => achievementsApi.list() })
+  const { data: rawAchievements , error: loadError, refetch: retryLoad, isLoading: pageLoading } = useQuery({ queryKey: ["achievements"], queryFn: () => achievementsApi.list() })
   const achievements = Array.isArray(rawAchievements) ? rawAchievements : []
 
   const unlockedCount = achievements.filter((a: Achievement) => a.is_unlocked).length
@@ -25,6 +26,10 @@ export default function Achievements() {
     if (a.is_unlocked !== b.is_unlocked) return a.is_unlocked ? -1 : 1
     return a.id - b.id
   })
+
+  if (loadError) return <div><PageHeader title="成就墙" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
+
+  if (pageLoading) return <div><PageHeader title="成就墙" onBack={() => navigate(-1)} /><RequestState /></div>
 
   return (
     <div className="animate-fadeUp">

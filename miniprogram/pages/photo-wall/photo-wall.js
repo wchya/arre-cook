@@ -30,6 +30,7 @@ Page({
 
   async load() {
     if (this._loading) return
+    this.setData({ loadError: "", loading: true })
     this._loading = true
     this.setData({ loading: !this.data.days.length })
     try {
@@ -38,6 +39,7 @@ Page({
       this.setData({ days, totalDays: data.total_days || days.length, totalPhotos: data.total_photos || 0 })
       this._loadedOnce = true
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       ui.toast(error.message || "照片墙暂时无法加载")
     } finally {
       this._loading = false

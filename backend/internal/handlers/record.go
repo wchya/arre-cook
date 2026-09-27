@@ -57,10 +57,16 @@ func GetRecords(c *gin.Context) {
 	}
 
 	var total int64
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		utils.InternalError(c, "用餐记录加载失败")
+		return
+	}
 
 	var records []models.MealRecord
-	query.Order("meal_date DESC, created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&records)
+	if err := query.Order("meal_date DESC, created_at DESC, id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&records).Error; err != nil {
+		utils.InternalError(c, "用餐记录加载失败")
+		return
+	}
 
 	ids := make([]uint, 0, len(records))
 	seen := map[uint]bool{}

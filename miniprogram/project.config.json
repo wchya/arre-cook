@@ -3,7 +3,7 @@
   "compileType": "miniprogram",
   "libVersion": "3.7.12",
   "miniprogramRoot": "./",
-  "projectname": "ss-menu",
+  "projectname": "arre食谱推荐小助手",
   "setting": {
     "checkSiteMap": false,
     "coverView": true,

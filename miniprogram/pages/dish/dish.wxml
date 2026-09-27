@@ -9,9 +9,10 @@
     <icon name="{{pendingRequestId ? 'clock-3' : 'trash-2'}}" size="32" stroke="2.3" color="{{pendingRequestId ? 'text3' : 'text2'}}" />
   </view>
 </nav-bar>
+<request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
 <!-- 加载中骨架 -->
-<view wx:if="{{loading}}" class="detail-skeleton">
+<view wx:elif="{{loading}}" class="detail-skeleton">
   <view class="skeleton hero-skeleton" style="height:{{heroHeight}}rpx;"></view>
   <view class="detail">
     <view class="skeleton sk-title"></view>

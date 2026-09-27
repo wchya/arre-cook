@@ -1,6 +1,7 @@
+import RequestState from "@/components/RequestState"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { adminNotificationsApi, settingsApi, shoppingCategoriesApi, errorMessage } from "@/api"
+import { adminApi, adminNotificationsApi, shoppingCategoriesApi, errorMessage } from "@/api"
 import { asString } from "@/lib/utils"
 import { useAppInfoStore } from "@/store/useAppInfoStore"
 import type { ShoppingCategoryOverride } from "@/types"
@@ -8,35 +9,25 @@ import toast from "react-hot-toast"
 
 const shoppingCategories = ["蔬菜", "肉类", "配料", "其他"]
 
-function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
+function SettingRow({ label, children, stacked = false }: { label: string; children: React.ReactNode; stacked?: boolean }) {
   return (
-    <button
-      onClick={onChange}
-      className={`w-11 h-6 rounded-xl relative cursor-pointer transition-all flex-shrink-0 ${value ? "bg-primary" : "bg-border2"}`}
-    >
-      <div className={`absolute top-[2px] w-5 h-5 rounded-full bg-white shadow-sm transition-all ${value ? "left-[22px]" : "left-[2px]"}`} />
-    </button>
-  )
-}
-
-function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between py-3 border-b border-border/60 last:border-b-0">
+    <div className={`flex gap-3 py-3 border-b border-border/60 last:border-b-0 ${stacked ? "flex-col" : "flex-wrap items-center justify-between"}`}>
       <div className="text-sm font-medium text-text">{label}</div>
-      <div className="flex items-center gap-3">{children}</div>
+      <div className="flex min-w-0 items-center gap-3">{children}</div>
     </div>
   )
 }
 
 export default function AdminSettings() {
   const qc = useQueryClient()
-  const { data: settings, isLoading } = useQuery({ queryKey: ["settings"], queryFn: () => settingsApi.get() })
+  const { data: settings, isLoading , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["admin-site-settings"], queryFn: () => adminApi.settings() })
 
   const [repeatDays, setRepeatDays] = useState<string | null>(null)
   const [lunchPerDay, setLunchPerDay] = useState<string | null>(null)
   const [dinnerPerDay, setDinnerPerDay] = useState<string | null>(null)
   const [appName, setAppName] = useState<string | null>(null)
-  const [agentEmbedUrl, setAgentEmbedUrl] = useState<string | null>(null)
+  const [siteLimit, setSiteLimit] = useState<string | null>(null)
+  const [assistantLimit, setAssistantLimit] = useState<string | null>(null)
   const [shoppingItemName, setShoppingItemName] = useState("")
   const [shoppingCategory, setShoppingCategory] = useState("蔬菜")
   const [noticeType, setNoticeType] = useState("system_update")
@@ -44,21 +35,23 @@ export default function AdminSettings() {
   const [noticeContent, setNoticeContent] = useState("")
   const storedAppName = useAppInfoStore((s) => s.appName)
   const updateAppName = useAppInfoStore((s) => s.setAppName)
-  const storedAgentEmbedUrl = useAppInfoStore((s) => s.agentEmbedUrl)
-  const updateAgentEmbedUrl = useAppInfoStore((s) => s.setAgentEmbedUrl)
 
   const updateMut = useMutation({
-    mutationFn: (s: Record<string, string>) => settingsApi.update(s),
+    mutationFn: (s: Record<string, string>) => adminApi.updateSettings(s),
     onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["admin-site-settings"] })
       qc.invalidateQueries({ queryKey: ["settings"] })
       if (variables.app_name !== undefined) {
-        updateAppName(variables.app_name || "ss-menu")
+        updateAppName(variables.app_name || "arre食谱推荐小助手")
       }
-      if (variables.agent_embed_url !== undefined) {
-        updateAgentEmbedUrl(variables.agent_embed_url)
+      if (variables.assistant_daily_limit !== undefined || variables.assistant_site_daily_limit !== undefined) {
+        if (variables.assistant_daily_limit !== undefined) setAssistantLimit(null)
+        if (variables.assistant_site_daily_limit !== undefined) setSiteLimit(null)
+        void qc.invalidateQueries({ queryKey: ["assistant-status"] })
       }
       toast.success("已保存")
     },
+    onError: (error) => toast.error(errorMessage(error, "保存失败")),
   })
 
   const { data: categoryOverrides = [] } = useQuery({
@@ -106,6 +99,8 @@ export default function AdminSettings() {
     saveCategoryMut.mutate({ item_name: itemName, category: shoppingCategory })
   }
 
+  if (loadError) return <div><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
+
   if (isLoading) return <div className="p-8 text-center text-text2">加载中...</div>
 
   return (
@@ -114,19 +109,20 @@ export default function AdminSettings() {
         <div className="text-[13px] font-semibold text-text2 mb-1">基本设置</div>
         <div className="text-[11px] text-text3 mb-2">应用名称与显示偏好</div>
 
-        <SettingRow label="应用名称">
-          <div className="flex items-center gap-2">
+        <SettingRow label="应用名称" stacked>
+          <div className="flex w-full min-w-0 items-center gap-2">
             <input
               type="text"
+              aria-label="应用名称"
               value={appName !== null ? appName : asString(settings?.app_name, storedAppName)}
               onChange={(e) => setAppName(e.target.value)}
-              placeholder="ss-menu"
-              className="w-28 py-2 px-3 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none transition-all focus:border-primary text-right"
+              placeholder="arre食谱推荐小助手"
+              className="min-w-0 flex-1 py-2 px-3 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none transition-all focus:border-primary"
             />
             <button
-              onClick={() => updateMut.mutate({ app_name: (appName !== null ? appName : asString(settings?.app_name, "ss-menu")) || "ss-menu" })}
+              onClick={() => updateMut.mutate({ app_name: (appName !== null ? appName : asString(settings?.app_name, "arre食谱推荐小助手")) || "arre食谱推荐小助手" })}
               disabled={updateMut.isPending}
-              className="px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
+              className="min-h-11 shrink-0 px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
             >
               保存
             </button>
@@ -151,19 +147,14 @@ export default function AdminSettings() {
                 updateMut.mutate({ repeat_days: v })
               }}
               disabled={updateMut.isPending}
-              className="px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
+              className="min-h-11 px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
             >
               保存
             </button>
           </div>
         </SettingRow>
 
-        <SettingRow label="语音播报">
-          <Toggle
-            value={settings?.voice_enabled !== "0"}
-            onChange={() => updateMut.mutate({ voice_enabled: settings?.voice_enabled === "1" ? "0" : "1" })}
-          />
-        </SettingRow>
+
 
       </div>
 
@@ -186,27 +177,39 @@ export default function AdminSettings() {
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="text-[13px] font-semibold text-text2 mb-1">AI 推荐官</div>
-        <div className="text-[11px] text-text3 mb-2">智能体嵌入页地址（如 https://agent.example.com/embed?agentId=100003&amp;mode=auto&amp;accent=amber）。填写后「AI 推荐官」页面会内嵌对话助手。</div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={agentEmbedUrl !== null ? agentEmbedUrl : asString(settings?.agent_embed_url, storedAgentEmbedUrl)}
-            onChange={(e) => setAgentEmbedUrl(e.target.value)}
-            placeholder="留空则不显示对话助手"
-            className="flex-1 min-w-0 py-2.5 px-3 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none transition-all focus:border-primary"
-          />
-          <button
-            onClick={() => updateMut.mutate({ agent_embed_url: (agentEmbedUrl !== null ? agentEmbedUrl : asString(settings?.agent_embed_url, storedAgentEmbedUrl)).trim() })}
-            disabled={updateMut.isPending}
-            className="px-4 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
-          >
-            保存
-          </button>
-        </div>
-        <div className="text-[11px] text-text3 mt-2 leading-relaxed">
-          外部智能体请由每位用户在「我的 → AI 连接」创建独立令牌，并按需授权。令牌只访问签发者自己的数据。
-        </div>
+        <h2 className="text-sm font-semibold text-text">AI 助手请求上限</h2>
+        <p className="mt-1 text-xs leading-relaxed text-text3">每个账号每天的提问次数，Web 与小程序共用。北京时间 00:00 重置，新建或删除对话不会清零。</p>
+        <SettingRow label="每人每日最多" stacked>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="number" inputMode="numeric" min={0} max={20} step={1} aria-label="AI 助手每日请求上限"
+              value={assistantLimit ?? asString(settings?.assistant_daily_limit, "20")}
+              onChange={(event) => setAssistantLimit(event.target.value)}
+              className="min-h-11 w-20 rounded-[10px] border border-border bg-bg px-3 text-sm outline-none focus:border-primary" />
+            <span className="text-sm text-text2">次</span>
+            <button disabled={updateMut.isPending} onClick={() => {
+              const value = assistantLimit ?? asString(settings?.assistant_daily_limit, "20")
+              if (!/^\d+$/.test(value) || Number(value) > 20) { toast.error("请输入 0–20 之间的整数"); return }
+              updateMut.mutate({ assistant_daily_limit: String(Number(value)) })
+            }} className="min-h-11 rounded-full bg-primary px-4 text-xs font-semibold text-white disabled:opacity-60">保存请求上限</button>
+          </div>
+        </SettingRow>
+        <p className="text-xs leading-relaxed text-text3">默认 20 次，最高 20 次；设为 0 可暂停请求。每条被助手接收的消息计 1 次，停止生成也会计入。调整上限立即生效，已用次数保留。</p>
+        <SettingRow label="全站每日总额度" stacked>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="number" inputMode="numeric" min={0} max={10000} step={1} aria-label="全站每日 AI 总额度"
+              value={siteLimit ?? asString(settings?.assistant_site_daily_limit, "200")}
+              onChange={(event) => setSiteLimit(event.target.value)}
+              className="min-h-11 w-24 rounded-[10px] border border-border bg-bg px-3 text-sm outline-none focus:border-primary" />
+            <span className="text-sm text-text2">次</span>
+            <button disabled={updateMut.isPending} onClick={() => {
+              const value = siteLimit ?? asString(settings?.assistant_site_daily_limit, "200")
+              if (!/^\d+$/.test(value) || Number(value) > 10000) { toast.error("请输入 0–10000 之间的整数"); return }
+              updateMut.mutate({ assistant_site_daily_limit: String(Number(value)) })
+            }} className="min-h-11 rounded-full bg-primary px-4 text-xs font-semibold text-white disabled:opacity-60">保存全站额度</button>
+          </div>
+        </SettingRow>
+        <p className="text-xs leading-relaxed text-text3">默认 200 次，用于控制全部账号的总消耗；设为 0 可暂停服务。单个账号仍最多 20 次。每人同时只处理 1 个问题，全站同时最多 4 个。</p>
+        <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-text3">内容检查始终启用：仅处理食谱与日常饮食；提问和回复经过检查后才进入下一步。资料或菜谱中的指令不能授权后台操作，删除操作需在对应页面确认。</p>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">
@@ -231,7 +234,7 @@ export default function AdminSettings() {
                 updateMut.mutate({ lunch_dishes_per_day: v })
               }}
               disabled={updateMut.isPending}
-              className="px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
+              className="min-h-11 px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
             >
               保存
             </button>
@@ -256,7 +259,7 @@ export default function AdminSettings() {
                 updateMut.mutate({ dinner_dishes_per_day: v })
               }}
               disabled={updateMut.isPending}
-              className="px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
+              className="min-h-11 px-3 rounded-full text-xs font-semibold bg-primary text-white disabled:opacity-60"
             >
               保存
             </button>

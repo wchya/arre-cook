@@ -9,7 +9,7 @@ import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
 import toast from "react-hot-toast"
 import {
   Bell, Bot, Camera, ChevronRight, Heart, Images, Inbox, LayoutDashboard, LogOut, NotebookPen, Plug, Salad, Shield,
-  ShoppingBasket, Sparkles, Trophy, UserRound, UsersRound, Activity, type LucideIcon,
+  ShoppingBasket, Sparkles, Trophy, UserRound, UsersRound, Activity, LoaderCircle, Info, type LucideIcon,
 } from "lucide-react"
 
 function Row({ icon: Icon, tone, title, desc, badge, onClick, right }: {
@@ -64,10 +64,11 @@ export default function Me() {
   const [editingName, setEditingName] = useState(false)
   const [nickname, setNickname] = useState("")
   const [repeatSheet, setRepeatSheet] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: () => statsApi.get() })
   const { data: pending = [] } = useQuery({ queryKey: ["suggestions", "pending"], queryFn: () => suggestionsApi.list("pending") })
-  const { data: notifications } = useQuery({ queryKey: ["notifications"], queryFn: () => notificationsApi.list({ pageSize: 1 }) })
+  const { data: notifications } = useQuery({ queryKey: ["notifications", "preview"], queryFn: () => notificationsApi.list({ pageSize: 1 }) })
   const { data: achievements = [] } = useQuery({ queryKey: ["achievements"], queryFn: () => achievementsApi.list() })
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: () => settingsApi.get() })
 
@@ -83,6 +84,7 @@ export default function Me() {
   const profileMut = useMutation({
     mutationFn: (data: { nickname?: string; avatar?: string }) => meApi.update(data),
     onSuccess: (u) => {
+      if (useAuthStore.getState().user?.id !== u.id) return
       setUser(u)
       toast.success("已更新")
       setEditingName(false)
@@ -93,12 +95,17 @@ export default function Me() {
   async function onAvatar(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ""
-    if (!file) return
+    if (!file || uploadingAvatar || profileMut.isPending) return
+    const accountId = user?.id
+    setUploadingAvatar(true)
     try {
       const res = await uploadApi.image(file)
+      if (useAuthStore.getState().user?.id !== accountId) return
       profileMut.mutate({ avatar: res.data.data.url })
     } catch (err) {
       toast.error(getUploadErrorMessage(err))
+    } finally {
+      setUploadingAvatar(false)
     }
   }
 
@@ -116,10 +123,10 @@ export default function Me() {
 
   return (
     <div className="animate-fadeUp">
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#FFE9DE] via-primary-light to-bg px-5 pb-6" style={{ paddingTop: "calc(20px + env(safe-area-inset-top))" }}>
+      <div className="relative overflow-hidden bg-gradient-to-br from-hero-warm via-primary-light to-bg px-5 pb-6" style={{ paddingTop: "calc(20px + env(safe-area-inset-top))" }}>
         <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-primary/15 blur-2xl" />
         <div className="relative mx-auto flex max-w-[640px] items-center gap-4">
-          <label htmlFor="avatar-upload" className="relative block shrink-0 cursor-pointer" aria-label="更换头像">
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploadingAvatar || profileMut.isPending} className="relative block shrink-0 cursor-pointer disabled:opacity-60" aria-label={uploadingAvatar ? "头像上传中" : "更换头像"} aria-busy={uploadingAvatar}>
             {user.avatar ? (
               <img src={user.avatar} alt="" className="h-[68px] w-[68px] rounded-[24px] object-cover shadow-[0_10px_24px_rgba(232,115,74,.25)] ring-4 ring-white/70" />
             ) : (
@@ -128,21 +135,23 @@ export default function Me() {
               </span>
             )}
             <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-card text-text2 shadow">
-              <Camera size={13} strokeWidth={2.4} />
+              {uploadingAvatar ? <LoaderCircle size={13} className="animate-spin" /> : <Camera size={13} strokeWidth={2.4} />}
             </span>
-          </label>
-          <input id="avatar-upload" ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={onAvatar} />
+          </button>
+          <input id="avatar-upload" ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onAvatar} />
           <div className="min-w-0 flex-1">
             <button onClick={() => { setNickname(user.nickname); setEditingName(true) }} className="flex max-w-full items-center gap-1.5 text-left">
               <span className="truncate text-[21px] font-black tracking-tight text-text">{user.nickname}</span>
               <NotebookPen size={14} className="shrink-0 text-text3" />
             </button>
+            <button type="button" aria-label="查看个人资料" onClick={() => navigate("/me/account")} className="block min-h-11 w-full text-left">
             <div className="mt-0.5 truncate text-[12px] text-text2">{user.email || user.username}</div>
             <div className="mt-1.5 flex gap-1.5">
               {user.role === "admin" && <span className="rounded-full bg-text px-2 py-0.5 text-[10px] font-bold text-bg">管理员</span>}
               {user.wechat_bound && <span className="rounded-full bg-mint-light px-2 py-0.5 text-[10px] font-bold text-mint">已绑定微信</span>}
               <span className="rounded-full bg-card/80 px-2 py-0.5 text-[10px] font-bold text-text2">🏆 {unlocked} 个成就</span>
             </div>
+            </button>
           </div>
         </div>
 
@@ -182,6 +191,7 @@ export default function Me() {
         </Group>
 
         <Group>
+          <Row icon={Info} tone="bg-bg text-text2" title="关于我们" desc="食谱站特色与使用指南" onClick={() => navigate("/about")} />
           <Row icon={Shield} tone="bg-bg text-text2" title="账号与安全" desc="密码、登录设备、导出与注销" onClick={() => navigate("/me/account")} />
           {user.role === "admin" && <Row icon={LayoutDashboard} tone="bg-text text-bg" title="管理后台" desc="菜谱、用户、AI 模型与站点设置" onClick={() => navigate("/admin/dashboard")} />}
         </Group>
@@ -201,13 +211,14 @@ export default function Me() {
       </div>
 
       {editingName && (
-        <AnimatedBottomSheet onClose={() => setEditingName(false)} className="rounded-t-3xl p-5 pb-8">
+        <AnimatedBottomSheet label="修改昵称" onClose={() => setEditingName(false)} className="rounded-t-3xl p-5 pb-8">
           {({ close }) => (
             <>
               <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border2" />
               <div className="mb-3 text-[17px] font-extrabold">修改昵称</div>
               <input
                 autoFocus
+                aria-label="昵称"
                 value={nickname}
                 maxLength={20}
                 onChange={(e) => setNickname(e.target.value)}

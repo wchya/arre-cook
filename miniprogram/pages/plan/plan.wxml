@@ -20,7 +20,8 @@
       </view>
     </view>
 
-    <view wx:if="{{weekLoading}}"><view wx:for="{{[1, 2]}}" wx:key="*this" class="skeleton day-sk"></view></view>
+    <request-state wx:if="{{weekError}}" error="{{weekError}}" bind:retry="loadWeek" />
+    <view wx:elif="{{weekLoading}}"><view wx:for="{{[1, 2]}}" wx:key="*this" class="skeleton day-sk"></view></view>
     <view wx:elif="{{!days.length}}" class="card"><empty emoji="📅" title="还没有一周菜单" desc="点“重新生成”，按口味自动排好 7 天午晚餐" compact /></view>
     <view wx:else class="days">
       <view wx:for="{{visibleDays}}" wx:key="date" class="card day {{item.quick ? 'is-quick' : ''}}" hover-class="{{item.quick ? 'tap-active' : 'none'}}" hover-stay-time="80" data-date="{{item.date}}" bindtap="openQuick">
@@ -46,7 +47,7 @@
         <view wx:if="{{!item.lunch.length && !item.dinner.length}}" class="t-xs c-text3">暂无菜品</view>
       </view>
     </view>
-    <view wx:if="{{days.length > 2}}" class="more-btn" hover-class="tap-active" bindtap="toggleAll">
+    <view wx:if="{{!weekError && !weekLoading && days.length > 2}}" class="more-btn" hover-class="tap-active" bindtap="toggleAll">
       <text>{{showAll ? '收起菜单' : '查看完整一周菜单'}}</text>
       <icon name="{{showAll ? 'chevron-up' : 'chevron-down'}}" size="28" stroke="2.4" color="mint-ink" />
     </view>
@@ -95,8 +96,9 @@
     </view>
 
     <view wx:if="{{shoppingLoading}}" class="skeleton day-sk"></view>
+    <request-state wx:elif="{{shoppingError}}" error="{{shoppingError}}" bind:retry="loadShopping" />
 
-    <block wx:if="{{!shoppingLoading && scope === 'personal'}}">
+    <block wx:if="{{!shoppingLoading && !shoppingError && scope === 'personal'}}">
       <view wx:if="{{!personalCats.length}}" class="card">
         <empty emoji="🧺" title="暂无买菜清单" desc="点菜后自动生成今日 + 明日食材" compact>
           <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="goDishes">去选菜</view>
@@ -118,7 +120,7 @@
       </view>
       <view wx:if="{{personalCats.length}}" class="tip-line">勾选表示已买；家里已有的食材点“库存”，之后生成的清单会自动跳过</view>
     </block>
-    <block wx:if="{{!shoppingLoading && scope === 'family'}}">
+    <block wx:if="{{!shoppingLoading && !shoppingError && scope === 'family'}}">
       <view wx:if="{{!familyCats.length && !familyManual.length}}" class="card">
         <empty emoji="🧺" title="家庭清单是空的" desc="在家庭菜单里点菜，食材会自动出现在这里" compact>
           <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="addFamilyItem">手动添加食材</view>

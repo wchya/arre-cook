@@ -5,7 +5,7 @@ import type {
   ShoppingCategory, ShoppingCategoryOverride, Holiday, Quote, DayRating, PhotoWall, DishRecordsResponse, DishCategoryCounts,
   FavoriteOverview, SmartPickRequest, SmartPickResult, TasteProfile, BehaviorEventInput, AuthOptions, LoginResult, User,
   Preferences, UserStats, AgentTokenList, AgentToken, AgentAuditLog, AgentSession, Suggestion, ChatSession, ChatMessage,
-  ChatCard, AssistantStatus, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
+  ChatCard, AssistantStatus, AssistantQuota, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
   FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport,
   NotificationPage,
   DishVideoMeta,
@@ -103,6 +103,9 @@ export const assistantApi = {
 }
 
 export type ChatEvent =
+  | { event: "status"; data: { message: string } }
+  | { event: "cards"; data: { cards: ChatCard[] } }
+  | { event: "quota"; data: AssistantQuota }
   | { event: "session"; data: { session_id: number; title: string } }
   | { event: "delta"; data: { text: string } }
   | { event: "tool_start"; data: { id: string; name: string; label: string } }
@@ -128,18 +131,22 @@ export async function streamChat(
     signal,
   })
   if (res.status === 401) {
-    window.dispatchEvent(new Event("auth-expired"))
+    if (token === getToken()) window.dispatchEvent(new Event("auth-expired"))
     throw new ApiError("登录已过期", 40100, 401)
   }
   if (!res.ok || !res.body) {
     let message = "AI 助手暂时不可用"
+    let code = -1
+    let data: unknown
     try {
       const j = await res.json()
       if (j?.message) message = j.message
+      code = j?.code ?? -1
+      data = j?.data
     } catch {
       /* ignore */
     }
-    throw new ApiError(message, -1, res.status)
+    throw new ApiError(message, code, res.status, data)
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -172,7 +179,7 @@ export type { ChatMessage }
 
 export const dishesApi = {
   list: (params?: Record<string, string>) => api<PaginatedData<Dish>>("GET", "/dishes", params),
-  categoryCounts: () => api<DishCategoryCounts & { mine: number }>("GET", "/dishes/category-counts"),
+  categoryCounts: (scope?: string) => api<DishCategoryCounts & { mine: number }>("GET", "/dishes/category-counts", scope ? { scope } : undefined),
   get: (id: number) => api<Dish>("GET", `/dishes/${id}`),
   records: (id: number) => api<DishRecordsResponse>("GET", `/dishes/${id}/records`),
   create: (data: DishInput) => api<Dish>("POST", "/dishes", data),
@@ -210,6 +217,17 @@ export const behaviorApi = {
 
 export const recordsApi = {
   list: (params?: Record<string, string>) => api<PaginatedData<MealRecord>>("GET", "/records", params),
+  forDates: async (from: string, to: string): Promise<PaginatedData<MealRecord>> => {
+    const params = { date_from: from, date_to: to, pageSize: "100" }
+    const first = await api<PaginatedData<MealRecord>>("GET", "/records", params)
+    const items = [...first.items]
+    for (let page = 2; items.length < first.total; page++) {
+      const next = await api<PaginatedData<MealRecord>>("GET", "/records", { ...params, page: String(page) })
+      if (!next.items.length) break
+      items.push(...next.items)
+    }
+    return { ...first, items: Array.from(new Map(items.map((item) => [item.id, item])).values()) }
+  },
   create: (data: Partial<MealRecord>) => api<MealRecord>("POST", "/records", data),
   batchCreate: (data: Partial<MealRecord>[]) =>
     api<{ created: MealRecord[]; skipped: number; total: number }>("POST", "/records/batch", { records: data }),

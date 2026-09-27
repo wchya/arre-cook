@@ -29,8 +29,8 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .day-panel__head { display: flex; align-items: center; justify-content: space-between; padding: 24rpx 32rpx; background: var(--primary-light); color: var(--primary); font-size: 28rpx; font-weight: 600; }
 .tag-today { padding: 2rpx 12rpx; border-radius: 999rpx; background: var(--primary); color: #fff; font-size: 20rpx; font-weight: 500; }
 .tag-mood { padding: 2rpx 12rpx; border-radius: 999rpx; background: var(--card); color: var(--primary); font-size: 20rpx; font-weight: 500; }
-.rate-btn { flex-shrink: 0; padding: 4rpx 20rpx; border-radius: 999rpx; background: var(--primary); color: #fff; font-size: 22rpx; font-weight: 600; }
-.rate-btn.is-done { background: var(--mint); }
+.rate-btn { display: flex; align-items: center; min-height: 44px; flex-shrink: 0; padding: 4rpx 20rpx; border-radius: 999rpx; background: var(--primary); color: #fff; font-size: 22rpx; font-weight: 600; }
+.rate-btn.is-done { background: var(--mint-action); }
 .day-panel__empty { padding: 40rpx 32rpx; color: var(--text3); font-size: 26rpx; text-align: center; }
 
 /* 左滑删除 */

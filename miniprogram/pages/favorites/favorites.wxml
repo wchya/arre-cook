@@ -1,6 +1,7 @@
 <nav-bar icon="heart" title="收藏" subtitle="按自己的口味重新整理菜单" />
+<request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
-<view class="content anim-fade-up">
+<view wx:if="{{!loadError}}" class="content anim-fade-up">
   <view wx:if="{{loading}}">
     <view class="skeleton sk-hero"></view>
     <view wx:for="{{[1, 2, 3, 4]}}" wx:key="*this" class="skeleton sk-row"></view>

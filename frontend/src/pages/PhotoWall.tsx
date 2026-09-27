@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
@@ -126,7 +127,7 @@ function MemoryDay({ day, onOpen }: { day: PhotoWallDay; onOpen: (photos: string
 
 export default function PhotoWall() {
   const navigate = useNavigate()
-  const { data, isLoading } = useQuery({ queryKey: ["photo-wall"], queryFn: () => photoWallApi.get() })
+  const { data, isLoading , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["photo-wall"], queryFn: () => photoWallApi.get() })
 
   const [viewerPhotos, setViewerPhotos] = useState<string[]>([])
   const [viewerIdx, setViewerIdx] = useState(0)
@@ -139,6 +140,8 @@ export default function PhotoWall() {
   }
 
   const days = useMemo(() => data?.days || [], [data])
+
+  if (loadError) return <div><PageHeader title="照片墙" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   return (
     <div className="animate-fadeUp">

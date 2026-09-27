@@ -1,7 +1,7 @@
 {
-  "name": "ss-menu",
-  "short_name": "ss-menu",
-  "description": "今天吃什么？让 ss-menu 帮你决定",
+  "name": "arre食谱推荐小助手",
+  "short_name": "arre食谱推荐小助手",
+  "description": "今天吃什么？让 arre食谱推荐小助手 帮你决定",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFF8F0",

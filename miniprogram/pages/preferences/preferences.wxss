@@ -8,11 +8,11 @@
 .spice.time { min-height: 88rpx; font-size: 22rpx; }
 .spice.is-mint { border-color: var(--mint); background: var(--mint-light); color: var(--mint-ink); }
 .spice__emoji { font-size: 30rpx; line-height: 1.2; }
-.pill { padding: 12rpx 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); color: var(--text2); font-size: 24rpx; font-weight: 600; transition: all .2s ease; }
-.pill--pink { border-color: var(--pink); background: var(--pink); color: #fff; }
+.pill { display: flex; align-items: center; min-height: 44px; padding: 12rpx 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); color: var(--text2); font-size: 24rpx; font-weight: 600; transition: all .2s ease; }
+.pill--pink { border-color: var(--pink-action); background: var(--pink-action); color: #fff; }
 .pill--purple { border-color: var(--purple); background: var(--purple-light); color: var(--purple); }
 .household { display: flex; align-items: center; gap: 24rpx; }
-.household__btn { display: flex; align-items: center; justify-content: center; width: 80rpx; height: 80rpx; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); }
+.household__btn { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); }
 .household__btn.is-off { opacity: .4; }
 .household__value { min-width: 144rpx; color: var(--text); font-size: 36rpx; font-weight: 900; text-align: center; }
 .bottom-space { height: calc(180rpx + env(safe-area-inset-bottom)); }

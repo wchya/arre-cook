@@ -20,9 +20,12 @@ Page({
   },
 
   async load() {
+    const requestId = this._loadRequest = (this._loadRequest || 0) + 1
+    this.setData({ loadError: "", loading: true })
     this.setData({ loading: !this.data.items.length })
     try {
       const list = await api.get("/suggestions", { status: this.data.history ? "all" : "pending" })
+      if (requestId !== this._loadRequest) return
       const items = (list || []).map((item) => ({
         id: item.id,
         title: item.title,
@@ -36,9 +39,11 @@ Page({
       }))
       this.setData({ items })
     } catch (error) {
+      if (requestId !== this._loadRequest) return
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       ui.toast(error.message || "建议暂时无法加载")
     } finally {
-      this.setData({ loading: false })
+      if (requestId === this._loadRequest) this.setData({ loading: false })
     }
   },
 

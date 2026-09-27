@@ -1,8 +1,9 @@
 <nav-bar icon="trophy" title="成就墙" subtitle="记录你一起解锁的小目标">
   <text class="nav-meta">{{unlocked}}/{{total}}</text>
 </nav-bar>
+<request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
-<view class="content anim-fade-up">
+<view wx:if="{{!loadError}}" class="content anim-fade-up">
   <view class="card card-pad progress-card">
     <view class="flex items-end justify-between mb-16">
       <view>

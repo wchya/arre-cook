@@ -112,7 +112,7 @@
   <view class="picker-head">
     <view class="field input-sm">
       <icon name="search" size="30" stroke="2.35" color="text3" />
-      <input class="field-input picker-input" value="{{pickerSearch}}" placeholder="搜索菜名、分类、配料" placeholder-class="placeholder" bindinput="onPickerSearch" />
+      <input adjust-position="{{false}}" class="field-input picker-input" value="{{pickerSearch}}" placeholder="搜索菜名、分类、配料" placeholder-class="placeholder" bindinput="onPickerSearch" />
     </view>
     <scroll-view class="picker-cats" scroll-x enhanced show-scrollbar="{{false}}">
       <view wx:for="{{pickerCategories}}" wx:key="*this" class="picker-cat {{pickerCategory === item ? 'is-active' : ''}}" data-name="{{item}}" hover-class="tap-active" hover-stay-time="60" bindtap="choosePickerCategory">{{item}}</view>

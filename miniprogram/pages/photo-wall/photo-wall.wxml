@@ -1,8 +1,9 @@
 <nav-bar icon="images" title="照片墙" subtitle="把饭桌上的片刻收起来">
   <text wx:if="{{totalPhotos}}" class="meta-pill">{{totalDays}} 天 · {{totalPhotos}} 张</text>
 </nav-bar>
+<request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
-<view class="content anim-fade-up">
+<view wx:if="{{!loadError}}" class="content anim-fade-up">
   <view wx:if="{{loading}}" class="tl">
     <view wx:for="{{[0,1,2]}}" wx:key="*this" class="tl-item">
       <view class="skeleton sk-title"></view>

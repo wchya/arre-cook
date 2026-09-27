@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"math/rand"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
@@ -48,8 +49,12 @@ func canEditDish(c *gin.Context, d *models.Dish) bool {
 
 func findEditableDish(c *gin.Context) (*models.Dish, bool) {
 	var dish models.Dish
-	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).First(&dish, c.Param("id")).Error; err != nil {
-		utils.NotFound(c, "菜品不存在")
+	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).Where("id = ?", c.Param("id")).First(&dish).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.NotFound(c, "菜品不存在")
+		} else {
+			utils.InternalError(c, "菜谱加载失败，请稍后重试")
+		}
 		return nil, false
 	}
 	if !canEditDish(c, &dish) {
@@ -101,17 +106,26 @@ func GetDishes(c *gin.Context) {
 	}
 
 	var total int64
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		utils.InternalError(c, "菜谱加载失败，请稍后重试")
+		return
+	}
 
 	var dishes []models.Dish
 	if isRandom {
-		query.Find(&dishes)
+		if err := query.Find(&dishes).Error; err != nil {
+			utils.InternalError(c, "菜谱加载失败，请稍后重试")
+			return
+		}
 		rand.Shuffle(len(dishes), func(i, j int) { dishes[i], dishes[j] = dishes[j], dishes[i] })
 		if len(dishes) > pageSize {
 			dishes = dishes[:pageSize]
 		}
 	} else {
-		query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&dishes)
+		if err := query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&dishes).Error; err != nil {
+			utils.InternalError(c, "菜谱加载失败，请稍后重试")
+			return
+		}
 	}
 	services.MarkFavorites(uid(c), dishes)
 	utils.SuccessPaginated(c, dishes, total, page, pageSize)
@@ -120,7 +134,11 @@ func GetDishes(c *gin.Context) {
 func GetDish(c *gin.Context) {
 	dish, err := services.FindVisibleDish(uid(c), c.Param("id"))
 	if err != nil {
-		utils.NotFound(c, "菜品不存在")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.NotFound(c, "菜品不存在")
+		} else {
+			utils.InternalError(c, "菜谱加载失败，请稍后重试")
+		}
 		return
 	}
 	services.MarkFavorite(uid(c), &dish)
@@ -191,6 +209,10 @@ func CreateDish(c *gin.Context) {
 		utils.BadRequest(c, "菜名不能为空")
 		return
 	}
+	if err := req.validate(); err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
 	dish := models.Dish{Enabled: true, OwnerID: uid(c)}
 	if req.Public && isAdmin(c) {
 		dish.OwnerID = 0
@@ -236,6 +258,10 @@ func UpdateDish(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
+	if err := req.validate(); err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
 	oldVideoURL := dish.VideoURL
 	req.apply(dish)
 	if dish.VideoURL != oldVideoURL {
@@ -252,7 +278,7 @@ func UpdateDish(c *gin.Context) {
 
 func DeleteDish(c *gin.Context) {
 	var dish models.Dish
-	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).First(&dish, c.Param("id")).Error; err != nil {
+	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).Where("id = ?", c.Param("id")).First(&dish).Error; err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
@@ -322,16 +348,27 @@ type CategoryCount struct {
 
 func GetDishCategoryCounts(c *gin.Context) {
 	var counts []CategoryCount
-	database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c))).
+	query := dishScope(c)
+	if c.Query("scope") != "mine" {
+		query = query.Where("enabled = ?", true)
+	}
+	if err := query.
 		Select("category, count(*) as count").
-		Where("enabled = ?", true).
 		Group("category").
 		Order("count DESC").
-		Find(&counts)
+		Find(&counts).Error; err != nil {
+		utils.InternalError(c, "分类统计加载失败")
+		return
+	}
 
 	var total, mine int64
-	database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c))).Where("enabled = ?", true).Count(&total)
-	database.DB.Model(&models.Dish{}).Where("owner_id = ? AND family_id = 0", uid(c)).Count(&mine)
+	for _, category := range counts {
+		total += category.Count
+	}
+	if err := database.DB.Model(&models.Dish{}).Where("owner_id = ? AND family_id = 0", uid(c)).Count(&mine).Error; err != nil {
+		utils.InternalError(c, "分类统计加载失败")
+		return
+	}
 
 	utils.Success(c, gin.H{"total": total, "mine": mine, "categories": counts})
 }

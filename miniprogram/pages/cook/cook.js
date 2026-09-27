@@ -49,6 +49,7 @@ Page({
   },
 
   async load() {
+    this.setData({ loadError: "", loading: true })
     try {
       const dish = await api.get(`/dishes/${this.data.id}`)
       const steps = dishUtil.normalizeSteps(dish.steps).map((step, index) => ({
@@ -61,6 +62,7 @@ Page({
       this.setData({ name: dish.name, steps, loading: false, current })
       this.prepareStep(current)
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       this.setData({ loading: false })
       ui.toast(error.message || "菜谱加载失败")
     }

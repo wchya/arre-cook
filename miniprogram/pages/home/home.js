@@ -83,7 +83,7 @@ Page({
   onShareAppMessage() {
     const dish = this.data.current
     if (dish) return { title: `今天就吃「${dish.name}」吧`, path: `/pages/dish/dish?id=${dish.id}`, imageUrl: dish.cover || undefined }
-    return { title: "ss-menu · 今天吃什么", path: "/pages/home/home" }
+    return { title: "arre食谱推荐小助手 · 今天吃什么", path: "/pages/home/home" }
   },
 
   async boot() {

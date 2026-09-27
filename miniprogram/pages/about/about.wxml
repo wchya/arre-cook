@@ -1,0 +1,32 @@
+<nav-bar title="关于我们" subtitle="认识你的日常饮食小帮手" />
+<view class="content about-content">
+  <view class="about-hero">
+    <image src="/assets/chef-mark.svg" class="about-logo" mode="aspectFit" />
+    <view class="about-name">{{content.name}}</view>
+    <view class="about-title"><view wx:for="{{taglineLines}}" wx:key="*this">{{item}}</view></view>
+    <view class="about-intro">{{content.intro}}</view>
+  </view>
+  <view class="about-section">
+    <view class="about-heading">在这里，你可以</view>
+    <view wx:for="{{content.features}}" wx:key="title" class="about-feature">
+      <view class="about-icon"><icon name="{{item.icon}}" size="44" color="primary" /></view>
+      <view class="flex-1"><view class="about-label">{{item.title}}</view><view class="about-text">{{item.text}}</view></view>
+    </view>
+  </view>
+  <view class="card about-start">
+    <view class="about-heading">从这四步开始</view>
+    <view wx:for="{{content.steps}}" wx:key="number" class="about-step" hover-class="tap-bg" bindtap="go" data-url="{{item.mini}}" aria-role="button" aria-label="{{item.title}}">
+      <text class="about-number">{{item.number}}</text>
+      <view class="flex-1"><view class="about-label">{{item.title}}</view><view class="about-step-desc">{{item.text}}</view></view>
+      <icon name="chevron-right" size="32" color="text3" />
+    </view>
+  </view>
+  <view class="about-section">
+    <view class="about-heading">用之前，你可能想知道</view>
+    <view wx:for="{{content.questions}}" wx:key="title" class="about-question"><view class="about-label">{{item.title}}</view><view class="about-text">{{item.text}}</view></view>
+  </view>
+  <view class="about-footer">
+    <view>愿每一餐，都更合你的心意。</view>
+    <view class="about-links"><view bindtap="go" data-url="/pages/legal/legal?type=terms" aria-role="button">用户服务协议</view><view bindtap="go" data-url="/pages/legal/legal?type=privacy" aria-role="button">隐私政策</view></view>
+  </view>
+</view>

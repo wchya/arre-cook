@@ -41,7 +41,7 @@ func CreateQuote(c *gin.Context) {
 
 func UpdateQuote(c *gin.Context) {
 	var quote models.Quote
-	if err := database.DB.First(&quote, c.Param("id")).Error; err != nil {
+	if err := database.DB.Where("id = ?", c.Param("id")).First(&quote).Error; err != nil {
 		utils.NotFound(c, "推荐语不存在")
 		return
 	}
@@ -57,7 +57,7 @@ func UpdateQuote(c *gin.Context) {
 }
 
 func DeleteQuote(c *gin.Context) {
-	database.DB.Delete(&models.Quote{}, c.Param("id"))
+	database.DB.Where("id = ?", c.Param("id")).Delete(&models.Quote{})
 	utils.SuccessMsg(c, "删除成功")
 }
 
@@ -96,7 +96,7 @@ func GetAchievements(c *gin.Context) {
 // UnlockAchievement 手动成就（condition=manual）由用户自己点亮；自动成就不允许手动解锁。
 func UnlockAchievement(c *gin.Context) {
 	var achievement models.Achievement
-	if err := database.DB.First(&achievement, c.Param("id")).Error; err != nil {
+	if err := database.DB.Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
 		utils.NotFound(c, "成就不存在")
 		return
 	}
@@ -116,7 +116,7 @@ func UnlockAchievement(c *gin.Context) {
 
 func ToggleAchievement(c *gin.Context) {
 	var achievement models.Achievement
-	if err := database.DB.First(&achievement, c.Param("id")).Error; err != nil {
+	if err := database.DB.Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
 		utils.NotFound(c, "成就不存在")
 		return
 	}
@@ -161,7 +161,7 @@ func CreateAchievement(c *gin.Context) {
 
 func UpdateAchievement(c *gin.Context) {
 	var achievement models.Achievement
-	if err := database.DB.First(&achievement, c.Param("id")).Error; err != nil {
+	if err := database.DB.Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
 		utils.NotFound(c, "成就不存在")
 		return
 	}
@@ -182,7 +182,7 @@ func UpdateAchievement(c *gin.Context) {
 func DeleteAchievement(c *gin.Context) {
 	id := c.Param("id")
 	database.DB.Where("achievement_id = ?", id).Delete(&models.UserAchievement{})
-	database.DB.Delete(&models.Achievement{}, id)
+	database.DB.Where("id = ?", id).Delete(&models.Achievement{})
 	utils.SuccessMsg(c, "删除成功")
 }
 
@@ -193,7 +193,9 @@ var siteSettingKeys = map[string]bool{
 	"app_name": true, "categories": true, "tastes": true, "repeat_days": true, "pick_animation": true,
 	"lunch_dishes_per_day": true, "dinner_dishes_per_day": true, "agent_embed_url": true,
 	"allow_register": true, "llm_base_url": true, "llm_model": true, "llm_api_key": true,
-	"announcement": true,
+	"announcement":                  true,
+	services.AssistantDailyLimitKey: true,
+	services.AssistantSiteLimitKey:  true,
 }
 
 var secretSettingKeys = map[string]bool{"llm_api_key": true}
@@ -207,7 +209,7 @@ var userSettingKeys = map[string]bool{
 func GetAppInfo(c *gin.Context) {
 	llmOn := llm.Resolve().Enabled()
 	utils.Success(c, gin.H{
-		"app_name":        database.GetSetting("app_name", "ss-menu"),
+		"app_name":        database.GetSetting("app_name", "arre食谱推荐小助手"),
 		"agent_embed_url": database.GetSetting("agent_embed_url", ""),
 		"announcement":    database.GetSetting("announcement", ""),
 		"ai_enabled":      llmOn,
@@ -273,7 +275,10 @@ func UpdateSettings(c *gin.Context) {
 		if !userSettingKeys[key] {
 			continue
 		}
-		_ = database.SetUserSetting(uid(c), key, strings.TrimSpace(value))
+		if err := database.SetUserSetting(uid(c), key, strings.TrimSpace(value)); err != nil {
+			utils.InternalError(c, "保存失败，请稍后重试")
+			return
+		}
 		if key == "lunch_dishes_per_day" || key == "dinner_dishes_per_day" {
 			changedPlan = true
 		}
@@ -299,6 +304,19 @@ func UpdateSiteSettings(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "请提供设置数据")
 		return
+	}
+	// Validate the quota before saving any key, so an invalid batch cannot partially apply.
+	if value, ok := req.Settings[services.AssistantDailyLimitKey]; ok {
+		if _, err := services.ParseAssistantDailyLimit(value); err != nil {
+			utils.BadRequest(c, err.Error())
+			return
+		}
+	}
+	if value, ok := req.Settings[services.AssistantSiteLimitKey]; ok {
+		if _, err := services.ParseAssistantSiteLimit(value); err != nil {
+			utils.BadRequest(c, err.Error())
+			return
+		}
 	}
 	for key, value := range req.Settings {
 		if !siteSettingKeys[key] {

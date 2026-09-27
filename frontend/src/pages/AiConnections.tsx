@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -39,7 +40,7 @@ function fmtTime(s: string | null) {
 export default function AiConnections() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { data, isLoading } = useQuery({ queryKey: ["agent-tokens"], queryFn: () => agentConnApi.list() })
+  const { data, isLoading , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["agent-tokens"], queryFn: () => agentConnApi.list() })
   const { data: audit } = useQuery({ queryKey: ["agent-audit"], queryFn: () => agentConnApi.audit({ pageSize: "20" }) })
 
   const [creating, setCreating] = useState(false)
@@ -91,12 +92,12 @@ export default function AiConnections() {
     mcp: {
       label: "MCP 通用",
       note: "Claude Desktop / Cursor / Cherry Studio 等支持远程 MCP（Streamable HTTP）的客户端",
-      code: JSON.stringify({ mcpServers: { "ss-menu": { type: "http", url: mcpURL, headers: { Authorization: `Bearer ${token}` } } } }, null, 2),
+      code: JSON.stringify({ mcpServers: { "arre食谱推荐小助手": { type: "http", url: mcpURL, headers: { Authorization: `Bearer ${token}` } } } }, null, 2),
     },
     hermes: {
       label: "Hermes",
       note: "Hermes Agent：写入 ~/.hermes/config.yaml 的 mcp_servers（参考配置，以所用版本文档为准）",
-      code: `mcp_servers:\n  ss-menu:\n    url: "${mcpURL}"\n    headers:\n      Authorization: "Bearer ${token}"`,
+      code: `mcp_servers:\n  arre食谱推荐小助手:\n    url: "${mcpURL}"\n    headers:\n      Authorization: "Bearer ${token}"`,
     },
     deepseek: {
       label: "DeepSeek 函数调用",
@@ -139,6 +140,8 @@ while True:
   const active = tokens.filter((t) => t.active)
   const inactive = tokens.filter((t) => !t.active)
   const scopeLabels = data?.scopes || {}
+
+  if (loadError) return <div><PageHeader title="AI 连接" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   return (
     <div className="animate-fadeUp pb-10">
@@ -245,7 +248,7 @@ while True:
           </div>
           <div className="mb-2 text-[11px] leading-relaxed text-text3">{snippets[snippet].note}</div>
           <div className="relative">
-            <pre className="max-h-72 overflow-auto rounded-2xl bg-[#1d1d22] p-3.5 pr-11 text-[11px] leading-relaxed text-[#e8e8ee]"><code>{snippets[snippet].code}</code></pre>
+            <pre className="max-h-72 overflow-x-auto overflow-y-auto rounded-2xl bg-[#1d1d22] p-3.5 pr-11 text-[11px] leading-relaxed text-[#e8e8ee]"><code>{snippets[snippet].code}</code></pre>
             <button onClick={() => copyText(snippets[snippet].code)} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-white active:scale-90" aria-label="复制">
               <Copy size={14} />
             </button>

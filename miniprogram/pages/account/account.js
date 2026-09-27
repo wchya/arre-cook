@@ -48,14 +48,17 @@ Page({
 
   onLoad() {
     if (!session.requireLogin("/pages/account/account")) return
-    this.load()
   },
 
+  onShow() { if (session.hasSession()) this.load() },
+
   async load() {
+    this.setData({ loadError: "", loading: true })
     try {
       const user = await session.currentUser(true)
       this.applyUser(user)
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       ui.toast(error.message || "账号信息暂时无法加载")
     } finally {
       this.setData({ loading: false })

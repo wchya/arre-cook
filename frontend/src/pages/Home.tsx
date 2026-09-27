@@ -8,6 +8,7 @@ import DishImage from "@/components/DishImage"
 import DishCard from "@/components/DishCard"
 import SectionHeader from "@/components/SectionHeader"
 import PageHeader, { HeaderIconButton } from "@/components/PageHeader"
+import RequestState from "@/components/RequestState"
 import { cardShadow } from "@/components/Card"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useAppInfoStore } from "@/store/useAppInfoStore"
@@ -42,10 +43,10 @@ export default function Home() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const todayKey = dateKey()
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn)
+  const isAdmin = useAuthStore((s) => s.user?.role === "admin")
   const appName = useAppInfoStore((s) => s.appName)
 
-  const { data: dishesData } = useQuery({
+  const { data: dishesData, error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["dishes", "enabled"],
     queryFn: () => dishesApi.list({ enabled: "true", pageSize: "20", sort: "sort_order", order: "asc" }),
   })
@@ -54,8 +55,8 @@ export default function Home() {
     queryFn: () => dishesApi.list({ enabled: "true", pageSize: "12", sort: "random" }),
   })
   const { data: recordsData } = useQuery({
-    queryKey: ["records"],
-    queryFn: () => recordsApi.list({ pageSize: "100" }),
+    queryKey: ["records", "date", todayKey],
+    queryFn: () => recordsApi.forDates(todayKey, todayKey),
   })
   const { data: todayRating } = useQuery({
     queryKey: ["day-rating", todayKey],
@@ -306,13 +307,14 @@ export default function Home() {
         subtitle="今天也好好吃饭"
         icon={HomeIcon}
         actions={
-           <HeaderIconButton onClick={() => navigate(isLoggedIn ? "/admin/dashboard" : "/admin/login")} aria-label="管理设置">
+           <HeaderIconButton onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/me/preferences")} aria-label={isAdmin ? "管理设置" : "饮食偏好"}>
             <Settings size={18} strokeWidth={2.3} />
           </HeaderIconButton>
         }
       />
 
       <div className="px-5 py-4 max-w-[640px] mx-auto">
+        {loadError && <RequestState error={loadError} onRetry={() => { void retryLoad() }} compact />}
         <div className="mb-5">
           <div className="text-sm text-text2 mb-1">{getGreeting()}</div>
           <div className="text-[26px] font-extrabold tracking-tight leading-tight">今天<em className="not-italic text-primary">想吃什么</em>？</div>

@@ -33,8 +33,12 @@ function setup() {
   const messages = []
   const api = { token: () => 'test', put: async (_, data) => ({ ...app.globalData.user, ...data }) }
   const wx = { hideKeyboard() {}, reLaunch() {} }
+  let activePage
+  const sheetTabsModule = { exports: {} }
+  load('utils/sheet-tabs.js', { module: sheetTabsModule, getCurrentPages: () => activePage ? [activePage] : [] })
+  const sheetTabs = sheetTabsModule.exports
   const sessionModule = { exports: {} }
-  load('utils/session.js', { module: sessionModule, require: () => api, getApp: () => app, wx })
+  load('utils/session.js', { module: sessionModule, require: name => name === './sheet-tabs' ? sheetTabs : api, getApp: () => app, wx })
   const session = sessionModule.exports
 
   let tabDefinition
@@ -42,7 +46,7 @@ function setup() {
   const tab = { data: structuredClone(tabDefinition.data), setData(patch) { Object.assign(this.data, patch) } }
 
   let sheetDefinition
-  load('components/sheet/index.js', { Component: value => { sheetDefinition = value }, ...clock, wx, getApp: () => app })
+  load('components/sheet/index.js', { Component: value => { sheetDefinition = value }, require: () => sheetTabs, ...clock, wx, getApp: () => app })
   const sheet = { data: structuredClone(sheetDefinition.data), events: [] }
   for (const [name, property] of Object.entries(sheetDefinition.properties)) sheet.data[name] = property.value
   for (const [name, fn] of Object.entries(sheetDefinition.methods)) sheet[name] = fn.bind(sheet)
@@ -58,6 +62,7 @@ function setup() {
   }
   load('pages/me/me.js', { Page: value => { pageDefinition = value }, require: name => dependencies[name], wx })
   const page = { data: structuredClone(pageDefinition.data), getTabBar: () => tab }
+  activePage = page
   for (const [name, value] of Object.entries(pageDefinition)) if (typeof value === 'function') page[name] = value.bind(page)
   page.load = () => {}
   page.data.user = app.globalData.user

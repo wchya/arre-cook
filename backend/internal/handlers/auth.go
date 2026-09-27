@@ -232,6 +232,7 @@ var userOwnedModels = []any{
 	&models.HomeInventory{}, &models.BehaviorEvent{}, &models.AchievementEvent{}, &models.UserAchievement{},
 	&models.UserPreference{}, &models.UserSetting{}, &models.AgentToken{}, &models.AgentAuditLog{},
 	&models.AgentSuggestion{}, &models.Notification{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{},
+	&models.AssistantUsage{},
 }
 
 // DeleteMe DELETE /api/me —— 注销账号并删除全部个人数据（不可恢复）。
@@ -405,7 +406,7 @@ func AdminUpdateUser(c *gin.Context) {
 		return
 	}
 	var u models.User
-	if err := database.DB.First(&u, c.Param("id")).Error; err != nil {
+	if err := database.DB.Where("id = ?", c.Param("id")).First(&u).Error; err != nil {
 		utils.NotFound(c, "用户不存在")
 		return
 	}

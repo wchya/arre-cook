@@ -71,6 +71,7 @@ Page({
     messages: [],
     draft: "",
     busy: false,
+    progressText: "正在确认你的食谱需求…",
     loadingSession: false,
     historyOpen: false,
     sessions: [],
@@ -78,39 +79,93 @@ Page({
     navHeight: 64,
     anchor: "",
     inputFocus: false,
+    quota: null,
+    quotaText: "正在读取今日次数…",
+    canSend: false,
+    statusLoading: true,
+    statusError: "",
+    sessionsError: "",
+    loadingSessions: false,
   },
 
   onLoad(query) {
     this._request = 0
     this.setData({ navHeight: getApp().navMetrics().navHeight })
     if (!session.requireLogin("/pages/chat/chat")) return
-    this.loadStatus()
     this.loadSessions()
-    if (query.q) this.setData({ draft: decodeURIComponent(query.q) })
+    if (query.q) {
+      try { this.setData({ draft: decodeURIComponent(query.q).slice(0, 1000) }) } catch (_) { /* malformed optional link */ }
+    }
+  },
+
+  onShow() {
+    this._visible = true
+    if (session.requireLogin("/pages/chat/chat")) this.loadStatus()
+  },
+
+  onHide() {
+    this._visible = false
+    clearTimeout(this._quotaTimer)
   },
 
   onUnload() {
+    this._unloaded = true
+    this._visible = false
+    clearTimeout(this._quotaTimer)
     this.abort()
   },
 
   // ---------- 数据 ----------
 
+  applyQuota(quota) {
+    if (!quota) return
+    const quotaText = quota.blocked_reason === "site_limit" ? "今日助手服务次数已用完或已暂停" : quota.limit === 0 ? "管理员已暂停 AI 助手请求" : quota.remaining === 0 ? `今日 ${quota.limit} 次已用完` : `今日还可提问 ${quota.remaining} 次 / 每日 ${quota.limit} 次`
+    this.setData({ quota, quotaText, canSend: quota.remaining > 0 && !quota.blocked_reason, statusError: "" })
+  },
+
+  scheduleQuotaRefresh() {
+    clearTimeout(this._quotaTimer)
+    if (!this._visible || this._unloaded) return
+    const resetAt = this.data.quota && Date.parse(this.data.quota.reset_at)
+    const delay = resetAt ? Math.min(60000, Math.max(1000, resetAt - Date.now() + 100)) : 60000
+    this._quotaTimer = setTimeout(() => this.loadStatus(), delay)
+  },
+
   async loadStatus() {
+    if (this._unloaded) return
+    const request = this._statusRequest = (this._statusRequest || 0) + 1
+    const token = api.token()
+    this.setData({ statusLoading: true })
     try {
       const status = await api.get("/assistant/status")
+      if (this._unloaded || request !== this._statusRequest || token !== api.token()) return
       this.setData({
         llmEnabled: Boolean(status.llm_enabled),
         statusText: status.llm_enabled ? "可以聊饮食、菜谱与记录" : "基础推荐与饮食报告",
         suggestions: status.suggestions && status.suggestions.length ? status.suggestions : FALLBACK_SUGGESTIONS,
       })
-    } catch (_) { /* ignore */ }
+      this.applyQuota(status.quota)
+    } catch (error) {
+      if (!this._unloaded && request === this._statusRequest && token === api.token()) this.setData({ statusError: error.message || "助手次数读取失败", canSend: false })
+    } finally {
+      if (!this._unloaded && request === this._statusRequest) {
+        this.setData({ statusLoading: false })
+        this.scheduleQuotaRefresh()
+      }
+    }
   },
 
   async loadSessions() {
+    this.setData({ loadingSessions: true, sessionsError: "" })
     try {
       const sessions = await api.get("/assistant/sessions")
+      if (this._unloaded) return
       this.setData({ sessions: (sessions || []).map((item) => ({ id: item.id, title: item.title || "新对话", date: fmt.relativeDate(item.updated_at) })) })
-    } catch (_) { /* ignore */ }
+    } catch (error) {
+      if (!this._unloaded) this.setData({ sessionsError: error.message || "对话记录读取失败" })
+    } finally {
+      if (!this._unloaded) this.setData({ loadingSessions: false })
+    }
   },
 
   async openSession(event) {
@@ -189,8 +244,14 @@ Page({
   send(value) {
     const text = String(value || "").trim()
     if (!text || this.data.busy || this.data.loadingSession) return
+    if (!this.data.canSend) {
+      this.setData({ draft: text })
+      ui.toast(this.data.statusError ? "请先重试加载助手次数" : this.data.quotaText)
+      return
+    }
     const assistantId = uid("a")
-    const messages = this.data.messages.concat([
+    const previousMessages = this.data.messages
+    const messages = previousMessages.concat([
       { id: uid("u"), role: "user", content: text, cards: [], tools: [] },
       { id: assistantId, role: "assistant", content: "", cards: [], tools: [], streaming: true, error: "" },
     ])
@@ -202,10 +263,11 @@ Page({
     this._completed = false
     this._gotChunk = false
     this._pending = ""
-    this.setData({ messages, draft: "", busy: true }, () => this.scrollToBottom())
+    this.setData({ messages, draft: "", busy: true, progressText: "正在确认你的食谱需求…" }, () => this.scrollToBottom())
     ui.haptic()
 
     const app = getApp()
+    const requestToken = api.token()
     this._task = wx.request({
       url: `${app.globalData.apiBase}/assistant/chat`,
       method: "POST",
@@ -216,10 +278,10 @@ Page({
       header: {
         "content-type": "application/json",
         Accept: "text/event-stream",
-        Authorization: `Bearer ${api.token()}`,
+        Authorization: `Bearer ${requestToken}`,
       },
       success: (response) => {
-        if (request !== this._request) return
+        if (request !== this._request || requestToken !== api.token()) return
         if (response.statusCode === 401) {
           session.logout("expired")
           return
@@ -227,10 +289,18 @@ Page({
         if (response.statusCode < 200 || response.statusCode >= 300) {
           let message = "助手暂时不可用，请稍后再试"
           try {
-            const body = JSON.parse(decodeUTF8Chunk(response.data, new Uint8Array(0)).text)
+            const raw = typeof response.data === "string" ? response.data : decodeUTF8Chunk(response.data, new Uint8Array(0)).text
+            const body = JSON.parse(raw || this._buffer)
             if (body && body.message) message = body.message
+            if (body && body.data && body.data.quota) this.applyQuota(body.data.quota)
           } catch (_) { /* ignore */ }
-          this.patchAssistant({ error: message })
+          if (response.statusCode === 429) {
+            this.setData({ messages: previousMessages, draft: this.data.draft || text })
+            ui.toast(message)
+          } else {
+            this.patchAssistant({ error: message })
+            this.setData({ draft: this.data.draft || text })
+          }
         } else if (response.data && response.data.byteLength && !this._gotChunk) {
           // 不支持分块的基础库会在最后一次性返回全部内容
           this.receiveChunk(response.data)
@@ -238,7 +308,10 @@ Page({
       },
       fail: (error) => {
         if (request !== this._request) return
-        if (!/abort/i.test((error && error.errMsg) || "")) this.patchAssistant({ error: "网络连接失败，请重试" })
+        if (!/abort/i.test((error && error.errMsg) || "")) {
+          this.patchAssistant({ error: "网络连接失败，请查看对话记录后重试" })
+          this.setData({ draft: this.data.draft || text })
+        }
       },
       complete: () => {
         if (request !== this._request) return
@@ -249,6 +322,7 @@ Page({
         this.setData({ busy: false })
         this._task = null
         this.loadSessions()
+        this.loadStatus()
       },
     })
     if (this._task && typeof this._task.onChunkReceived === "function") {
@@ -283,6 +357,22 @@ Page({
     if (!lines.length) return
     let data
     try { data = JSON.parse(lines.join("\n")) } catch (_) { return }
+    if (eventName === "status") {
+      this.setData({ progressText: data.message || "正在整理菜谱…" })
+      return
+    }
+    if (eventName === "cards") {
+      const message = this.data.messages[this._assistantIndex]
+      if (message) this.patchAssistant({ cards: message.cards.concat((data.cards || []).map(toCard).filter(Boolean)) })
+      return
+    }
+    if (eventName === "quota") {
+      this._statusRequest = (this._statusRequest || 0) + 1
+      this.setData({ statusLoading: false })
+      this.applyQuota(data)
+      this.scheduleQuotaRefresh()
+      return
+    }
     const index = this._assistantIndex
     const message = this.data.messages[index]
     if (!message) return
@@ -346,6 +436,7 @@ Page({
       this.patchAssistant({ streaming: false })
       this.setData({ busy: false })
     }
+    if (!this._unloaded) this.loadStatus()
   },
 
   stop() {

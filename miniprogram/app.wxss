@@ -1,20 +1,23 @@
 /*
- * ss-menu 小程序设计系统：色板、圆角、阴影与 Web 端 frontend/src/index.css 保持一致。
+ * arre食谱推荐小助手 小程序设计系统：色板、圆角、阴影与 Web 端 frontend/src/index.css 保持一致。
  * 尺寸换算：Web 端 1px ≈ 小程序 2rpx（以 375 宽屏为基准）。
  */
 page {
   --bg: #FAFAF8;
   --card: #FFFFFF;
-  --primary: #E8734A;
+  --primary: #B94E2B;
+  --primary-action: #B94E2B;
   --primary-light: #FFF0EB;
   --primary-dark: #C85A35;
-  --mint: #6EC6B8;
+  --mint: #227A68;
+  --mint-action: #227A68;
   --mint-light: #E8F8F5;
-  --mint-ink: #3F9D90;
-  --pink: #F4A8A0;
+  --mint-ink: #227A68;
+  --pink: #B4485D;
+  --pink-action: #B4485D;
   --pink-light: #FFF0EE;
-  --pink-ink: #E07A6E;
-  --yellow: #F5D76E;
+  --pink-ink: #B4485D;
+  --yellow: #957010;
   --yellow-light: #FFF9E6;
   --yellow-dark: #A67912;
   --purple: #8B5CF6;
@@ -23,7 +26,7 @@ page {
   --red-light: #FEE2E2;
   --text: #1A1A2E;
   --text2: #6B7280;
-  --text3: #9CA3AF;
+  --text3: #747880;
   --text4: #D1D5DB;
   --border: #F0F0EC;
   --border2: #E5E5E0;
@@ -154,7 +157,7 @@ button::after { border: 0; }
 .chip-yellow { border: 1px solid rgba(245, 215, 110, .35); background: var(--yellow-light); color: var(--yellow-dark); }
 .chip-purple { background: var(--purple-light); color: var(--purple); }
 .chip-ghost { border: 1px solid var(--border); background: var(--bg); color: var(--text2); }
-.chip-solid { background: var(--primary); color: #fff; }
+.chip-solid { background: var(--primary-action); color: #fff; }
 
 /* ---------- 按钮 ---------- */
 .btn { position: relative; display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 84rpx; padding: 0 40rpx; border-radius: 999rpx; font-size: 28rpx; font-weight: 600; line-height: 1; white-space: nowrap; transition: transform .15s ease, opacity .15s ease; }
@@ -162,9 +165,9 @@ button::after { border: 0; }
 .btn-sm { height: 60rpx; padding: 0 24rpx; font-size: 24rpx; gap: 8rpx; }
 .btn-xs { height: 48rpx; padding: 0 20rpx; font-size: 22rpx; gap: 6rpx; }
 .btn-block { width: 100%; }
-.btn-primary { background: var(--primary); color: #fff; }
-.btn-primary-glow { background: var(--primary); color: #fff; box-shadow: var(--shadow-primary); }
-.btn-mint { background: var(--mint); color: #fff; }
+.btn-primary { background: var(--primary-action); color: #fff; }
+.btn-primary-glow { background: var(--primary-action); color: #fff; box-shadow: var(--shadow-primary); }
+.btn-mint { background: var(--mint-action); color: #fff; }
 .btn-soft { background: var(--primary-light); color: var(--primary); }
 .btn-ghost { border: 3rpx solid var(--border2); background: var(--card); color: var(--text); }
 .btn-danger { background: var(--red-light); color: var(--red); }
@@ -275,30 +278,31 @@ button::after { border: 0; }
 /* 仅覆盖 page 上的设计令牌即可全局级联进各自定义组件（CSS 变量穿透 shadow 边界）。 */
 @media (prefers-color-scheme: dark) {
   page {
-    --bg: #121016;
-    --card: #1C1922;
-    --primary: #F0805A;
-    --primary-light: #38241C;
-    --primary-dark: #F5936F;
-    --mint: #5FBFB0;
-    --mint-light: #16302B;
+    --bg: #131316;
+    --card: #1D1D22;
+    --primary: #F0825A;
+    --primary-action: #B94E2B;
+    --primary-light: #3A2419;
+    --primary-dark: #D8683F;
+    --mint: #72CDBE;
+    --mint-light: #15302C;
     --mint-ink: #6FD8C6;
-    --pink: #E89A91;
-    --pink-light: #37231F;
+    --pink: #F4A8A0;
+    --pink-light: #3A2226;
     --pink-ink: #F3A99E;
-    --yellow: #E9C65E;
-    --yellow-light: #2F2914;
-    --yellow-dark: #E7C25C;
-    --purple: #A98BFF;
-    --purple-light: #241C3B;
-    --red: #F26D6D;
-    --red-light: #3A1E1E;
-    --text: #F4F2F7;
-    --text2: #A7A2B0;
-    --text3: #6E6979;
-    --text4: #45414D;
-    --border: #262230;
-    --border2: #332E3C;
+    --yellow: #F5D76E;
+    --yellow-light: #352E18;
+    --yellow-dark: #F2CD5C;
+    --purple: #A78BFA;
+    --purple-light: #2A2140;
+    --red: #EF4444;
+    --red-light: #3B1C1C;
+    --text: #ECECF1;
+    --text2: #A1A1AA;
+    --text3: #A0A0AB;
+    --text4: #3F3F46;
+    --border: #26262C;
+    --border2: #34343C;
     --shadow-card: 0 2rpx 6rpx rgba(0, 0, 0, .3), 0 8rpx 24rpx rgba(0, 0, 0, .28);
     --shadow-float: 0 20rpx 60rpx rgba(0, 0, 0, .55);
     --shadow-primary: 0 24rpx 56rpx rgba(232, 115, 74, .3);
@@ -323,4 +327,15 @@ button::after { border: 0; }
    安卓保持高不透明度降级。组件内的导航栏 / Tab 栏 / 弹层另外按 globalData.isIOS 加 --ios 修饰。 */
 @supports (-webkit-touch-callout: none) {
   page { --glass-bg: var(--glass-ios-bg); --glass-strong: var(--glass-ios-strong); --glass-blur: var(--glass-blur-ios); }
+}
+
+/* Shared controls stay readable and easy to tap on small phones. */
+.btn { min-height:44px; min-width:44px; margin-left:0; margin-right:0; }
+.btn-sm, .btn-xs { min-height:40px; }
+.btn[disabled], .is-disabled { opacity:.5; pointer-events:none; }
+.segmented-item, .section-action { min-height:44px; }
+.field-input, .field-textarea { font-size:32rpx; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-pop, .anim-pop-soft, .anim-float, .skeleton { animation:none; }
+  .btn, .chip, .card, .segmented-item { transition:none; }
 }

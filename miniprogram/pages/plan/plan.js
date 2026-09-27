@@ -67,8 +67,11 @@ Page({
   // ---------- 一周菜单 ----------
 
   async loadWeek() {
+    const requestId = this._weekRequest = (this._weekRequest || 0) + 1
+    this.setData({ weekLoading: true, weekError: "" })
     try {
       const plan = await api.get("/week-plan")
+      if (requestId !== this._weekRequest) return
       const today = fmt.dateKey()
       const tomorrow = fmt.dateKey(fmt.addDays(new Date(), 1))
       const days = (plan.days || []).slice()
@@ -86,9 +89,9 @@ Page({
       this.setData({ days })
       this.applyVisible()
     } catch (error) {
-      ui.toast(error.message || "一周菜单加载失败")
+      if (requestId === this._weekRequest) this.setData({ weekError: error.message || "一周菜单加载失败" })
     } finally {
-      this.setData({ weekLoading: false })
+      if (requestId === this._weekRequest) this.setData({ weekLoading: false })
     }
   },
 
@@ -156,13 +159,16 @@ Page({
   // ---------- 买菜清单 ----------
 
   async loadShopping() {
+    const requestId = this._shoppingRequest = (this._shoppingRequest || 0) + 1
+    this.setData({ shoppingLoading: true, shoppingError: "" })
     try {
       const data = await api.get("/shopping/overview")
+      if (requestId !== this._shoppingRequest) return
       this.applyOverview(data || {})
     } catch (error) {
-      ui.toast(error.message || "买菜清单加载失败")
+      if (requestId === this._shoppingRequest) this.setData({ shoppingError: error.message || "买菜清单加载失败" })
     } finally {
-      this.setData({ shoppingLoading: false })
+      if (requestId === this._shoppingRequest) this.setData({ shoppingLoading: false })
     }
   },
 

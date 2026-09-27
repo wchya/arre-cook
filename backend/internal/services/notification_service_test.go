@@ -21,7 +21,7 @@ func TestAnnounceDeploymentIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int64
-	database.DB.Model(&models.Notification{}).Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Count(&count)
+	database.DB.Model(&models.Notification{}).Where("user_id = ? AND title = ?", user.ID, "arre食谱推荐小助手 已更新").Count(&count)
 	if count != 1 {
 		t.Fatalf("deployment notification count = %d, want 1", count)
 	}
@@ -29,7 +29,7 @@ func TestAnnounceDeploymentIsIdempotent(t *testing.T) {
 	if err := AnnounceDeployment("test-build-2"); err != nil {
 		t.Fatal(err)
 	}
-	database.DB.Model(&models.Notification{}).Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Count(&count)
+	database.DB.Model(&models.Notification{}).Where("user_id = ? AND title = ?", user.ID, "arre食谱推荐小助手 已更新").Count(&count)
 	if count != 2 {
 		t.Fatalf("new deployment notification count = %d, want 2", count)
 	}
@@ -45,7 +45,7 @@ func TestAnnounceDeploymentWithNotesUsesReadableSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	var notice models.Notification
-	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Order("id DESC").First(&notice).Error; err != nil {
+	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "arre食谱推荐小助手 已更新").Order("id DESC").First(&notice).Error; err != nil {
 		t.Fatal(err)
 	}
 	want := "系统已更新到版本 v1。\n\n本次更新：\n- 优化站内信详情查看体验\n- 修复头像选择无响应问题"
@@ -64,7 +64,7 @@ func TestAnnounceDeploymentWithNotesFallsBackWhenEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	var notice models.Notification
-	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Order("id DESC").First(&notice).Error; err != nil {
+	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "arre食谱推荐小助手 已更新").Order("id DESC").First(&notice).Error; err != nil {
 		t.Fatal(err)
 	}
 	if notice.Content != "系统已更新到版本 v1。\n\n本次更新了一些内容，并修复了一些 bug。" {

@@ -102,7 +102,7 @@ export default function AchievementUnlockOverlay() {
     queryFn: () => achievementsApi.list(),
     refetchOnWindowFocus: true,
   })
-  const achievements = Array.isArray(rawAchievements) ? rawAchievements : []
+  const achievements = useMemo(() => Array.isArray(rawAchievements) ? rawAchievements : [], [rawAchievements])
 
   const unlocked = useMemo(
     () => achievements.filter((a: Achievement) => a.is_unlocked).sort(sortUnlocked),
@@ -148,9 +148,10 @@ export default function AchievementUnlockOverlay() {
   }, [achievements.length, unlocked, showNext])
 
   useEffect(() => {
+    const timers = timerRef.current
     return () => {
-      window.clearTimeout(timerRef.current.leave)
-      window.clearTimeout(timerRef.current.next)
+      window.clearTimeout(timers.leave)
+      window.clearTimeout(timers.next)
     }
   }, [])
 

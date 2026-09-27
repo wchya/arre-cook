@@ -1,6 +1,7 @@
 <nav-bar title="我的家庭" subtitle="{{family ? family.name : '一起安排每一餐'}}" icon="users-round" />
+<request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
-<view class="content anim-fade-up">
+<view wx:if="{{!loadError}}" class="content anim-fade-up">
   <!-- 加载中 -->
   <block wx:if="{{loading}}">
     <view class="skeleton" style="height:220rpx;border-radius:32rpx;margin-bottom:24rpx;"></view>
@@ -25,7 +26,7 @@
     <view class="section-head mt-32"><view class="section-title">收到邀请？</view></view>
     <view class="card card-pad">
       <view class="field-label">邀请链接</view>
-      <textarea class="join-textarea {{joinFocus ? 'is-focus' : ''}}" value="{{joinToken}}" placeholder="粘贴家庭创建者发来的邀请链接" placeholder-class="placeholder" auto-height data-k="joinFocus" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="onJoinInput" />
+      <textarea maxlength="2048" class="join-textarea {{joinFocus ? 'is-focus' : ''}}" value="{{joinToken}}" placeholder="粘贴家庭创建者发来的邀请链接" placeholder-class="placeholder" auto-height data-k="joinFocus" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="onJoinInput" />
       <view class="field-hint">需用受邀的邮箱账号登录后加入；一个账号同时只能属于一个家庭。</view>
       <view class="btn btn-soft btn-block mt-16 {{joinToken && !busy ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="joinFamily"><icon name="door-open" size="30" stroke="2.4" color="primary" /><text>加入家庭</text></view>
     </view>
@@ -75,7 +76,8 @@
       </view>
     </view>
 
-    <block wx:if="{{requests.length}}">
+    <request-state wx:if="{{requestsError}}" error="{{requestsError}}" bind:retry="loadRequests" compact />
+    <block wx:elif="{{requests.length}}">
       <view id="requests" class="section-head mt-8">
         <view class="section-title">菜谱删除申请</view>
         <view class="section-sub">{{isOwner ? '家人申请删除家庭菜谱，需你确认' : '等待家庭管理员处理'}}</view>
@@ -137,7 +139,8 @@
         <view class="icon-btn {{itemName && !busy ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="addItem"><icon name="plus" size="34" stroke="2.6" color="white" /></view>
       </view>
 
-      <view wx:if="{{!shopping.length}}" class="shop-empty">买菜清单还没有食材</view>
+      <request-state wx:if="{{shoppingError}}" error="{{shoppingError}}" bind:retry="loadShopping" compact />
+      <view wx:elif="{{!shopping.length}}" class="shop-empty">买菜清单还没有食材</view>
       <view wx:else class="shop-list">
         <view wx:for="{{shopping}}" wx:key="id" class="shop-item">
           <view class="shop-check {{item.checked ? 'is-on' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-checked="{{item.checked}}" bindtap="toggleItem"><icon wx:if="{{item.checked}}" name="check" size="24" stroke="3" color="white" /></view>
@@ -172,7 +175,7 @@
 
 <sheet show="{{renameOpen}}" title="家庭名称" bind:close="closeRename">
   <view class="sheet-body">
-    <view class="field is-focus"><input class="field-input" value="{{renameValue}}" maxlength="30" focus="{{renameOpen}}" placeholder="家庭名称" placeholder-class="placeholder" cursor-spacing="120" bindinput="onRenameInput" bindconfirm="saveRename" /></view>
+    <view class="field is-focus"><input adjust-position="{{false}}" class="field-input" value="{{renameValue}}" maxlength="30" focus="{{renameOpen}}" placeholder="家庭名称" placeholder-class="placeholder" cursor-spacing="120" bindinput="onRenameInput" bindconfirm="saveRename" /></view>
     <view class="flex gap-20 mt-32">
       <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeRename">取消</view>
       <view class="btn btn-primary flex-1 {{renameValue && !savingRename ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveRename"><view wx:if="{{savingRename}}" class="spinner"></view><text wx:else>保存</text></view>

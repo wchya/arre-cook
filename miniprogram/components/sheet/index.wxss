@@ -19,3 +19,5 @@
 .sheet__body { flex: 0 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .sheet__footer { flex-shrink: 0; }
 .sheet__safe { height: env(safe-area-inset-bottom); flex-shrink: 0; }
+
+.sheet__close { min-width:44px; min-height:44px; }

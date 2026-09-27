@@ -1,4 +1,5 @@
 const api = require("./api")
+const { hasVisibleSheet, releasePage } = require("./sheet-tabs")
 
 const TAB_PAGES = ["pages/home/home", "pages/dishes/dishes", "pages/history/history", "pages/me/me"]
 const CONSENT_KEY = "ninimenu_privacy_consent_v1"
@@ -51,6 +52,7 @@ function logout(reason) {
 
 // 每个 Tab 页 onShow 时同步选中态与可见性，避免弹层关闭后菜单仍被隐藏。
 function syncTabBar(page, index, hidden = false) {
+  hidden = hidden || hasVisibleSheet(page)
   if (typeof page.getTabBar !== "function") return
   const tabBar = page.getTabBar()
   if (tabBar && (tabBar.data.selected !== index || tabBar.data.hidden !== hidden)) {
@@ -62,4 +64,9 @@ function isTabPage(route) {
   return TAB_PAGES.indexOf(String(route || "").replace(/^\//, "")) >= 0
 }
 
-module.exports = { TAB_PAGES, CONSENT_KEY, hasSession, requireLogin, enterAfterLogin, currentUser, setUser, logout, syncTabBar, isTabPage }
+function resetTabBar(page, index) {
+  releasePage(page)
+  syncTabBar(page, index)
+}
+
+module.exports = { TAB_PAGES, CONSENT_KEY, hasSession, requireLogin, enterAfterLogin, currentUser, setUser, logout, syncTabBar, resetTabBar, isTabPage }

@@ -7,6 +7,8 @@ import (
 	"ninimenu/internal/models"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 var (
@@ -97,7 +99,7 @@ type MealPatch struct {
 
 func UpdateMealRecord(uid uint, id any, patch MealPatch) (*models.MealRecord, error) {
 	var record models.MealRecord
-	if err := database.DB.Scopes(database.OwnedBy(uid)).First(&record, id).Error; err != nil {
+	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).First(&record).Error; err != nil {
 		return nil, ErrRecordNotFound
 	}
 	if patch.Rating != nil {
@@ -121,7 +123,7 @@ func UpdateMealRecord(uid uint, id any, patch MealPatch) (*models.MealRecord, er
 
 func DeleteMealRecord(uid uint, id any) (*models.MealRecord, error) {
 	var record models.MealRecord
-	if err := database.DB.Scopes(database.OwnedBy(uid)).First(&record, id).Error; err != nil {
+	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).First(&record).Error; err != nil {
 		return nil, ErrRecordNotFound
 	}
 	if err := database.DB.Delete(&record).Error; err != nil {
@@ -160,12 +162,19 @@ func SetFavorite(uid, dishID uint, favorite bool) error {
 	if favorite {
 		dish, err := FindVisibleDish(uid, dishID)
 		if err != nil {
-			return ErrDishNotFound
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrDishNotFound
+			}
+			return err
 		}
 		fav := models.Favorite{UserID: uid, DishID: dish.ID}
-		database.DB.Where("user_id = ? AND dish_id = ?", uid, dish.ID).FirstOrCreate(&fav)
+		if err := database.DB.Where("user_id = ? AND dish_id = ?", uid, dish.ID).FirstOrCreate(&fav).Error; err != nil {
+			return err
+		}
 	} else {
-		database.DB.Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dishID).Delete(&models.Favorite{})
+		if err := database.DB.Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dishID).Delete(&models.Favorite{}).Error; err != nil {
+			return err
+		}
 	}
 	QueueAutoAchievementSync(uid)
 	return nil

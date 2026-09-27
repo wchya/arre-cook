@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { dishesApi, favoritesApi, settingsApi, recordsApi } from "@/api"
 import { asArray } from "@/lib/utils"
 import { gsap, scrollToElement } from "@/lib/gsap"
@@ -11,6 +11,7 @@ import type { Dish, MealRecord } from "@/types"
 import PageHeader, { HeaderIconButton } from "@/components/PageHeader"
 import { useAuthStore } from "@/store/useAuthStore"
 import toast from "react-hot-toast"
+import RequestState from "@/components/RequestState"
 import { Settings, UtensilsCrossed, Minus, Plus, ChefHat, X, Trash2 } from "lucide-react"
 
 const DEFAULT_CATEGORIES = ["川菜", "湘菜", "贵州菜", "云南菜", "粤菜"]
@@ -33,7 +34,7 @@ export default function DishList() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const qc = useQueryClient()
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn)
+  const isAdmin = useAuthStore((s) => s.user?.role === "admin")
   const scope = searchParams.get("scope") === "mine" ? "mine" : ""
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState("全部")
@@ -48,8 +49,8 @@ export default function DishList() {
   })
 
   const { data: categoryCountsData } = useQuery({
-    queryKey: ["dishes", "category-counts"],
-    queryFn: () => dishesApi.categoryCounts(),
+    queryKey: ["dishes", "category-counts", scope],
+    queryFn: () => dishesApi.categoryCounts(scope),
   })
   const categoryCountMap = useMemo(() => {
     const m = new Map<string, number>()
@@ -63,8 +64,8 @@ export default function DishList() {
   const tastes = useMemo(() => ["全部", ...parseList(settings?.tastes, DEFAULT_TASTES)], [settings])
   const sidebarCats = useMemo(() => {
     const cats = parseList(settings?.categories, DEFAULT_CATEGORIES)
-    return ["全部", ...cats]
-  }, [settings])
+    return ["全部", ...new Set([...cats, ...categoryCountMap.keys()])]
+  }, [settings, categoryCountMap])
 
   const queryParams = useMemo(() => {
     const params: Record<string, string> = {
@@ -77,58 +78,29 @@ export default function DishList() {
     if (activeTaste !== "全部") params.taste = activeTaste
     if (search) params.search = search
     if (scope) params.scope = scope
+    else params.enabled = "true"
     return params
   }, [activeCategory, activeTaste, search, scope])
 
-  const { data: dishesData, isLoading } = useQuery({
-    queryKey: ["dishes", queryParams],
-    queryFn: () => dishesApi.list(queryParams),
+  const { data: dishPages, isLoading, error: listError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = useInfiniteQuery({
+    queryKey: ["dishes", "list", queryParams],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => dishesApi.list({ ...queryParams, page: String(pageParam) }),
+    getNextPageParam: (last, pages) => pages.reduce((sum, page) => sum + page.items.length, 0) < last.total ? pages.length + 1 : undefined,
   })
-
-  const firstPageDishes = useMemo(() => dishesData?.items || [], [dishesData])
-  const totalFromServer = dishesData?.total ?? 0
-
-  const [pages, setPages] = useState<Dish[][]>([])
-  const [nextPageNum, setNextPageNum] = useState(2)
-  const [currentParamsKey, setCurrentParamsKey] = useState("")
-  const paramsKey = `${scope}|${activeCategory}|${activeTaste}|${search}`
-
-  if (currentParamsKey !== paramsKey) {
-    setCurrentParamsKey(paramsKey)
-    setPages([])
-    setNextPageNum(2)
-  }
-
-  const allDishes = useMemo(() => [...firstPageDishes, ...pages.flat()], [firstPageDishes, pages])
-  const hasMore = allDishes.length < totalFromServer
-
-  const loadMore = useCallback(async () => {
-    if (!hasMore) return
-    const page = nextPageNum
-    const params = { ...queryParams, page: String(page), pageSize: String(PAGE_SIZE) }
-    try {
-      const data = await dishesApi.list(params)
-      if (data?.items?.length) {
-        setPages(prev => [...prev, data.items])
-        setNextPageNum(page + 1)
-      }
-    } catch { /* pagination error, skip */ }
-  }, [hasMore, nextPageNum, queryParams])
-
+  const allDishes = useMemo(() => Array.from(new Map((dishPages?.pages.flatMap((page) => page.items) || []).map((dish) => [dish.id, dish])).values()), [dishPages])
+  const hasMore = Boolean(hasNextPage)
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    if (!hasMore) return
     const el = loadMoreRef.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) loadMore()
-      },
-      { rootMargin: "200px" },
-    )
+    if (!hasMore || !el || isFetchNextPageError || isFetchingNextPage) return
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadMore() }, { rootMargin: "200px" })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [hasMore, loadMore])
+  }, [hasMore, loadMore, isFetchNextPageError, isFetchingNextPage])
 
   const { data: favDishes } = useQuery({
     queryKey: ["favorites"],
@@ -137,8 +109,8 @@ export default function DishList() {
   const favIds = useMemo(() => new Set((favDishes || []).map((d: Dish) => d.id)), [favDishes])
 
   const { data: recordsData } = useQuery({
-    queryKey: ["records"],
-    queryFn: () => recordsApi.list({ pageSize: "100" }),
+    queryKey: ["records", "date", today],
+    queryFn: () => recordsApi.forDates(today, today),
   })
   const todayRecords = useMemo(() => (recordsData?.items || []) as MealRecord[], [recordsData])
 
@@ -178,8 +150,8 @@ export default function DishList() {
     mutationFn: (id: number) => recordsApi.delete(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["records"] })
-      const prev = qc.getQueryData(["records"])
-      qc.setQueryData(["records"], (old: unknown) => {
+      const prev = qc.getQueriesData({ queryKey: ["records"] })
+      qc.setQueriesData({ queryKey: ["records"] }, (old: unknown) => {
         if (!old || typeof old !== "object" || old === null) return old
         const o = old as { items?: MealRecord[] }
         if (!o.items) return old
@@ -187,11 +159,12 @@ export default function DishList() {
       })
       return { prev }
     },
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ["records"] }) },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["achievements"] })
     },
     onError: (_err, _id, context) => {
-      if (context?.prev) qc.setQueryData(["records"], context.prev)
+      context?.prev.forEach(([key, value]) => qc.setQueryData(key, value))
       toast.error("删除失败")
     },
   })
@@ -300,7 +273,7 @@ export default function DishList() {
         subtitle={scope === "mine" ? "只显示你创建的食谱" : "选菜加餐，一键搞定"}
         icon={UtensilsCrossed}
         actions={
-           <HeaderIconButton onClick={() => navigate(isLoggedIn ? "/admin/dashboard" : "/admin/login")} aria-label="管理设置">
+           <HeaderIconButton onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/me/preferences")} aria-label={isAdmin ? "管理设置" : "饮食偏好"}>
             <Settings size={18} strokeWidth={2.3} />
           </HeaderIconButton>
         }
@@ -372,11 +345,12 @@ export default function DishList() {
                     </div>
                   ))}
                 </div>
-              ) : allDishes.length === 0 ? (
+              ) : listError && allDishes.length === 0 ? <RequestState error={listError} onRetry={() => { void refetch() }} compact /> : allDishes.length === 0 ? (
                 <div className="text-center py-16">
                   <span className="text-[56px] block mb-4 animate-float">🍽</span>
                   <div className="text-base font-semibold mb-1.5">没有找到菜品</div>
-                  <div className="text-[13px] text-text2">换个关键词试试？</div>
+                  <div className="text-[13px] text-text2">{scope === "mine" ? "在这里收藏自己的做法，随时回来编辑。" : "试试调整分类或搜索关键词。"}</div>
+                  {scope === "mine" && <button type="button" className="btn-secondary mt-4" onClick={() => navigate("/dishes/new")}>创建第一道私房菜</button>}
                 </div>
               ) : showGrouped ? (
                 Array.from(groupedByCategory.entries()).map(([cat, dishes]) => (
@@ -417,7 +391,7 @@ export default function DishList() {
 
               {hasMore && (
                 <div ref={loadMoreRef} className="py-4 text-center text-[12px] text-text3">
-                  {isLoading ? "加载中..." : "下滑加载更多"}
+                  {isFetchNextPageError ? <button type="button" className="btn-secondary" onClick={loadMore}>加载失败，点击重试</button> : isFetchingNextPage ? "正在加载更多…" : "下滑加载更多"}
                 </div>
               )}
               {!hasMore && allDishes.length > 0 && (
@@ -453,6 +427,7 @@ export default function DishList() {
 
       {showTodayModal && (
         <AnimatedBottomSheet
+          label="今日菜单"
           onClose={() => setShowTodayModal(false)}
           className="flex max-h-[70dvh] flex-col rounded-t-2xl"
         >
@@ -460,7 +435,7 @@ export default function DishList() {
             <>
               <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                 <div className="text-base font-bold">📋 今日菜单</div>
-                <button onClick={close} className="w-8 h-8 rounded-full bg-bg flex items-center justify-center text-text2 active:scale-95 transition-transform">
+                <button onClick={close} aria-label="关闭今日菜单" className="w-11 h-11 rounded-full bg-bg flex items-center justify-center text-text2 active:scale-95 transition-transform">
                   <X size={16} />
                 </button>
               </div>
@@ -539,7 +514,8 @@ function TodayMenuItem({ record, dish, onDelete, onClick }: { record: MealRecord
   const dishHasImage = dish && isImageUrl(dish.image_url)
   const recordHasImage = !dishHasImage && isImageUrl(record.dish_image_url)
   return (
-    <div className="flex items-center gap-3 p-2.5 bg-bg rounded-xl transition-all active:scale-98" onClick={onClick}>
+    <div className="flex items-center gap-3 p-2.5 bg-bg rounded-xl">
+      <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`查看${record.dish_name}`}>
       <div className="w-[52px] h-[52px] rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-primary-light to-pink-light cursor-pointer">
         {dishHasImage ? (
           <DishImage dish={dish!} className="w-full h-full" emojiSize="text-[20px]" />
@@ -567,9 +543,10 @@ function TodayMenuItem({ record, dish, onDelete, onClick }: { record: MealRecord
           )}
         </div>
       </div>
+      </button>
       <button
-        onClick={(e) => { e.stopPropagation(); onDelete() }}
-        className="w-8 h-8 rounded-full bg-red-light text-red flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
+        onClick={onDelete} aria-label={`从今日菜单移除${record.dish_name}`}
+        className="w-11 h-11 rounded-full bg-red-light text-red flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
       >
         <Trash2 size={14} />
       </button>
@@ -590,35 +567,29 @@ interface DishRowProps {
 function DishRow({ dish, isFav, isLunch, isDinner, onToggleFav, onToggleMeal, onClick }: DishRowProps) {
   return (
     <div className="flex items-center gap-3 py-2.5 px-1 rounded-xl transition-all active:bg-card group">
-      <div
+      <button type="button" aria-label={`查看${dish.name}`}
         onClick={onClick}
-        className="w-[72px] h-[72px] rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-primary-light to-pink-light cursor-pointer"
+        className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-primary-light to-pink-light cursor-pointer"
       >
         <DishImage dish={dish} className="w-full h-full" emojiSize="text-[28px]" />
-      </div>
+      </button>
 
-      <div className="flex-1 min-w-0" onClick={onClick}>
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-[14px] font-semibold truncate">{dish.name}</span>
+      <div className="flex-1 min-w-0 relative">
+        <div className="flex items-center gap-1 mb-0.5">
+          <button type="button" onClick={onClick} className="min-h-11 min-w-0 flex-1 text-left text-[14px] font-semibold"><span className="line-clamp-2">{dish.name}</span></button>
           <button
             onClick={(e) => { e.stopPropagation(); onToggleFav() }}
-            className={`text-[14px] transition-all active:scale-90 flex-shrink-0 ${isFav ? "text-primary animate-heartbeat" : "text-text3 opacity-0 group-hover:opacity-100"}`}
+            aria-label={`${isFav ? "取消收藏" : "收藏"}${dish.name}`} aria-pressed={isFav}
+            className={`h-11 w-11 text-[18px] transition-all active:scale-90 flex-shrink-0 ${isFav ? "text-primary" : "text-text3"}`}
           >
             {isFav ? "❤" : "♡"}
           </button>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-text2 mb-1.5">
-          <span>{dish.category}</span>
-          <span className="w-[3px] h-[3px] rounded-full bg-text3" />
-          <span>{dish.cook_time}分钟</span>
-          <span className="w-[3px] h-[3px] rounded-full bg-text3" />
-          <span className={diffColor(dish.difficulty)}>{diffLabel(dish.difficulty)}</span>
-          {dish.taste && (
-            <>
-              <span className="w-[3px] h-[3px] rounded-full bg-text3" />
-              <span>{dish.taste}</span>
-            </>
-          )}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-text2 mb-2">
+          <span className="whitespace-nowrap">{dish.category}</span>
+          {dish.cook_time > 0 && <span className="whitespace-nowrap">{dish.cook_time}分钟</span>}
+          <span className={`whitespace-nowrap ${diffColor(dish.difficulty)}`}>{diffLabel(dish.difficulty)}</span>
+          {dish.taste && <span className="max-w-full truncate">{dish.taste}</span>}
         </div>
         <div className="flex items-center gap-2">
           <MealToggle active={isLunch} emoji="🍳" label="午餐" onClick={() => onToggleMeal("lunch")} color="primary" />
@@ -646,7 +617,8 @@ function MealToggle({ active, emoji, label, onClick, color }: MealToggleProps) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick() }}
-      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all active:scale-95 ${
+      aria-pressed={active} aria-label={`${active ? "移出" : "加入"}${label}`}
+      className={`flex flex-1 min-h-11 min-w-0 justify-center items-center gap-1 px-1.5 py-1 whitespace-nowrap rounded-full text-[11px] font-semibold border transition-all active:scale-95 ${
         active ? activeClass : inactiveClass
       }`}
     >

@@ -4,6 +4,7 @@
   <view wx:for="{{[1, 2, 3, 4]}}" wx:key="*this" class="skeleton sk"></view>
 </view>
 
+<request-state wx:elif="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 <view wx:else class="content anim-fade-up">
   <view class="card sec">
     <view class="sec__title">🚫 过敏原</view>
@@ -13,7 +14,7 @@
 
   <view class="card sec">
     <view class="sec__title">🙅 忌口</view>
-    <view class="sec__hint">尽量避开；实在没得选时才会放宽</view>
+    <view class="sec__hint">含有这些食材的菜也不会推荐</view>
     <tag-input value="{{form.avoid_ingredients}}" suggestions="{{commonAvoid}}" placeholder="如：香菜、内脏" bind:change="onAvoid" />
   </view>
 

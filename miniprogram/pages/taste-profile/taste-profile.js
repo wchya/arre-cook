@@ -16,6 +16,7 @@ Page({
   },
 
   async load() {
+    this.setData({ loadError: "", loading: true, error: false })
     try {
       const profile = await api.get("/profile", { days: 90 })
       this.setData({
@@ -33,7 +34,8 @@ Page({
         topDishes: (profile.top_dishes || []).slice(0, 5).map((dish) => ({ id: dish.dish_id, name: dish.dish_name, count: dish.count })),
         disliked: (profile.disliked_dishes || []).map((dish) => ({ id: dish.id, name: dish.name })),
       })
-    } catch (_) {
+    } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       this.setData({ error: true })
     } finally {
       this.setData({ loading: false })

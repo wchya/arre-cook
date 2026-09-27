@@ -1,0 +1,7 @@
+.state { display:flex; flex-direction:column; align-items:center; gap:24rpx; padding:100rpx 40rpx; text-align:center; }
+.state--compact { padding:48rpx 32rpx; }
+.state__title { font-size:30rpx; font-weight:600; color:var(--text); }
+.state__desc { max-width:560rpx; font-size:26rpx; color:var(--text2); line-height:1.7; }
+.state__retry { display:flex; align-items:center; justify-content:center; min-height:88rpx; margin:0; padding:16rpx 36rpx; background:var(--card); color:var(--text); border:1px solid var(--border2); border-radius:28rpx; font-size:28rpx; line-height:1.4; }
+.state__retry::after { border:0; }
+.state__skeleton { width:80rpx; height:80rpx; border-radius:28rpx; background:var(--border2); }

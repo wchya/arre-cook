@@ -46,6 +46,7 @@ Page({
   },
 
   async load() {
+    this.setData({ loadError: "", loading: true })
     this.setData({ loading: !this._loaded })
     try {
       const info = await api.get("/family")
@@ -74,6 +75,7 @@ Page({
       })
       if (hasFamily) await Promise.all([this.loadShopping(), this.loadRequests()])
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       ui.toast(error.message || "家庭信息加载失败")
     } finally {
       this._loaded = true
@@ -87,15 +89,17 @@ Page({
   },
 
   async loadShopping() {
+    this.setData({ shoppingError: "" })
     try {
       const items = await api.get("/family/shopping")
       const shopping = (items || []).map((i) => ({ id: i.id, name: i.name, amount: i.amount || "", checked: Boolean(i.checked) }))
       this.setData({ shopping, boughtCount: shopping.filter((i) => i.checked).length })
-    } catch (_) { /* 静默 */ }
+    } catch (error) { this.setData({ shoppingError: error.message || "买菜清单加载失败" }) }
   },
 
   // 家庭共享菜谱的删除申请：管理员看到全家的（可同意/拒绝），普通成员看到自己的（可撤回）。
   async loadRequests() {
+    this.setData({ requestsError: "" })
     try {
       const items = await api.get("/family/dish-requests")
       const requests = (items || []).map((r) => ({
@@ -111,7 +115,7 @@ Page({
         this._scrollToRequests = false
         wx.pageScrollTo({ selector: "#requests", offsetTop: -120, duration: 300 })
       })
-    } catch (_) { /* 静默 */ }
+    } catch (error) { this.setData({ requestsError: error.message || "删除申请加载失败" }) }
   },
 
   onReqCoverError(e) {

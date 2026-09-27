@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { X } from "lucide-react"
 
 // 标签输入：回车 / 逗号 / 空格添加，点 × 删除；可给出快捷选项
@@ -11,6 +11,7 @@ export default function TagInput({ value, onChange, placeholder, suggestions = [
   max?: number
 }) {
   const [draft, setDraft] = useState("")
+  const composing = useRef(false)
   const toneCls = tone === "red" ? "bg-red-light text-red" : tone === "mint" ? "bg-mint-light text-mint" : "bg-primary-light text-primary"
 
   function add(raw: string) {
@@ -32,19 +33,23 @@ export default function TagInput({ value, onChange, placeholder, suggestions = [
         {value.map((v) => (
           <span key={v} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold ${toneCls}`}>
             {v}
-            <button onClick={() => onChange(value.filter((x) => x !== v))} aria-label={`删除${v}`} className="opacity-70 hover:opacity-100">
+            <button type="button" onClick={() => onChange(value.filter((x) => x !== v))} aria-label={`删除${v}`} className="inline-flex h-8 w-8 items-center justify-center opacity-70 hover:opacity-100">
               <X size={12} strokeWidth={2.6} />
             </button>
           </span>
         ))}
         <input
           value={draft}
+          aria-label={placeholder || "添加标签"}
+          onCompositionStart={() => { composing.current = true }}
+          onCompositionEnd={() => { composing.current = false }}
           onChange={(e) => {
             const v = e.target.value
-            if (/[,，、]$/.test(v)) add(v)
+            if (!composing.current && /[,，、]$/.test(v)) add(v)
             else setDraft(v)
           }}
           onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || composing.current) return
             if (e.key === "Enter") {
               e.preventDefault()
               add(draft)
@@ -60,7 +65,7 @@ export default function TagInput({ value, onChange, placeholder, suggestions = [
       {rest.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {rest.slice(0, 12).map((s) => (
-            <button key={s} onClick={() => add(s)} className="rounded-full border border-dashed border-border2 px-2.5 py-1 text-[11px] font-medium text-text2 active:scale-95">
+            <button type="button" key={s} onClick={() => add(s)} className="min-h-11 rounded-full border border-dashed border-border2 px-3 py-2 text-xs font-medium text-text2 active:scale-95">
               + {s}
             </button>
           ))}

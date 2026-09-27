@@ -13,6 +13,8 @@ import { setMiniProgramShare } from "@/lib/miniprogram"
 
 // 子页面与管理后台按需加载，首屏只带首页相关代码
 const DishDetail = lazy(() => import("@/pages/DishDetail"))
+const About = lazy(() => import("@/pages/About"))
+const Legal = lazy(() => import("@/pages/Legal"))
 const DishEditor = lazy(() => import("@/pages/admin/DishEdit"))
 const Favorites = lazy(() => import("@/pages/Favorites"))
 const PhotoWall = lazy(() => import("@/pages/PhotoWall"))
@@ -89,6 +91,8 @@ export default function App() {
         <Suspense fallback={<Splash />}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/legal" element={<Legal />} />
+            <Route path="/about" element={<About />} />
 
             <Route element={<RequireAuth><MainLayout /></RequireAuth>}>
               <Route path="/" element={null} />

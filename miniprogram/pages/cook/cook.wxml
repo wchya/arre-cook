@@ -6,6 +6,7 @@
   <view class="progress"><view class="progress__bar" style="width:{{progress}}%;"></view></view>
 
   <view wx:if="{{loading}}" class="center-state"><view class="spinner"></view></view>
+  <request-state wx:elif="{{loadError}}" error="{{loadError}}" bind:retry="load" />
   <view wx:elif="{{!steps.length}}" class="center-state"><text class="empty-text">这道菜还没有制作步骤</text></view>
 
   <swiper wx:else class="stage" current="{{current}}" duration="300" bindchange="onSwiperChange">
@@ -19,8 +20,8 @@
           <view wx:if="{{item.time && index === current}}" class="timer" bindtap="toggleTimer">
             <view class="timer__ring" style="background:conic-gradient(#E8734A {{ringPct}}%, rgba(255,255,255,.1) 0);">
               <view class="timer__inner">
-                <view class="timer__clock {{running && remaining <= 10 ? 'anim-pulse' : ''}}">{{clock}}</view>
-                <view class="timer__state">{{running ? '进行中…' : remaining < total ? '已暂停' : '点击开始计时'}}</view>
+                <view class="timer__clock {{running && 10 >= remaining ? 'anim-pulse' : ''}}">{{clock}}</view>
+                <view class="timer__state">{{running ? '进行中…' : total > remaining ? '已暂停' : '点击开始计时'}}</view>
               </view>
             </view>
           </view>

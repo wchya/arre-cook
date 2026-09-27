@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { quotesApi } from "@/api"
@@ -24,7 +25,7 @@ export default function AdminQuotes() {
   const [form, setForm] = useState({ content: "", scene: "general" })
   const [filterScene, setFilterScene] = useState("")
 
-  const { data: rawQuotes, isLoading } = useQuery({
+  const { data: rawQuotes, isLoading , error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["quotes"],
     queryFn: () => quotesApi.list(),
   })
@@ -82,6 +83,8 @@ export default function AdminQuotes() {
       createMut.mutate(form)
     }
   }
+
+  if (loadError) return <div><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   if (isLoading) return <div className="p-8 text-center text-text2">加载中...</div>
 

@@ -44,6 +44,11 @@ export interface Dish {
   // 0 = 公共菜谱；否则为该用户的私房菜
   owner_id: number
   family_id: number
+  access?: {
+    can_edit: boolean
+    delete_mode: "direct" | "request" | "none"
+    pending_request_id: number
+  }
   tags: string[]
   sort_order: number
   created_at: string
@@ -667,10 +672,19 @@ export interface ChatSession {
   updated_at: string
 }
 
+export interface AssistantQuota {
+  limit: number
+  used: number
+  remaining: number
+  reset_at: string
+  blocked_reason?: "site_limit"
+}
+
 export interface AssistantStatus {
   llm_enabled: boolean
   model: string
   suggestions: string[]
+  quota: AssistantQuota
 }
 
 export interface AdminUser extends User {

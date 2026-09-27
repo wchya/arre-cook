@@ -17,11 +17,13 @@
             <text class="truncate">{{user ? user.nickname : '加载中…'}}</text>
             <icon name="notebook-pen" size="28" stroke="2.2" color="text3" />
           </view>
+          <view class="profile__details" hover-class="tap-fade" bindtap="go" data-url="/pages/account/account" aria-role="button" aria-label="查看个人资料">
           <view class="profile__email truncate">{{user ? (user.email || user.username) : ''}}</view>
           <view class="profile__badges">
             <text wx:if="{{user && user.role === 'admin'}}" class="badge-tag badge-tag--dark">管理员</text>
             <text wx:if="{{user && user.wechat_bound}}" class="badge-tag badge-tag--mint">已绑定微信</text>
             <text class="badge-tag">🏆 {{unlocked}} 个成就</text>
+          </view>
           </view>
         </view>
       </view>
@@ -136,6 +138,11 @@
 
       <view class="group">
         <view class="group-body">
+          <view class="row" hover-class="tap-bg" data-url="/pages/about/about" bindtap="go">
+            <view class="row-icon tone-muted"><icon name="info" size="34" stroke="2.3" color="text2" /></view>
+            <view class="row-main"><view class="row-title">关于我们</view><view class="row-desc">食谱站特色与使用指南</view></view>
+            <icon name="chevron-right" size="32" stroke="2" color="text4" />
+          </view>
           <view class="row" hover-class="tap-bg" data-url="/pages/account/account" bindtap="go">
             <view class="row-icon tone-muted"><icon name="shield" size="34" stroke="2.3" color="text2" /></view>
             <view class="row-main"><view class="row-title">账号与安全</view><view class="row-desc">密码、登录设备、导出与注销</view></view>
@@ -153,7 +160,7 @@
         <icon name="log-out" size="32" stroke="2.4" color="red" />
         <text>退出登录</text>
       </view>
-      <view class="foot">ss-menu · 你的数据只属于你</view>
+      <view class="foot">arre食谱推荐小助手 · 你的数据只属于你</view>
     </view>
     <view class="tabbar-spacer"></view>
   </scroll-view>

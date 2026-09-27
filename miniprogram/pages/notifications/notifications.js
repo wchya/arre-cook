@@ -37,6 +37,7 @@ Page({
   },
 
   async load() {
+    this.setData({ loadError: "", loading: true })
     try {
       const result = await api.get("/notifications", { pageSize: 50 })
       const items = (result.items || []).map((item) => {
@@ -45,6 +46,7 @@ Page({
       })
       this.setData({ items, unread: result.unread || 0 })
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       ui.toast(error.message || "消息暂时无法加载")
     } finally {
       this.setData({ loading: false })

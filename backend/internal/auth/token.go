@@ -16,7 +16,7 @@ import (
 
 // 令牌类型：
 //   - user：App/小程序登录态，拥有本人全部权限；
-//   - agent：嵌入式智能体会话令牌（短期，带 scopes），由用户在 App 内签发并通过 postMessage 交给 iframe；
+//   - agent：智能体会话令牌（短期，带 scopes），保留既有客户端接入协议；
 //   - 个人访问令牌（PAT，nm_ 前缀）不是 JWT，见 GeneratePAT。
 const (
 	KindUser         = "user"
@@ -92,7 +92,7 @@ func ParseToken(raw string) (*Claims, error) {
 			return nil, fmt.Errorf("意外的签名算法: %v", t.Header["alg"])
 		}
 		return []byte(config.C.JWTSecret), nil
-	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithIssuer(issuer))
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithIssuer(issuer), jwt.WithExpirationRequired(), jwt.WithIssuedAt())
 	if err != nil || !token.Valid {
 		return nil, errors.New("token 无效或已过期")
 	}

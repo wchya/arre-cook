@@ -47,6 +47,8 @@ func main() {
 		Addr:              ":" + config.C.Port,
 		Handler:           r,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		MaxHeaderBytes:    32 * 1024,
 		IdleTimeout:       120 * time.Second,
 		// 不设 WriteTimeout：AI 对话走 SSE 长连接
 	}
@@ -56,7 +58,7 @@ func main() {
 	go housekeeping(ctx)
 
 	go func() {
-		log.Printf("ss-menu 启动成功：http://localhost:%s（版本：%s，存储：%s，邮件：%v，微信登录：%v）",
+		log.Printf("arre食谱推荐小助手 启动成功：http://localhost:%s（版本：%s，存储：%s，邮件：%v，微信登录：%v）",
 			config.C.Port, config.C.AppVersion, storage.Backend(), config.C.SMTPEnabled(), config.C.WechatEnabled())
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("启动失败: %v", err)
@@ -89,6 +91,8 @@ func housekeeping(ctx context.Context) {
 	run := func() {
 		now := time.Now()
 		services.PurgeExpiredCodes()
+		database.DB.Where("expires_at < ?", now.Add(-time.Hour)).Delete(&models.AssistantLease{})
+		database.DB.Where("usage_date < ?", now.AddDate(0, 0, -180).Format("2006-01-02")).Delete(&models.AssistantUsage{})
 		database.DB.Model(&models.AgentSuggestion{}).
 			Where("status = ? AND expires_at IS NOT NULL AND expires_at < ?", "pending", now).
 			Update("status", "expired")

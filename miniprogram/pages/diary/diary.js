@@ -75,17 +75,20 @@ Page({
   },
 
   async loadJournal(force) {
+    const requestId = this._loadRequest = (this._loadRequest || 0) + 1
+    this.setData({ loadError: "" })
     if (this._journalLoaded && !force) { this.setData({ loading: false }); return }
     this.setData({ loading: !this.data.dayGroups.length })
     try {
       const from = fmt.dateKey(fmt.addDays(new Date(), -120))
       const list = await api.get("/food-journal", { from, to: fmt.dateKey() })
+      if (requestId !== this._loadRequest) return
       this.applyJournal(list || [])
       this._journalLoaded = true
     } catch (error) {
-      ui.toast(error.message || "饮食记录暂时无法加载")
+      if (requestId === this._loadRequest) this.setData({ loadError: error.message || "饮食记录暂时无法加载" })
     } finally {
-      this.setData({ loading: false })
+      if (requestId === this._loadRequest) this.setData({ loading: false })
     }
   },
 
@@ -114,17 +117,20 @@ Page({
   },
 
   async loadReport(force) {
+    const requestId = this._loadRequest = (this._loadRequest || 0) + 1
+    this.setData({ loadError: "" })
     const cacheKey = `_report${this.data.days}`
     if (this[cacheKey] && !force) { this.applyReport(this[cacheKey]); this.setData({ loading: false }); return }
     this.setData({ loading: true })
     try {
       const report = await api.get("/health-report", { days: this.data.days })
+      if (requestId !== this._loadRequest) return
       this[cacheKey] = report
       this.applyReport(report)
     } catch (error) {
-      ui.toast(error.message || "报告暂时无法生成")
+      if (requestId === this._loadRequest) this.setData({ loadError: error.message || "报告暂时无法生成" })
     } finally {
-      this.setData({ loading: false })
+      if (requestId === this._loadRequest) this.setData({ loading: false })
     }
   },
 

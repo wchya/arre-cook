@@ -5,6 +5,8 @@ import { authApi, errorMessage } from "@/api"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useAppInfoStore } from "@/store/useAppInfoStore"
 import toast from "react-hot-toast"
+import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
+import LegalContent from "@/components/LegalContent"
 import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, LockKeyhole, Mail, MessageCircle, ShieldCheck, UserRound, X } from "lucide-react"
 
 type Mode = "wechat" | "code" | "password"
@@ -28,6 +30,7 @@ export default function Login() {
 
   const [mode, setMode] = useState<Mode>("wechat")
   const [agreed, setAgreed] = useState(false)
+  const [legalType, setLegalType] = useState<"terms" | "privacy" | null>(null)
   const [focused, setFocused] = useState<"email" | "code" | "account" | "password" | "">("")
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [email, setEmail] = useState(() => {
@@ -148,9 +151,9 @@ export default function Login() {
         <div className="mb-8">
           <img src="/chef-mark.svg" alt={appName} className="mb-5 h-[68px] w-[68px] rounded-[20px] shadow-[0_14px_36px_rgba(232,115,74,.28)]" />
           <h1 className="text-[30px] font-black leading-tight tracking-tight text-text">
-            今天吃什么，
+            今天吃什么？
             <br />
-            <span className="text-primary">交给 ss-menu</span>
+            <span className="mt-2 block text-[22px] leading-snug text-primary">{appName}</span>
           </h1>
           <p className="mt-2.5 text-[14px] leading-relaxed text-text2">按你的口味推荐每一餐，AI 助手帮你排菜单、记饮食、列清单。</p>
         </div>
@@ -161,7 +164,7 @@ export default function Login() {
               <button
                 key={key}
                 onClick={() => setMode(key)}
-                className={`flex h-9 items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition-all ${mode === key ? "bg-card text-text shadow-sm" : "text-text3"}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition-all ${mode === key ? "bg-card text-text shadow-sm" : "text-text3"}`}
               >
                 <Icon size={15} strokeWidth={2.4} />
                 {label}
@@ -253,16 +256,26 @@ export default function Login() {
         </div>
 
         <div className="mt-auto pt-6 text-center">
-          <button onClick={() => setAgreed((value) => !value)} className="inline-flex items-start gap-2 text-[11px] leading-relaxed text-text2">
-            <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${agreed ? "border-primary bg-primary text-white" : "border-text4 bg-card"}`}>{agreed && "✓"}</span>
-            <span>我已阅读并同意《用户服务协议》和《隐私政策》</span>
-          </button>
+          <div className="flex items-center justify-center gap-1 text-xs leading-relaxed text-text2">
+            <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="h-5 w-5 accent-primary" aria-label="同意用户服务协议和隐私政策" />
+              我已阅读并同意
+            </label>
+            <span><a href="/legal?type=terms" onClick={(event) => { event.preventDefault(); setLegalType("terms") }} className="inline-block py-2 text-primary underline underline-offset-4">《用户服务协议》</a>和<a href="/legal?type=privacy" onClick={(event) => { event.preventDefault(); setLegalType("privacy") }} className="inline-block py-2 text-primary underline underline-offset-4">《隐私政策》</a></span>
+          </div>
+          <a href="/about" className="inline-flex min-h-11 items-center text-xs text-primary underline underline-offset-4">关于我们 · 特色与使用指南</a>
           <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-text3">
             <ShieldCheck size={13} strokeWidth={2.4} />
             你的饮食数据只属于你，AI 也只能读取你授权的部分
           </div>
         </div>
       </div>
+      {legalType && <AnimatedBottomSheet label={legalType === "terms" ? "用户服务协议" : "隐私政策"} onClose={() => setLegalType(null)}>
+        {({ close }) => <div className="p-5">
+          <div className="mb-5 flex items-center justify-between gap-3"><h1 className="text-lg font-bold">{legalType === "terms" ? "用户服务协议" : "隐私政策"}</h1><button type="button" onClick={close} aria-label="关闭协议" className="flex h-11 w-11 items-center justify-center rounded-full bg-bg"><X size={20} /></button></div>
+          <LegalContent type={legalType} />
+        </div>}
+      </AnimatedBottomSheet>}
     </div>
   )
 }

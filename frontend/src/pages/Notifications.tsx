@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Bell, ChevronRight, ShieldCheck, Sparkles, Wrench, HeartPulse, UsersRound, X } from "lucide-react"
@@ -30,7 +31,7 @@ export default function Notifications() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [selected, setSelected] = useState<Notification | null>(null)
-  const { data, isLoading, isError } = useQuery({ queryKey: ["notifications"], queryFn: () => notificationsApi.list({ pageSize: 50 }) })
+  const { data, isLoading, isError , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["notifications"], queryFn: () => notificationsApi.list({ pageSize: 50 }) })
   const readMut = useMutation({
     mutationFn: (id: number) => notificationsApi.markRead(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["notifications"] }),
@@ -42,6 +43,8 @@ export default function Notifications() {
     onError: (err) => toast.error(errorMessage(err)),
   })
   const items = data?.items || []
+  if (loadError) return <div><PageHeader title="站内信" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
+
   return (
     <div className="min-h-dvh bg-bg pb-8">
       <PageHeader title="站内信" subtitle={data?.unread ? `${data.unread} 条未读消息` : "消息与服务提醒"} icon={Bell} onBack={() => navigate(-1)} actions={data?.unread ? <button onClick={() => allMut.mutate()} disabled={allMut.isPending} className="rounded-md px-2 py-1 text-xs font-semibold text-text2 hover:bg-card">全部已读</button> : undefined} />
@@ -64,14 +67,14 @@ function NotificationRow({ item, onRead, onOpen }: { item: Notification; onRead:
 function NotificationDetail({ item, onClose }: { item: Notification; onClose: () => void }) {
   const info = meta[item.type] || meta.system_update
   const Icon = info.icon
-  return <AnimatedBottomSheet onClose={onClose} className="max-h-[82dvh] rounded-t-3xl p-5 pb-8">
+  return <AnimatedBottomSheet onClose={onClose} label="站内信详情" className="max-h-[82dvh] rounded-t-3xl p-5 pb-8">
     <div className="mb-4 flex items-start gap-3">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${info.tone}`}><Icon size={19} /></span>
       <div className="min-w-0 flex-1">
         <div className="text-base font-extrabold leading-6 text-text">{item.title}</div>
         <div className="mt-1 text-xs text-text3">{info.label} · {timeLabel(item.created_at)}</div>
       </div>
-      <button onClick={onClose} aria-label="关闭详情" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg text-text2"><X size={16} /></button>
+      <button onClick={onClose} aria-label="关闭详情" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg text-text2"><X size={16} /></button>
     </div>
     <div className="max-h-[52dvh] overflow-y-auto whitespace-pre-wrap break-words rounded-2xl bg-bg px-4 py-4 text-sm leading-7 text-text2">{item.content}</div>
   </AnimatedBottomSheet>

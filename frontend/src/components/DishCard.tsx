@@ -1,52 +1,34 @@
+import { Heart } from "lucide-react"
 import type { Dish } from "@/types"
 import DishImage from "@/components/DishImage"
 import { cardShadow } from "@/components/Card"
 
-function diffLabel(d: string) { return d === "easy" ? "简单" : d === "medium" ? "中等" : "困难" }
-function diffColor(d: string) { return d === "easy" ? "text-mint" : d === "medium" ? "text-yellow" : "text-primary" }
-
 interface DishCardProps {
   dish: Dish
   onClick?: () => void
-  /** 是否显示收藏爱心角标 */
   showFav?: boolean
-  /** 当前是否已收藏 */
   favActive?: boolean
-  /** 点击爱心回调（已 stopPropagation） */
   onToggleFav?: () => void
-  /** 是否显示左下难度角标 */
   showDifficulty?: boolean
 }
 
-// 菜品网格卡：Home 心情推荐 / DishList 主网格复用
 export default function DishCard({ dish, onClick, showFav, favActive, onToggleFav, showDifficulty }: DishCardProps) {
   return (
-    <button
-      onClick={onClick}
-      className={`bg-card rounded-2xl overflow-hidden border border-border ${cardShadow} transition-transform duration-200 ease-[var(--ease-spring)] active:scale-97 text-left w-full`}
-    >
-      <div className="h-[120px] bg-gradient-to-br from-primary-light to-pink-light relative">
-        <DishImage dish={dish} className="w-full h-full" />
-        {showFav && (
-          <span
-            onClick={(e) => { e.stopPropagation(); onToggleFav?.() }}
-            className={`absolute top-2 right-2 w-7 h-7 rounded-full border border-glass-border glass-strong flex items-center justify-center text-sm shadow-sm transition-transform duration-200 ease-[var(--ease-spring)] active:scale-85 ${favActive ? "text-primary animate-heartbeat" : "text-text3"}`}
-          >
-            {favActive ? "❤" : "♡"}
-          </span>
-        )}
-        {showDifficulty && (
-          <span className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-glass-border glass-strong ${diffColor(dish.difficulty)}`}>
-            {diffLabel(dish.difficulty)}
-          </span>
-        )}
-      </div>
-      <div className="px-3 py-2.5">
-        <div className="text-sm font-semibold truncate mb-1">{dish.name}</div>
-        <div className="flex gap-1.5 items-center text-[11px] text-text2">
-          {dish.category} <span className="w-[3px] h-[3px] rounded-full bg-text3" /> {dish.cook_time}分钟
+    <article className={`relative min-w-0 overflow-hidden rounded-2xl border border-border bg-card ${cardShadow}`}>
+      <button type="button" onClick={onClick} className="block w-full text-left transition-colors hover:bg-bg active:bg-primary-light" aria-label={`查看${dish.name}`}>
+        <div className="relative h-[132px] bg-primary-light">
+          <DishImage dish={dish} className="h-full w-full" />
+          {showDifficulty && <span className="absolute bottom-2 left-2 rounded-lg bg-card/95 px-2 py-1 text-[11px] font-medium text-text2">{dish.difficulty === "easy" ? "简单" : dish.difficulty === "medium" ? "中等" : "困难"}</span>}
         </div>
-      </div>
-    </button>
+        <div className="px-3 py-3">
+          <h3 className="mb-1 truncate text-sm font-semibold">{dish.name}</h3>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text2"><span>{dish.category || "家常菜"}</span><span aria-hidden="true">·</span><span>{dish.cook_time > 0 ? `${dish.cook_time} 分钟` : "时间待补充"}</span></div>
+        </div>
+      </button>
+      {showFav && <button type="button" onClick={onToggleFav} aria-pressed={Boolean(favActive)} aria-label={`${favActive ? "取消收藏" : "收藏"}${dish.name}`}
+        className={`absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card/95 shadow-sm transition-colors ${favActive ? "text-primary" : "text-text2"}`}>
+        <Heart size={19} fill={favActive ? "currentColor" : "none"} />
+      </button>}
+    </article>
   )
 }

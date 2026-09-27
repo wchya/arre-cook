@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { achievementsApi } from "@/api"
@@ -12,7 +13,7 @@ export default function AdminAchievements() {
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ code: "", name: "", description: "", icon: "🏆", condition: "manual" })
 
-  const { data: rawAchievements, isLoading } = useQuery({
+  const { data: rawAchievements, isLoading , error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["achievements"],
     queryFn: () => achievementsApi.list(),
   })
@@ -67,6 +68,8 @@ export default function AdminAchievements() {
       createMut.mutate(form)
     }
   }
+
+  if (loadError) return <div><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   if (isLoading) return <div className="p-8 text-center text-text2">加载中...</div>
 

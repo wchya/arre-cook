@@ -7,10 +7,10 @@
     "bgTopWarm": "#FFE9DE"
   },
   "dark": {
-    "bg": "#121016",
+    "bg": "#131316",
     "navTxt": "white",
     "bgTxt": "light",
-    "bgTop": "#38241C",
+    "bgTop": "#3A2419",
     "bgTopWarm": "#45291D"
   }
 }

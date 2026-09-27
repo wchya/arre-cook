@@ -30,7 +30,7 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .meal-tag { padding: 2rpx 20rpx; border-radius: 999rpx; background: var(--glass-strong); color: var(--primary); font-size: 20rpx; font-weight: 600; -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); transition: background-color .2s ease, color .2s ease; }
 .meal-tag--mint { color: var(--mint-ink); }
 .meal-tag--lunch { background: var(--primary); color: #fff; }
-.meal-tag--dinner { background: var(--mint); color: #fff; }
+.meal-tag--dinner { background: var(--mint-action); color: #fff; }
 .rec-card__name { margin-bottom: 12rpx; color: var(--text); font-size: 40rpx; font-weight: 700; line-height: 1.35; }
 .rec-card__reasons { margin-top: 20rpx; gap: 12rpx; }
 .rec-card__actions { display: flex; gap: 20rpx; margin-top: 28rpx; }

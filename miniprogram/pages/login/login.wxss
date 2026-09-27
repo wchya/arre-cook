@@ -69,3 +69,7 @@ page { background: var(--bg); }
 .doc-row { display: flex; align-items: center; gap: 22rpx; padding: 26rpx 28rpx; transition: background-color .15s ease; }
 .doc-row + .doc-row { border-top: 1px solid var(--border); }
 .consent-sheet__cancel { margin-top: 12rpx; color: var(--text3); font-weight: 600; }
+
+.brand__name { margin-top:16rpx; color:var(--primary); font-size:44rpx; font-weight:800; line-height:1.4; }
+
+.about-link { display: flex; justify-content: center; align-items: center; min-height: 44px; color: var(--primary); font-size: 24rpx; text-decoration: underline; }

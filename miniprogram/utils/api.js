@@ -43,6 +43,10 @@ function request(method, path, data) {
         ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
       },
       success(response) {
+        if (auth && auth !== token()) {
+          reject(new Error("登录状态已变化，请重新加载"))
+          return
+        }
         const body = response.data || {}
         if (response.statusCode >= 200 && response.statusCode < 300) redirecting = false
         if (response.statusCode === 401 && auth) {
@@ -67,14 +71,19 @@ function request(method, path, data) {
 // 上传图片：返回服务端给出的原始地址（/uploads/... 或对象存储地址），提交给接口时必须用原始地址。
 function upload(filePath) {
   const app = getApp()
+  const auth = token()
   return new Promise((resolve, reject) => {
     wx.uploadFile({
       url: `${app.globalData.apiBase}/upload/image`,
       filePath,
       name: "image",
       timeout: 60000,
-      header: { Authorization: `Bearer ${token()}` },
+      header: { Authorization: `Bearer ${auth}` },
       success(response) {
+        if (auth !== token()) {
+          reject(new Error("登录状态已变化，请重新上传"))
+          return
+        }
         let body = {}
         try { body = JSON.parse(response.data || "{}") } catch (_) { body = {} }
         if (response.statusCode === 401) {

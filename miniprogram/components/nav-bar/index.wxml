@@ -15,7 +15,7 @@
       <icon name="{{icon}}" size="42" stroke="2.45" color="primary" />
     </view>
     <view class="nav__titles" style="{{theme === 'transparent' ? 'opacity:' + opacity : ''}}">
-      <view class="nav__title">{{title}}<text wx:if="{{accent}}" class="nav__accent">{{accent}}</text></view>
+      <view class="nav__title {{title.length > 10 ? 'nav__title--long' : ''}}">{{title}}<text wx:if="{{accent}}" class="nav__accent">{{accent}}</text></view>
       <view wx:if="{{subtitle}}" class="nav__subtitle">{{subtitle}}</view>
     </view>
     <view class="nav__extra"><slot></slot></view>

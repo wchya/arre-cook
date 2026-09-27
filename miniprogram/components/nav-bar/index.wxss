@@ -20,7 +20,10 @@
 .nav__titles { flex: 1; min-width: 0; }
 .nav__title { overflow: hidden; color: var(--text); font-size: 34rpx; font-weight: 800; line-height: 1.2; letter-spacing: -.5rpx; white-space: nowrap; text-overflow: ellipsis; }
 .nav__accent { color: var(--primary); }
+.nav__title--long { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 28rpx; white-space: normal; }
 .nav__subtitle { overflow: hidden; margin-top: 4rpx; color: var(--text3); font-size: 22rpx; font-weight: 500; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
 .nav--dark .nav__title { color: #fff; }
 .nav--dark .nav__subtitle { color: rgba(255, 255, 255, .5); }
 .nav__extra { display: flex; flex-shrink: 0; align-items: center; gap: 12rpx; }
+
+.nav__btn { min-width:44px; min-height:44px; }

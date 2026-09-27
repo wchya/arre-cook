@@ -1,13 +1,23 @@
-<nav-bar title="{{isNew ? '新建私房菜' : '编辑菜品'}}" subtitle="只有你自己看得到" icon="chef-hat" />
+<nav-bar title="{{isNew ? '新建私房菜' : '编辑菜品'}}" subtitle="{{alreadyFamily || shareFamily ? '家庭成员可见' : '仅自己可见'}}" icon="chef-hat" />
 
-<view class="content anim-fade-up de-body">
+<request-state wx:if="{{loading || error}}" error="{{error}}" retrying="{{loading}}" bind:retry="initialize" />
+<view wx:elif="{{recovery}}" class="content">
+  <view class="draft-notice">
+    <view class="draft-title">有一份未完成的草稿</view>
+    <view class="draft-desc">保存于 {{recovery.time}}。恢复后可继续编辑，保存才会更新菜谱。</view>
+    <button class="btn btn-primary mt-24" bindtap="resumeDraft">继续编辑草稿</button>
+    <button class="btn btn-ghost mt-16" bindtap="discardDraft">丢弃旧草稿</button>
+  </view>
+</view>
+<view wx:else class="content anim-fade-up de-body">
+  <view class="draft-status">{{draftStatus}}</view>
   <view class="card de-sec">
     <view class="de-sec__title"><icon name="notebook-pen" size="26" stroke="2.4" color="primary" /><text>基本信息</text></view>
 
     <view class="de-field">
       <view class="field-label">菜品名称 *</view>
       <view class="field {{focusKey === 'name' ? 'is-focus' : ''}}">
-        <input class="field-input" value="{{name}}" maxlength="30" placeholder="如：番茄炒蛋" placeholder-class="placeholder" data-key="name" bindfocus="onFocus" bindblur="onBlur" bindinput="onName" />
+        <input class="field-input" value="{{name}}" maxlength="100" placeholder="如：番茄炒蛋" placeholder-class="placeholder" data-key="name" bindfocus="onFocus" bindblur="onBlur" bindinput="onName" />
       </view>
     </view>
 
@@ -39,7 +49,7 @@
       <tag-input value="{{tasteList}}" suggestions="{{tastes}}" tone="primary" placeholder="添加口味，回车确认" bind:change="onTasteChange" />
     </view>
 
-    <view class="de-field flex gap-24">
+    <view class="de-field de-numbers">
       <view class="flex-1">
         <view class="field-label">烹饪时间</view>
         <view class="de-num">
@@ -89,7 +99,7 @@
     <view class="de-field">
       <view class="field-label">教程视频链接</view>
       <view class="field {{focusKey === 'video' ? 'is-focus' : ''}}">
-        <input class="field-input" value="{{videoUrl}}" placeholder="B站 / 抖音链接" placeholder-class="placeholder" data-key="video" bindfocus="onFocus" bindblur="onBlur" bindinput="onVideo" />
+        <input class="field-input" maxlength="2048" value="{{videoUrl}}" placeholder="B站 / 抖音链接" placeholder-class="placeholder" data-key="video" bindfocus="onFocus" bindblur="onBlur" bindinput="onVideo" />
       </view>
       <view wx:if="{{videoChecking}}" class="de-vp de-vp--loading">
         <view class="spinner"></view><text>正在获取链接预览…</text>
@@ -134,16 +144,16 @@
     <view class="de-sec__title"><icon name="soup" size="26" stroke="2.4" color="primary" /><text>食材与步骤</text></view>
     <view class="de-field">
       <view class="field-label">配料清单</view>
-      <textarea class="field-textarea {{focusKey === 'ing' ? 'is-focus' : ''}}" value="{{ingredientsText}}" placeholder="每行一样，如：番茄 2个" placeholder-class="placeholder" data-key="ing" bindfocus="onFocus" bindblur="onBlur" bindinput="onIngredients" auto-height />
+      <textarea maxlength="100000" class="field-textarea {{focusKey === 'ing' ? 'is-focus' : ''}}" value="{{ingredientsText}}" placeholder="每行一样，如：番茄 2个" placeholder-class="placeholder" data-key="ing" bindfocus="onFocus" bindblur="onBlur" bindinput="onIngredients" auto-height />
       <view class="field-hint">每行「名称 数量」，最后一段作为数量</view>
     </view>
     <view class="de-field">
       <view class="field-label">调料清单</view>
-      <textarea class="field-textarea {{focusKey === 'sea' ? 'is-focus' : ''}}" value="{{seasoningsText}}" placeholder="如：盐 1茶匙" placeholder-class="placeholder" data-key="sea" bindfocus="onFocus" bindblur="onBlur" bindinput="onSeasonings" auto-height />
+      <textarea maxlength="100000" class="field-textarea {{focusKey === 'sea' ? 'is-focus' : ''}}" value="{{seasoningsText}}" placeholder="如：盐 1茶匙" placeholder-class="placeholder" data-key="sea" bindfocus="onFocus" bindblur="onBlur" bindinput="onSeasonings" auto-height />
     </view>
     <view class="de-field">
       <view class="field-label">制作步骤</view>
-      <textarea class="field-textarea {{focusKey === 'step' ? 'is-focus' : ''}}" value="{{stepsText}}" placeholder="每行一步，可写 (3分钟) 标注时间" placeholder-class="placeholder" data-key="step" bindfocus="onFocus" bindblur="onBlur" bindinput="onSteps" auto-height />
+      <textarea maxlength="100000" class="field-textarea {{focusKey === 'step' ? 'is-focus' : ''}}" value="{{stepsText}}" placeholder="每行一步，可写 (3分钟) 标注时间" placeholder-class="placeholder" data-key="step" bindfocus="onFocus" bindblur="onBlur" bindinput="onSteps" auto-height />
     </view>
   </view>
 
@@ -155,14 +165,14 @@
     </view>
     <view class="de-field">
       <view class="field-label">备注</view>
-      <textarea class="field-textarea {{focusKey === 'remark' ? 'is-focus' : ''}}" value="{{remark}}" placeholder="烹饪小贴士、注意事项…" placeholder-class="placeholder" data-key="remark" bindfocus="onFocus" bindblur="onBlur" bindinput="onRemark" auto-height />
+      <textarea maxlength="500" class="field-textarea {{focusKey === 'remark' ? 'is-focus' : ''}}" value="{{remark}}" placeholder="烹饪小贴士、注意事项…" placeholder-class="placeholder" data-key="remark" bindfocus="onFocus" bindblur="onBlur" bindinput="onRemark" auto-height />
     </view>
   </view>
 </view>
 
-<view class="de-save">
-  <view class="btn btn-primary btn-lg btn-block {{name && !saving ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="save">
+<view wx:if="{{!loading && !error && !recovery}}" class="de-save">
+  <button class="btn btn-primary btn-lg btn-block" disabled="{{!name || saving || uploadingCover || uploadingExtra}}" hover-class="tap-active" bindtap="save">
     <view wx:if="{{saving}}" class="spinner"></view>
-    <block wx:else><icon name="check" size="30" stroke="2.6" color="white" /><text>{{isNew ? '创建私房菜' : '保存修改'}}</text></block>
-  </view>
+    <block wx:else><icon name="check" size="30" stroke="2.6" color="white" /><text>{{uploadingCover || uploadingExtra ? '图片上传中…' : isNew ? '创建私房菜' : '保存修改'}}</text></block>
+  </button>
 </view>

@@ -45,3 +45,14 @@
 .de-switch.is-on { background: var(--primary); }
 .de-switch__dot { width: 44rpx; height: 44rpx; border-radius: 50%; background: #fff; box-shadow: 0 2rpx 6rpx rgba(0,0,0,.2); transition: transform .2s; }
 .de-switch.is-on .de-switch__dot { transform: translateX(36rpx); }
+
+.de-numbers { display:grid; grid-template-columns:minmax(0,1fr); gap:24rpx; }
+.de-num { max-width:100%; }
+.de-thumb__del { width:80rpx; height:80rpx; }
+.de-vp__badges { flex-wrap:wrap; }
+.de-vp__cover { width:160rpx; }
+.draft-notice { padding:32rpx; border:1px solid var(--border2); border-radius:32rpx; background:var(--primary-light); }
+.draft-title { font-size:30rpx; font-weight:700; }
+.draft-desc { margin-top:12rpx; color:var(--text2); font-size:26rpx; line-height:1.7; }
+.draft-status { margin-bottom:24rpx; color:var(--text2); font-size:24rpx; }
+@media (min-width:400px) { .de-numbers { grid-template-columns:repeat(2,minmax(0,1fr)); } }

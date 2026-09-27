@@ -1,11 +1,9 @@
-# ss-menu 开发指南
+# arre食谱推荐小助手 开发指南
 
 ## 环境要求
 
 - Go 1.25+
-- Node.js 20+
-- Python 3.10+（图片工具脚本）
-- uv（Python 包管理）
+- Node.js 20.19+ 或 22.12+（Vite 8 / jsdom 30）
 
 ## 后端开发
 
@@ -20,7 +18,7 @@ go run cmd/server/main.go
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -60,10 +58,12 @@ chmod +x ninimenu
 | `PORT` | `8080` | 服务端口 |
 | `ADMIN_EMAIL` | 空 | 初始管理员邮箱；旧单用户数据迁移给该管理员 |
 | `ADMIN_USERNAME` | `admin` | 初始管理员用户名 |
-| `ADMIN_PASSWORD` | `nini123` | 仅用于首次创建管理员和密码登录兜底；生产环境必须显式设置强密码 |
+| `ADMIN_PASSWORD` | 仅开发有默认值 | 仅用于首次创建管理员和密码登录兜底；生产环境必须显式设置强密码 |
 | `JWT_SECRET` | 开发用固定值 | JWT 签名密钥；生产环境必须设置至少 32 字节随机值 |
 | `ALLOW_REGISTER` | `true` | 是否允许新邮箱注册 |
 | `JWT_EXPIRE` | `720h` | 登录令牌有效期 |
+| `DB_DRIVER` | `sqlite` | 本地用 SQLite；生产为 `mysql` |
+| `MYSQL_DSN` | 空 | 生产 MySQL DSN，保存在受保护的部署配置中 |
 | `DB_PATH` | `data/ninimenu.db` | SQLite 数据库路径 |
 | `UPLOAD_DIR` | `uploads` | 本地上传目录；配置 S3 后使用对象存储 |
 | `MAX_UPLOAD_SIZE_MB` | `5` | 图片上传大小上限 |
@@ -75,7 +75,7 @@ chmod +x ninimenu
 | `S3_ENDPOINT` / `S3_BUCKET` | `http://127.0.0.1:3900` / `cook-uploads` | S3 兼容对象存储；生产环境使用博客 Garage 的独立 bucket |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | 空 | 容器内的对象存储访问凭据；Compose 从 `.env` 的 `COOK_S3_ACCESS_KEY` / `COOK_S3_SECRET_KEY` 注入 |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | DeepSeek 默认地址 / 空 / `deepseek-chat` | 可选的站内 AI 模型服务 |
-| `AGENT_RATE_LIMIT` | `120` | 每个 Agent 令牌每分钟请求上限 |
+| `AGENT_RATE_LIMIT` | `120` | 外部 Agent 每账号每分钟请求上限，多个令牌共用；非正数回落 120，上限 600；与站内助手每日次数分开 |
 
 可在项目根目录创建 `.env`。生产部署请按 `.env.example` 配置，具体 Compose、QQ 邮箱、Garage 和反向代理步骤见 [部署指南](docs/deployment.md)。`APP_PASSWORD` 与全站 `AGENT_TOKEN` 已不再使用；Agent 访问凭据由用户在「我的 → AI 连接」单独创建。
 
@@ -97,39 +97,17 @@ PNG 截图转 JPG quality=85 通常减少 70-90% 体积，视觉几乎无损。
 
 上传失败时前端会展示后端返回的具体错误信息（如"图片大小不能超过5MB"），而非通用提示。
 
-小程序端还必须在微信公众平台配置 request 合法域名和隐私保护指引（见 [微信小程序指南](docs/miniprogram.md)）；代码无法绕过这两个平台开关。
+小程序端还必须在微信公众平台配置 request、uploadFile 合法域名和隐私保护指引（见 [微信小程序指南](docs/miniprogram.md)）；代码无法绕过这两个平台开关。
 
-## 图片工具脚本
+## 品牌资源
 
-脚本依赖 `openai` 和 `pillow`，安装：
+Web 和小程序的名称统一为「arre食谱推荐小助手」。技术标识（Go module、数据库、容器、缓存键）保留 `ninimenu`，避免破坏兼容性。
 
-```bash
-uv sync
-```
-
-### 单张生成
-
-```bash
-uv run python scripts/generate_dish_image.py --prompt "菜品为番茄炒蛋 将宽高比设为 1:1" --output tomato_egg.png
-```
-
-### 批量生成
-
-编辑 `dish_images.txt`，格式为 `菜品名 输出路径`，然后：
-
-```bash
-uv run python scripts/generate_dish_images_batch.py --input dish_images.txt --output-root output
-```
-
-支持 `--submit-only`（仅提交请求）和 `--recover-history`（从历史记录下载）模式。
-
-### 图片压缩（离线批量处理）
-
-```bash
-uv run python scripts/compress_upload_images.py --input-dir output/uploads --auto-quality
-```
-
-> 这是离线批量脚本，用于压缩预生成的菜品图片。运行时上传压缩由 Go 后端自动完成。
+- Web 登录标记：`frontend/public/chef-mark.svg`。
+- 小程序登录标记：`miniprogram/assets/chef-mark.svg`。
+- Web PWA 图标：`frontend/public/32.png` 至 `512.png` 及 `manifest.json`。
+- 本仓库当前没有历史文档中提到的 Python 图片生成脚本与 `pyproject.toml`；替换素材时直接更新上述资源。
+- Go 图标处理工具源码在 `backend/cmd/imgtool/main.go`，可用 `go run ./cmd/imgtool -help` 查看用法。
 
 ## Go 图片处理依赖
 
@@ -143,7 +121,7 @@ uv run python scripts/compress_upload_images.py --input-dir output/uploads --aut
 ## 项目结构
 
 ```
-NiniMenu/
+arre-cook/
 ├── backend/                    # Go 后端
 │   ├── cmd/
 │   │   ├── server/main.go      # 服务入口
@@ -160,7 +138,6 @@ NiniMenu/
 │   │   ├── dishes/             # 菜品种子数据包
 │   │   ├── achievements/       # 成就目录
 │   │   └── utils/              # 工具函数
-│   ├── imgtool.exe             # 图片白边去除 & 多尺寸图标生成工具
 │   ├── data/                   # SQLite 数据库
 │   ├── uploads/                # 用户上传图片（压缩后的 JPG）
 │   ├── uploads_backup/         # 用户上传原图备份
@@ -174,10 +151,10 @@ NiniMenu/
 │   │   ├── types/              # TypeScript 类型
 │   │   └── api/                # API 封装（含上传错误信息提取）
 │   └── public/                 # 静态资源 & PWA 图标
-├── scripts/                    # Python 图片工具脚本
+├── miniprogram/                # 原生微信小程序页面、组件、工具
+├── scripts/                    # 版本计算、客户端回归测试
 ├── build_windows.bat           # Windows 构建脚本
 ├── build_linux.bat             # Linux 构建脚本
-├── pyproject.toml              # Python 脚本依赖
 └── .env                        # 本地环境变量
 ```
 
@@ -186,44 +163,42 @@ NiniMenu/
 ### 公开接口
 
 | 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/app/login` | 应用端密码登录 |
-| POST | `/api/admin/login` | 管理端密码登录 |
-| GET | `/api/app-info` | 应用信息（名称等） |
+|---|---|---|
+| GET | `/api/app-info`、`/api/auth/options` | 应用名称、登录能力 |
+| POST | `/api/auth/email/code`、`/api/auth/email/login` | 邮箱验证码申请与登录 |
+| POST | `/api/auth/login`、`/api/auth/wechat` | 密码、微信登录 |
+| GET | `/healthz` | 容器健康、存储、应用版本 |
 
-### 应用接口（需 App Token 或 JWT）
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/dishes` | 菜品列表 |
-| GET | `/api/dishes/:id` | 菜品详情 |
-| GET | `/api/dishes/:id/records` | 菜品用餐记录 |
-| GET/POST/PUT/DELETE | `/api/records` | 用餐记录 CRUD |
-| POST | `/api/records/batch` | 批量创建记录 |
-| GET/POST | `/api/favorites/:dishId` | 收藏/取消收藏 |
-| POST | `/api/pick/lunch\|dinner\|mood\|tomorrow` | 各类推荐（午/晚餐与心情推荐已接入推荐引擎） |
-| POST | `/api/pick/smart` | 智能推荐：口味画像 + 约束打分，返回带理由的结果 |
-| GET | `/api/profile` | 口味画像 |
-| POST | `/api/behavior` | 前端行为埋点（view / accept / reject …） |
-| GET/POST | `/api/day-rating` | 每日评价 |
-| GET | `/api/photo-wall` | 照片墙 |
-| GET/POST | `/api/shopping-list` | 购物清单 |
-| GET | `/api/week-plan` | 周计划 |
-| GET | `/api/achievements` | 成就列表 |
-| GET | `/api/stats` | 统计数据 |
-
-### 管理接口（需 JWT）
+### 用户接口（需用户 JWT）
 
 | 方法 | 路径 | 说明 |
-|------|------|------|
-| CRUD | `/api/dishes` | 菜品管理 |
-| POST | `/api/dishes/batch-*` | 批量操作 |
-| POST | `/api/upload/image` | 图片上传（自动备份+压缩） |
-| DELETE | `/api/upload/image` | 图片删除 |
-| CRUD | `/api/quotes` | 语录管理 |
-| CRUD | `/api/achievements` | 成就管理 |
-| PUT | `/api/settings` | 系统设置 |
-| GET | `/api/admin/dashboard` | 仪表盘 |
+|---|---|---|
+| GET/PUT | `/api/me`、`/api/me/preferences` | 当前用户资料与偏好 |
+| GET/POST | `/api/dishes` | 查询可见菜谱、创建私房菜；管理员可显式创建公共菜谱 |
+| GET/PUT/DELETE | `/api/dishes/:id` | 详情及按作者/家庭权限校验的修改、删除 |
+| GET | `/api/dishes/category-counts?scope=mine` | 本人个人菜谱分类计数 |
+| GET/POST | `/api/records` | 查询与创建记录；查询支持 `from`、`to`、分页 |
+| PUT/DELETE | `/api/records/:id` | 更新或删除自己的记录 |
+| GET | `/api/favorites` | 收藏列表 |
+| POST/DELETE | `/api/favorites/:dishId` | 收藏/取消收藏 |
+| GET/POST | `/api/notifications`、`/api/notifications/:id/read` | 读取站内信 / 标记已读 |
+| POST/DELETE | `/api/upload/image` | 上传、删除本人图片 |
+| GET/PUT | `/api/settings` | 当前用户设置 |
+| GET | `/api/week-plan`、`/api/shopping-list`、`/api/profile`、`/api/stats` | 计划、采购、画像、统计 |
+
+ID 路由参数必须为正整数。菜谱 JSON 数组字段在应用修改前校验，错误输入不会覆盖旧内容。菜谱编辑权限以详情返回的 `access.can_edit` 为准；前端按钮隐藏不能替代后端授权。
+
+### 管理接口（需管理员 JWT）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET/PUT | `/api/admin/settings` | 站点设置，与个人设置区分 |
+| GET | `/api/admin/dashboard`、`/api/admin/users` | 后台概览、用户列表 |
+| PUT | `/api/admin/users/:id` | 管理账号 |
+| POST | `/api/admin/notifications` | 站内通知 |
+| POST/PUT/DELETE | `/api/quotes`、`/api/achievements`（修改/删除带 `:id`） | 语录、成就定义 |
+
+完整路由以 `backend/internal/routes/routes.go` 为准。
 
 ### 智能体开放接口（需 `X-Agent-Token`）
 
@@ -246,4 +221,14 @@ NiniMenu/
 
 ## 智能体接入
 
-配套的「食谱推荐官」智能体在 `ai-agent-scaffold-lite` 工程中（`docs/dev-ops/recipe-agent.md`）。管理后台 → 设置 → 「AI 推荐官」填入智能体嵌入页地址后，站内 `/assistant` 页面会内嵌对话组件；该页同时展示口味画像并可按条件调用推荐引擎。
+配套的「食谱推荐官」智能体在 `ai-agent-scaffold-lite` 工程中（`docs/dev-ops/recipe-agent.md`），通过用户创建的 Agent 令牌调用食谱工具。站内 `/assistant` 提供按条件选菜和站内对话入口，`/assistant/chat` 统一使用服务端模型、内容审核与额度；Web 页面已移除外部 iframe 和嵌入地址控件，历史 `agent_embed_url` 字段仅保留兼容。
+
+站内模型接口只接受用户登录态。管理员在设置中调整每账号每日上限（0–20，默认 20）和全站每日预算（0–10000，默认 200）；北京时间 00:00 重置，数据保存在数据库，删除对话和部署不会清空次数。同账号同时 1 请求、全站同时 4 请求。审核、错误码、SSE 协议及防护边界见 [助手安全与额度](docs/assistant-safety.md)。
+
+## 客户端状态与回归
+
+- UI 规范见 [docs/ui-guide.md](docs/ui-guide.md)。Web 页面对话框复用 `use-dialog` 和 `AnimatedBottomSheet`，小程序复用 `sheet` 与 `sheet-tabs`。
+- 新增的草稿功能使用账号 + 编辑模式 + 菜谱 ID 组成存储键，离开时立即写入；只存表单和上传后的 URL，不存图片二进制和令牌。
+- 格式转换集中在两端的 `recipe-text` 工具，未修改的食材、步骤及图片元数据必须保留。
+- 执行 `cd frontend && npm test` 运行客户端回归；执行 `npm run lint`、`npm run build` 做静态检查。后端运行 `go test ./...`、`go vet ./...`。
+- 发布先提交实现，再执行 `./scripts/next-version.sh`，将结果写入并提交 `VERSION`。新功能递增 minor，修复递增 patch，不兼容变更递增 major。

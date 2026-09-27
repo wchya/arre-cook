@@ -44,7 +44,7 @@ client.interceptors.response.use(
   (res) => res,
   (err) => {
     const url: string = err.config?.url || ""
-    if (err.response?.status === 401 && !url.startsWith("/auth/")) {
+    if (err.response?.status === 401 && !url.startsWith("/auth/") && err.config?.headers?.Authorization === `Bearer ${getToken()}`) {
       setToken(null)
       window.dispatchEvent(new Event("auth-expired"))
     }

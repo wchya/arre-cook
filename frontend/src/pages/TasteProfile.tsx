@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowUpRight, Bot, Clock3, Flame, Leaf, Sparkles } from "lucide-react"
 import { useNavigate } from "react-router-dom"
@@ -30,7 +31,9 @@ function WeightList({ title, items, color }: { title: string; items: WeightItem[
 
 export default function TasteProfile() {
   const navigate = useNavigate()
-  const { data: profile, isLoading, isError } = useQuery({ queryKey: ["profile", 90], queryFn: () => profileApi.get(90) })
+  const { data: profile, isLoading, isError , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["profile", 90], queryFn: () => profileApi.get(90) })
+  if (loadError) return <div><PageHeader title="口味画像" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
+
   return (
     <div className="min-h-dvh bg-bg pb-8">
       <PageHeader title="口味画像" subtitle="根据你自己的用餐记录整理" icon={Bot} onBack={() => navigate(-1)} />

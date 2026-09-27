@@ -7,8 +7,9 @@
     <view class="segmented-item {{view === 'report' ? 'is-active' : ''}}" data-view="report" bindtap="switchView"><icon name="chart-pie" size="28" stroke="2.4" color="{{view === 'report' ? 'text' : 'text3'}}" /><text>健康报告</text></view>
   </view>
 
+  <request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
   <!-- 饮食日记 -->
-  <block wx:if="{{view === 'journal'}}">
+  <block wx:if="{{view === 'journal' && !loadError}}">
     <view wx:if="{{loading}}" class="skeleton sk"></view>
     <block wx:else>
       <view wx:if="{{!dayGroups.length}}" class="card">
@@ -41,7 +42,7 @@
   </block>
 
   <!-- 健康报告 -->
-  <block wx:elif="{{view === 'report'}}">
+  <block wx:elif="{{view === 'report' && !loadError}}">
     <view class="period">
       <view class="period__btn {{days === 7 ? 'is-active' : ''}}" hover-class="tap-active" data-days="7" bindtap="choosePeriod">近 7 天</view>
       <view class="period__btn {{days === 30 ? 'is-active' : ''}}" hover-class="tap-active" data-days="30" bindtap="choosePeriod">近 30 天</view>
@@ -120,11 +121,11 @@
     </view>
     <view class="form-block">
       <text class="field-label">吃了什么</text>
-      <view class="field {{focusDish ? 'is-focus' : ''}}"><input class="field-input" value="{{formDish}}" maxlength="100" placeholder="例如：番茄鸡蛋面" placeholder-class="placeholder" data-k="Dish" bindinput="onDishInput" bindfocus="focusOn" bindblur="focusOff" /></view>
+      <view class="field {{focusDish ? 'is-focus' : ''}}"><input adjust-position="{{false}}" class="field-input" value="{{formDish}}" maxlength="100" placeholder="例如：番茄鸡蛋面" placeholder-class="placeholder" data-k="Dish" bindinput="onDishInput" bindfocus="focusOn" bindblur="focusOff" /></view>
     </view>
     <view class="form-block">
       <text class="field-label">菜系 <text class="field-opt">可选</text></text>
-      <view class="field {{focusCuisine ? 'is-focus' : ''}}"><input class="field-input" value="{{formCuisine}}" maxlength="40" placeholder="自己填写或从下方选择" placeholder-class="placeholder" data-k="Cuisine" bindinput="onCuisineInput" bindfocus="focusOn" bindblur="focusOff" /></view>
+      <view class="field {{focusCuisine ? 'is-focus' : ''}}"><input adjust-position="{{false}}" class="field-input" value="{{formCuisine}}" maxlength="40" placeholder="自己填写或从下方选择" placeholder-class="placeholder" data-k="Cuisine" bindinput="onCuisineInput" bindfocus="focusOn" bindblur="focusOff" /></view>
       <scroll-view scroll-x class="cuisine-scroll" show-scrollbar="{{false}}" enhanced>
         <view class="cuisine-row">
           <view wx:for="{{cuisines}}" wx:key="*this" class="chip chip-sm {{formCuisine === item ? 'chip-primary' : 'chip-ghost'}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseCuisine">{{item}}</view>
@@ -139,7 +140,7 @@
     </view>
     <view class="form-block">
       <text class="field-label">备注 <text class="field-opt">可选</text></text>
-      <textarea class="field-textarea {{focusNotes ? 'is-focus' : ''}}" value="{{formNotes}}" maxlength="500" placeholder="口感、心情、和谁一起吃…" placeholder-class="placeholder" data-k="Notes" bindinput="onNotesInput" bindfocus="focusOn" bindblur="focusOff" auto-height />
+      <textarea adjust-position="{{false}}" class="field-textarea {{focusNotes ? 'is-focus' : ''}}" value="{{formNotes}}" maxlength="500" placeholder="口感、心情、和谁一起吃…" placeholder-class="placeholder" data-k="Notes" bindinput="onNotesInput" bindfocus="focusOn" bindblur="focusOff" auto-height />
     </view>
   </view>
   <view slot="footer" class="sheet-foot">

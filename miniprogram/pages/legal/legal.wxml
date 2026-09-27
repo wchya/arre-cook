@@ -1,4 +1,4 @@
-<nav-bar title="{{title}}" subtitle="arre 食谱推荐小助手" icon="file-text" />
+<nav-bar title="{{title}}" subtitle="arre食谱推荐小助手" icon="file-text" />
 
 <view class="content anim-fade-up">
   <view class="card card-pad legal-doc">

@@ -29,7 +29,7 @@ page { height: 100%; overflow: hidden; background: #1A1A2E; }
 .ctrl.is-off { opacity: .3; }
 .ctrl--main { width: 144rpx; height: 144rpx; background: var(--primary); box-shadow: 0 16rpx 40rpx rgba(232, 115, 74, .4); }
 .ctrl--main.is-muted { background: rgba(232, 115, 74, .45); box-shadow: none; }
-.ctrl--done { background: var(--mint); }
+.ctrl--done { background: var(--mint-action); }
 
 .list { padding: 0 40rpx 24rpx; }
 .list__item { display: flex; gap: 24rpx; padding: 24rpx 20rpx; border-radius: 24rpx; }

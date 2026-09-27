@@ -57,7 +57,7 @@ Page({
     this._pageVisible = false
     this._nameClosing = false
     this.setData({ nameOpen: false, nameFocus: false, nameKeyboardHeight: 0 })
-    session.syncTabBar(this, 3)
+    session.resetTabBar(this, 3)
   },
 
   async onRefresh() {

@@ -42,12 +42,14 @@ Page({
   },
 
   async load() {
+    this.setData({ loading: true, loadError: "" })
     const [prefs, settings] = await Promise.allSettled([api.get("/me/preferences"), api.get("/settings")])
     if (settings.status === "fulfilled") {
       const list = media.asArray(settings.value && settings.value.tastes).filter((item) => typeof item === "string" && item)
       if (list.length) this._tasteNames = list
     }
-    const form = { ...EMPTY, ...(prefs.status === "fulfilled" ? prefs.value : {}) }
+    if (prefs.status === "rejected") { this.setData({ loading: false, loadError: prefs.reason.message || "偏好加载失败，请重试" }); return }
+    const form = { ...EMPTY, ...prefs.value }
     form.avoid_ingredients = form.avoid_ingredients || []
     form.allergies = form.allergies || []
     form.favorite_tastes = form.favorite_tastes || []

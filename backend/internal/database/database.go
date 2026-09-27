@@ -65,6 +65,8 @@ func Init() error {
 		&models.Notification{},
 		&models.ChatSession{},
 		&models.ChatMessage{},
+		&models.AssistantUsage{},
+		&models.AssistantLease{},
 		&models.Family{},
 		&models.FamilyMember{},
 		&models.FamilyInvitation{},
@@ -339,6 +341,8 @@ func seedData() {
 	ensureSetting("lunch_dishes_per_day", "1")
 	ensureSetting("dinner_dishes_per_day", "1")
 	ensureSetting("allow_register", "1")
+	ensureSetting("assistant_daily_limit", "20")
+	ensureSetting("assistant_site_daily_limit", "200")
 	ensureLegacyBrandName()
 
 	upsertManagedStringArraySetting("categories", dishes.DefaultCategories())
@@ -358,12 +362,12 @@ func ensureSetting(key, value string) {
 func ensureLegacyBrandName() {
 	var setting models.Setting
 	if err := DB.Where("`key` = ?", "app_name").First(&setting).Error; err == nil {
-		if strings.TrimSpace(setting.Value) == "" || strings.EqualFold(strings.TrimSpace(setting.Value), "NiniMenu") {
-			_ = DB.Model(&setting).Update("value", "ss-menu").Error
+		if strings.TrimSpace(setting.Value) == "" || strings.EqualFold(strings.TrimSpace(setting.Value), "NiniMenu") || strings.EqualFold(strings.TrimSpace(setting.Value), "ss-menu") {
+			_ = DB.Model(&setting).Update("value", "arre食谱推荐小助手").Error
 		}
 		return
 	}
-	_ = DB.Create(&models.Setting{Key: "app_name", Value: "ss-menu"}).Error
+	_ = DB.Create(&models.Setting{Key: "app_name", Value: "arre食谱推荐小助手"}).Error
 }
 
 // GetSetting 读取站点级设置，不存在返回 fallback。

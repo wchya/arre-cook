@@ -32,7 +32,8 @@
       </view>
 
       <!-- 选中日期 -->
-      <view wx:if="{{selectedKey}}" class="card day-panel anim-pop-soft">
+      <request-state wx:if="{{monthError || monthLoading}}" error="{{monthError}}" retrying="{{monthLoading}}" bind:retry="loadMonth" compact />
+      <view wx:if="{{selectedKey && !monthError && !monthLoading}}" class="card day-panel anim-pop-soft">
         <view class="day-panel__head">
           <view class="flex items-center wrap gap-12">
             <text>{{selectedLabel}}</text>
@@ -87,6 +88,7 @@
       <view wx:if="{{loading}}" class="flex-col gap-20">
         <view wx:for="{{[1, 2, 3]}}" wx:key="*this" class="skeleton recent-sk"></view>
       </view>
+      <request-state wx:elif="{{recentError}}" error="{{recentError}}" bind:retry="loadRecent" compact />
       <view wx:elif="{{!recent.length}}" class="card">
         <empty emoji="📅" title="还没有记录" desc="去首页推荐一道菜吧~" compact>
           <view class="btn btn-soft btn-sm" hover-class="tap-active" catchtap="goHome">去首页看看</view>
@@ -119,7 +121,7 @@
         </view>
       </view>
       <view class="field-label">备注（可选）</view>
-      <textarea class="field-textarea" value="{{rateRemark}}" maxlength="200" placeholder="这道菜怎么样..." placeholder-class="placeholder" auto-height cursor-spacing="120" bindinput="onRateRemark" />
+      <textarea adjust-position="{{false}}" class="field-textarea" value="{{rateRemark}}" maxlength="200" placeholder="这道菜怎么样..." placeholder-class="placeholder" auto-height cursor-spacing="120" bindinput="onRateRemark" />
       <view class="field-label mt-32">📷 成品照（可选，限 1 张）</view>
       <view wx:if="{{ratePhoto}}" class="upload-thumb" bindtap="previewRatePhoto">
         <image class="upload-thumb__img" src="{{ratePhoto}}" mode="aspectFill" webp />
@@ -146,7 +148,7 @@
         </view>
       </view>
       <view class="field-label">备注（可选）</view>
-      <textarea class="field-textarea" value="{{dayRemark}}" maxlength="200" placeholder="今天这顿饭的整体感受..." placeholder-class="placeholder" auto-height cursor-spacing="120" bindinput="onDayRemark" />
+      <textarea adjust-position="{{false}}" class="field-textarea" value="{{dayRemark}}" maxlength="200" placeholder="今天这顿饭的整体感受..." placeholder-class="placeholder" auto-height cursor-spacing="120" bindinput="onDayRemark" />
       <view class="field-label mt-32">📷 上传照片（可选，最多 9 张）</view>
       <view class="upload-grid">
         <view class="upload-add" hover-class="tap-active" bindtap="addDayPhotos">

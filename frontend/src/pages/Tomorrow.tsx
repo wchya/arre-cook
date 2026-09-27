@@ -498,7 +498,7 @@ function DishPickerModal({
     queryKey: ["dishes", "tomorrow-picker", meal],
     queryFn: () => dishesApi.list({ enabled: "true", meal_type: meal, pageSize: "100", sort: "sort_order", order: "asc" }),
   })
-  const dishes = data?.items || []
+  const dishes = useMemo(() => data?.items || [], [data])
   const candidates = useMemo(() => dishes.filter((d) => matchesMeal(d, meal)), [dishes, meal])
 
   const categories = useMemo(() => {

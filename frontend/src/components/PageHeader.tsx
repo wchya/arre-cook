@@ -15,7 +15,8 @@ interface PageHeaderProps {
 export function HeaderIconButton({ className = "", children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-border glass-strong text-text2 shadow-[0_1px_3px_rgba(26,26,46,.05),0_6px_18px_rgba(26,26,46,.06)] transition-all duration-200 ease-[var(--ease-spring)] hover:border-primary/20 hover:bg-primary-light hover:text-primary active:scale-90 ${className}`}
+      type="button"
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-text2 transition-colors duration-200 hover:border-primary/20 hover:bg-primary-light hover:text-primary active:scale-95 ${className}`}
       {...props}
     >
       {children}
@@ -48,7 +49,7 @@ export default function PageHeader({
             </div>
           )}
           <div className={`min-w-0 ${centerTitle ? "text-center" : ""}`}>
-            <div className="truncate text-[18px] font-extrabold leading-tight tracking-tight text-text">{title}</div>
+            <h1 className="truncate text-[18px] font-extrabold leading-tight tracking-tight text-text">{title}</h1>
             {subtitle && <div className="mt-1 truncate text-[12px] font-medium leading-tight text-text3">{subtitle}</div>}
           </div>
         </div>

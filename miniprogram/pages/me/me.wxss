@@ -37,3 +37,5 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .sheet-body { padding: 8rpx 40rpx 24rpx; }
 .repeat { display: flex; align-items: center; justify-content: center; height: 88rpx; border: 3rpx solid var(--border); border-radius: 32rpx; background: var(--bg); color: var(--text2); font-size: 26rpx; font-weight: 700; transition: border-color .2s ease, background-color .2s ease; }
 .repeat.is-active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+.profile__details { min-height: 44px; }

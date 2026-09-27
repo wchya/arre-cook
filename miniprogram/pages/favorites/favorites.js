@@ -78,6 +78,7 @@ Page({
   },
 
   async load() {
+    this.setData({ loadError: "", loading: true })
     try {
       const overview = await api.get("/favorites/overview")
       const items = overview.items || []
@@ -111,6 +112,7 @@ Page({
       })
       this.applyFilter()
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       this.setData({ loading: false })
       ui.toast(error.message || "收藏加载失败")
     }

@@ -1,41 +1,28 @@
-import { useState, useEffect } from "react"
+import { cloneElement, isValidElement, useId, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { adminApi, dishesApi, uploadApi, getUploadErrorMessage } from "@/api"
-import type { DishInput } from "@/types"
+import type { Dish, DishInput } from "@/types"
+import { ArrowLeft, Camera, Check, FilePenLine, LoaderCircle } from "lucide-react"
+import PageHeader from "@/components/PageHeader"
+import RequestState from "@/components/RequestState"
+import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
+import { errorMessage } from "@/api/client"
+import { useAuthStore } from "@/store/useAuthStore"
+import { useRecipeDraft } from "@/lib/use-recipe-draft"
+import { formatIngredients, parseIngredients, formatSteps, parseSteps } from "@/lib/recipe-text"
 import { asArray } from "@/lib/utils"
 import toast from "react-hot-toast"
 
 const DEFAULT_CATEGORIES = ["川菜", "湘菜", "贵州菜", "云南菜", "粤菜"]
 const DEFAULT_TASTES = ["辣", "麻辣", "香辣", "酸辣", "鲜辣", "酸", "甜", "鲜", "清淡", "咸鲜", "蒜香", "葱香", "酱香", "豉香"]
 const mealTypes = [
-  { key: "lunch", label: "🍳 午餐" },
-  { key: "dinner", label: "🍲 晚餐" },
+  { key: "lunch", label: "午餐" },
+  { key: "dinner", label: "晚餐" },
   { key: "all", label: "通用" },
 ]
 const difficulties = ["easy", "medium", "hard"]
 const diffLabels = { easy: "简单", medium: "中等", hard: "困难" }
-
-interface Ingredient { name: string; amount: string }
-interface Step { text: string; time?: number }
-
-function fmtIngredient(item: unknown): string {
-  if (typeof item === "string") return item
-  if (typeof item === "object" && item !== null) {
-    const value = item as Record<string, unknown>
-    return `${value.name || ""} ${value.amount || ""}`.trim()
-  }
-  return String(item)
-}
-
-function fmtStep(item: unknown, index: number): string {
-  if (typeof item === "string") return `${index + 1}. ${item}`
-  if (typeof item === "object" && item !== null) {
-    const value = item as Record<string, unknown>
-    return `${index + 1}. ${value.text || ""}${value.time ? ` (${value.time}分钟)` : ""}`
-  }
-  return `${index + 1}. ${String(item)}`
-}
 
 function parseList(raw: unknown, fallback: string[]): string[] {
   const arr = asArray<string>(raw).filter((x) => typeof x === "string")
@@ -54,13 +41,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[13px] font-semibold mb-1.5 text-text2">{label}</label>
-      {hint && <div className="text-[11px] text-text3 mb-1">{hint}</div>}
-      {children}
-    </div>
-  )
+  const id = useId()
+  const field = isValidElement<{ id?: string; "aria-describedby"?: string }>(children) && (children.type === "input" || children.type === "textarea")
+    ? cloneElement(children, { id, "aria-describedby": hint ? `${id}-hint` : undefined }) : children
+  return <div role="group" aria-label={label}>
+    <label htmlFor={field !== children ? id : undefined} className="mb-2 block text-sm font-semibold text-text">{label}</label>
+    {hint && <p id={`${id}-hint`} className="mb-2 text-xs leading-relaxed text-text2">{hint}</p>}
+    {field}
+  </div>
 }
 
 const inputCls = "w-full py-2.5 px-3.5 rounded-[10px] border-[1.5px] border-border bg-bg text-sm outline-none transition-all focus:border-primary focus:shadow-[0_0_0_3px_rgba(232,115,74,.1)]"
@@ -69,16 +57,22 @@ const textareaCls = "w-full py-2.5 px-3.5 rounded-[10px] border-[1.5px] border-b
 export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "user" }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const qc = useQueryClient()
+  const userId = useAuthStore((state) => state.user?.id || 0)
   const dishId = id ? Number(id) : 0
   const isNew = !id || id === "new"
+  const validId = isNew || Number.isSafeInteger(dishId) && dishId > 0
+  const query = useQuery({ queryKey: ["dish", dishId], queryFn: () => dishesApi.get(dishId), enabled: !isNew && validId })
+  const denied = !isNew && query.isSuccess && !query.data.access?.can_edit
+  if (!validId || denied || !isNew && (query.isPending || query.isError)) return <>
+    <PageHeader title="编辑菜谱" onBack={() => navigate(mode === "admin" ? "/admin/dishes" : "/dishes?scope=mine")} />
+    <RequestState error={!validId ? new Error("菜谱地址无效，请返回菜谱列表") : denied ? new Error("你没有这道菜谱的编辑权限，可以返回查看或创建自己的私房菜。") : query.error} onRetry={validId && !denied ? () => { void query.refetch() } : undefined} loading={query.isFetching} />
+  </>
+  return <DishEditForm key={`${userId}:${mode}:${dishId}`} userId={userId} mode={mode} dishId={dishId} isNew={isNew} dish={query.data} />
+}
 
-  const { data: dish } = useQuery({
-    queryKey: ["dish", dishId],
-    queryFn: () => dishesApi.get(dishId),
-    enabled: !isNew && !!dishId,
-  })
-
+function DishEditForm({ userId, mode, dishId, isNew, dish }: { userId: number; mode: "admin" | "user"; dishId: number; isNew: boolean; dish?: Dish }) {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
   const { data: settings } = useQuery({
     queryKey: ["admin-site-settings"],
     queryFn: () => adminApi.settings(),
@@ -87,22 +81,23 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
   const categories = parseList(settings?.categories, DEFAULT_CATEGORIES)
   const tastes = parseList(settings?.tastes, DEFAULT_TASTES)
 
-  const [name, setName] = useState("")
-  const [category, setCategory] = useState("川菜")
-  const [mealType, setMealType] = useState("all")
-  const [difficulty, setDifficulty] = useState("easy")
-  const [tasteList, setTasteList] = useState<string[]>([])
-  const [cookTime, setCookTime] = useState(15)
-  const [ingredientsText, setIngredientsText] = useState("")
-  const [seasoningsText, setSeasoningsText] = useState("")
-  const [stepsText, setStepsText] = useState("")
-  const [remark, setRemark] = useState("")
-  const [imageUrl, setImageUrl] = useState("")
-  const [images, setImages] = useState<string[]>([])
-  const [videoUrl, setVideoUrl] = useState("")
-  const [tags, setTags] = useState<string[]>([])
+  const [name, setName] = useState(dish?.name || "")
+  const [category, setCategory] = useState(dish?.category || "川菜")
+  const [mealType, setMealType] = useState(dish?.meal_type || "all")
+  const [difficulty, setDifficulty] = useState(dish?.difficulty || "easy")
+  const [tasteList, setTasteList] = useState<string[]>((dish?.taste || "").split(",").map((item) => item.trim()).filter(Boolean))
+  const [cookTime, setCookTime] = useState(dish?.cook_time ?? 15)
+  const [sourceDish] = useState(dish)
+  const [ingredientsText, setIngredientsText] = useState(formatIngredients(asArray(dish?.ingredients)))
+  const [seasoningsText, setSeasoningsText] = useState(formatIngredients(asArray(dish?.seasonings)))
+  const [stepsText, setStepsText] = useState(formatSteps(asArray(dish?.steps)))
+  const [remark, setRemark] = useState(dish?.remark || "")
+  const [imageUrl, setImageUrl] = useState(dish?.image_url || "")
+  const [images, setImages] = useState<string[]>(asArray<string>(dish?.images))
+  const [videoUrl, setVideoUrl] = useState(dish?.video_url || "")
+  const [tags, setTags] = useState<string[]>(asArray<string>(dish?.tags))
   const [tagInput, setTagInput] = useState("")
-  const [sortOrder, setSortOrder] = useState(0)
+  const [sortOrder, setSortOrder] = useState(dish?.sort_order || 0)
   const [addingCategory, setAddingCategory] = useState(false)
   const [addingTaste, setAddingTaste] = useState(false)
   const [newCategory, setNewCategory] = useState("")
@@ -111,59 +106,31 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
   const [manageTaste, setManageTaste] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ type: "category" | "taste"; value: string } | null>(null)
 
-  useEffect(() => {
-    if (!dish) return
-    // Hydrate form fields when the requested dish is loaded.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setName(dish.name || "")
-    setCategory(dish.category || "川菜")
-    setMealType(dish.meal_type || "all")
-    setDifficulty(dish.difficulty || "easy")
-    setTasteList((dish.taste || "").split(",").map((t) => t.trim()).filter(Boolean))
-    setCookTime(dish.cook_time || 15)
-    setRemark(dish.remark || "")
-    setImageUrl(dish.image_url || "")
-    setImages(asArray<string>(dish.images).filter((x) => typeof x === "string"))
-    setVideoUrl(dish.video_url || "")
-    setTags(asArray<string>(dish.tags).filter((x) => typeof x === "string"))
-    setSortOrder(dish.sort_order || 0)
-    setIngredientsText(asArray(dish.ingredients).map(fmtIngredient).join("\n"))
-    setSeasoningsText(asArray(dish.seasonings).map(fmtIngredient).join("\n"))
-    setStepsText(asArray(dish.steps).map(fmtStep).join("\n"))
-  }, [dish])
-
-  function parseIngredients(text: string): Ingredient[] {
-    return text.split("\n").filter((l) => l.trim()).map((l) => {
-      const parts = l.trim().split(/\s+/)
-      if (parts.length === 1) return { name: parts[0], amount: "" }
-      return { name: parts.slice(0, -1).join(" "), amount: parts[parts.length - 1] }
-    })
-  }
-
-  function parseSteps(text: string): Step[] {
-    return text.split("\n").filter((l) => l.trim()).map((l) => {
-      const cleaned = l.replace(/^\d+\.\s*/, "")
-      const timeMatch = cleaned.match(/\((\d+)分钟\)/)
-      return { text: cleaned.replace(/\(\d+分钟\)/, "").trim(), time: timeMatch ? Number(timeMatch[1]) : undefined }
-    })
-  }
+  const [uploading, setUploading] = useState(false)
+  const draft = useRecipeDraft(userId, dishId, mode, { name, category, mealType, difficulty, tasteList, cookTime, ingredientsText, seasoningsText, stepsText, remark, imageUrl, images, videoUrl, tags, sortOrder }, (value) => {
+    setName(value.name); setCategory(value.category); setMealType(value.mealType); setDifficulty(value.difficulty)
+    setTasteList(value.tasteList); setCookTime(value.cookTime); setIngredientsText(value.ingredientsText)
+    setSeasoningsText(value.seasoningsText); setStepsText(value.stepsText); setRemark(value.remark)
+    setImageUrl(value.imageUrl); setImages(value.images); setVideoUrl(value.videoUrl); setTags(value.tags); setSortOrder(value.sortOrder)
+  })
+  const back = () => navigate(mode === "admin" ? "/admin/dishes" : isNew ? "/dishes?scope=mine" : `/dishes/${dishId}`)
 
   const saveMut = useMutation({
     mutationFn: () => {
       const data: DishInput = {
-        name,
+        name: name.trim(),
         category,
         meal_type: mealType,
         difficulty,
         taste: tasteList.join(","),
         cook_time: cookTime,
-        ingredients: JSON.stringify(parseIngredients(ingredientsText)),
-        seasonings: JSON.stringify(parseIngredients(seasoningsText)),
-        steps: JSON.stringify(parseSteps(stepsText)),
+        ingredients: JSON.stringify(parseIngredients(ingredientsText, asArray(sourceDish?.ingredients))),
+        seasonings: JSON.stringify(parseIngredients(seasoningsText, asArray(sourceDish?.seasonings))),
+        steps: JSON.stringify(parseSteps(stepsText, asArray(sourceDish?.steps))),
         remark,
         image_url: imageUrl,
         images: JSON.stringify(images),
-        video_url: videoUrl,
+        video_url: videoUrl.trim(),
         tags: JSON.stringify(tags),
         sort_order: sortOrder,
       }
@@ -171,12 +138,17 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
       return isNew ? dishesApi.create(data) : dishesApi.update(dishId, data)
     },
     onSuccess: () => {
+      draft.clear()
+      qc.invalidateQueries({ queryKey: ["dish", dishId] })
+      qc.invalidateQueries({ queryKey: ["category-counts"] })
+      qc.invalidateQueries({ queryKey: ["favorites"] })
+      qc.invalidateQueries({ queryKey: ["family-dishes"] })
       qc.invalidateQueries({ queryKey: ["admin", "dishes"] })
       qc.invalidateQueries({ queryKey: ["dishes"] })
       toast.success("已保存")
-      navigate(-1)
+      back()
     },
-    onError: () => toast.error("保存失败"),
+    onError: (error) => toast.error(errorMessage(error, "保存失败，草稿已保留")),
   })
 
   const addCategoryMut = useMutation({
@@ -237,28 +209,33 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
+    e.target.value = ""
+    if (!file || uploading) return
+    setUploading(true)
     try {
       const res = await uploadApi.image(file)
       setImageUrl(res.data.data.url)
       toast.success("主图已上传")
-    } catch (err) {
-      toast.error(getUploadErrorMessage(err))
-    }
+    } catch (err) { toast.error(getUploadErrorMessage(err)) }
+    finally { setUploading(false) }
   }
 
   async function handleExtraImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files
-    if (!files) return
-    for (const file of Array.from(files)) {
-      try {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ""
+    if (!files.length || uploading) return
+    if (files.length + images.length > 18) { toast.error("最多保存 18 张图片"); return }
+    setUploading(true)
+    let uploaded = 0
+    try {
+      for (const file of files) {
         const res = await uploadApi.image(file)
         setImages((prev) => [...prev, res.data.data.url])
-      } catch (err) {
-        toast.error(getUploadErrorMessage(err))
+        uploaded++
       }
-    }
-    toast.success("图片已上传")
+      toast.success(`已上传 ${uploaded} 张图片`)
+    } catch (err) { toast.error(`${uploaded ? `已上传 ${uploaded} 张，其余` : ""}${getUploadErrorMessage(err)}`) }
+    finally { setUploading(false) }
   }
 
   function addTag() {
@@ -270,20 +247,24 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
   }
 
   const pillClass = (active: boolean) =>
-    `inline-flex items-center rounded-full text-xs border-[1.5px] transition-all ${active ? "bg-primary text-white border-primary" : "border-border text-text2"}`
+    `inline-flex min-h-11 items-center rounded-full text-sm border-[1.5px] transition-all ${active ? "bg-primary text-white border-primary" : "border-border text-text2"}`
 
+  const disabled = !name.trim() || saveMut.isPending || uploading || Boolean(draft.recovery)
   return (
-    <div className="px-5 py-4 max-w-[640px] mx-auto pb-20">
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-lg font-bold">{isNew ? "添加菜品" : "编辑菜品"}</div>
-        <button onClick={() => saveMut.mutate()} disabled={!name || saveMut.isPending} className="py-1.5 px-5 rounded-full text-xs font-semibold bg-primary text-white transition-all active:scale-96 disabled:opacity-50">
-          {saveMut.isPending ? "保存中..." : "保存菜品"}
-        </button>
-      </div>
-
+    <>
+      <PageHeader title={isNew ? (mode === "admin" ? "添加公共菜谱" : "新建私房菜") : "编辑菜谱"}
+        subtitle={dish?.family_id ? "家庭成员可见" : mode === "admin" || dish?.owner_id === 0 ? "公共菜谱" : "仅自己可见"} onBack={back} />
+      <div className="mx-auto max-w-[640px] px-5 py-5 pb-[calc(100px+env(safe-area-inset-bottom))]">
+        {draft.recovery && <div className="draft-notice" role="status">
+          <div className="flex items-center gap-2 font-semibold"><FilePenLine size={18} />有一份未完成的草稿</div>
+          <p>保存于 {new Date(draft.recovery.savedAt).toLocaleString("zh-CN")}。恢复后可继续编辑，保存才会更新菜谱。</p>
+          <div className="draft-notice__actions"><button type="button" onClick={draft.resume} className="btn-secondary">继续编辑草稿</button><button type="button" onClick={draft.discard} className="btn-secondary">丢弃旧草稿</button></div>
+        </div>}
+        <div className="draft-status mb-4" aria-live="polite"><FilePenLine size={14} />{draft.status}</div>
+        <fieldset disabled={Boolean(draft.recovery) || saveMut.isPending} className="min-w-0">
       <Section title="基本信息">
         <Field label="菜品名称 *" hint="必填">
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="如：番茄炒蛋" className={inputCls} />
+          <input type="text" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="如：番茄炒蛋" className={inputCls} />
         </Field>
 
         <Field label="分类">
@@ -361,7 +342,7 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="烹饪时间（分钟）">
-            <input type="number" value={cookTime} onChange={(e) => setCookTime(Number(e.target.value))} min={1} className={inputCls} />
+            <input type="number" value={cookTime} onChange={(e) => setCookTime(Number(e.target.value))} min={0} max={600} className={inputCls} />
           </Field>
           <Field label="排序权重" hint="数值越大越靠前">
             <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className={inputCls} />
@@ -372,12 +353,12 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
       <Section title="图片与视频">
         <Field label="主图" hint="点击上传或替换菜品主图（支持 jpg/png/webp，最大5MB）">
           <label className="block border-2 border-dashed border-border2 rounded-2xl overflow-hidden text-center cursor-pointer transition-all hover:border-primary hover:bg-primary-light">
-            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            <input type="file" disabled={uploading} accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} className="hidden" />
             {imageUrl ? (
               <img src={imageUrl} alt="预览" className="w-full h-48 object-cover" />
             ) : (
               <div className="p-6">
-                <span className="text-[32px] block mb-2">📷</span>
+                <Camera size={32} className="mx-auto mb-2 text-text2" />
                 <div className="text-[13px] text-text2">点击上传主图</div>
               </div>
             )}
@@ -386,7 +367,7 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
 
         <Field label="额外图片" hint="可上传多张菜品图片">
           <label className="block border-2 border-dashed border-border2 rounded-xl overflow-hidden text-center cursor-pointer py-3 px-4 transition-all hover:border-primary hover:bg-primary-light">
-            <input type="file" accept="image/*" multiple onChange={handleExtraImageUpload} className="hidden" />
+            <input type="file" disabled={uploading} accept="image/jpeg,image/png,image/webp" multiple onChange={handleExtraImageUpload} className="hidden" />
             <span className="text-xs text-text2">+ 点击上传更多图片（可多选）</span>
           </label>
           {images.length > 0 && (
@@ -395,8 +376,8 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
                 <div key={i} className="relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden group">
                   <img src={img} alt="" className="w-full h-full object-cover" />
                   <button
-                    onClick={() => setImages(images.filter((_, j) => j !== i))}
-                    className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`删除第 ${i + 1} 张图片`} onClick={() => setImages(images.filter((_, j) => j !== i))}
+                    className="absolute top-0 right-0 w-10 h-10 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-100 transition-opacity"
                   >✕</button>
                 </div>
               ))}
@@ -405,7 +386,7 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
         </Field>
 
         <Field label="教程视频链接" hint="仅支持抖音 / 哔哩哔哩，保存后可从详情页直接打开播放">
-          <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="粘贴视频链接" className={inputCls} />
+          <input type="text" maxLength={2048} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="粘贴视频链接" className={inputCls} />
         </Field>
       </Section>
 
@@ -436,7 +417,7 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
           <div className="flex gap-2">
             <input
               type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag() } }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); addTag() } }}
               placeholder="输入标签后回车添加" className={`flex-1 ${inputCls}`}
             />
             <button onClick={addTag} className="px-4 rounded-full text-xs font-semibold bg-primary text-white">添加</button>
@@ -444,20 +425,25 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
         </Field>
 
         <Field label="备注" hint="烹饪小贴士、注意事项等">
-          <textarea value={remark} onChange={(e) => setRemark(e.target.value)} rows={2} placeholder="一些小贴士..." className={`${textareaCls} min-h-[60px]`} />
+          <textarea maxLength={500} value={remark} onChange={(e) => setRemark(e.target.value)} rows={2} placeholder="一些小贴士..." className={`${textareaCls} min-h-[60px]`} />
         </Field>
       </Section>
 
-      <div className="flex gap-2.5 mt-2">
-        <button onClick={() => navigate(-1)} className="flex-1 py-2.5 px-5 rounded-full text-sm font-semibold border-[1.5px] border-border2 transition-all">取消</button>
-        <button onClick={() => saveMut.mutate()} disabled={!name || saveMut.isPending} className="flex-1 py-2.5 px-5 rounded-full text-sm font-semibold bg-primary text-white transition-all active:scale-96 disabled:opacity-50">
-          {saveMut.isPending ? "保存中..." : "保存菜品"}
-        </button>
+        </fieldset>
+      </div>
+      <div className="fixed inset-x-0 bottom-0 z-[110] border-t border-border bg-card px-5 py-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-[600px] gap-3">
+          <button type="button" onClick={back} disabled={saveMut.isPending} className="btn-secondary"><ArrowLeft size={16} />返回</button>
+          <button type="button" onClick={() => saveMut.mutate()} disabled={disabled} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-semibold text-white">
+            {saveMut.isPending || uploading ? <LoaderCircle size={18} className="animate-spin" /> : <Check size={18} />}
+            {uploading ? "图片上传中…" : saveMut.isPending ? "保存中…" : isNew ? "创建菜谱" : "保存修改"}
+          </button>
+        </div>
       </div>
 
       {pendingDelete && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm" onClick={() => setPendingDelete(null)}>
-          <div className="bg-card rounded-2xl p-5 w-full max-w-[320px] shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <AnimatedBottomSheet label="删除分类或口味" onClose={() => setPendingDelete(null)}>
+          <div className="p-6 pb-8">
             <div className="text-base font-bold mb-1.5">删除{pendingDelete.type === "category" ? "分类" : "口味"}</div>
             <div className="text-sm text-text2 mb-5">确定删除「{pendingDelete.value}」吗？此操作不可撤销。</div>
             <div className="flex gap-2.5">
@@ -465,8 +451,8 @@ export default function AdminDishEdit({ mode = "admin" }: { mode?: "admin" | "us
               <button onClick={confirmDelete} disabled={delCategoryMut.isPending || delTasteMut.isPending} className="flex-1 py-2.5 px-5 rounded-full text-sm font-semibold bg-red-500 text-white disabled:opacity-50">删除</button>
             </div>
           </div>
-        </div>
+        </AnimatedBottomSheet>
       )}
-    </div>
+    </>
   )
 }

@@ -1,3 +1,5 @@
+import PageHeader from "@/components/PageHeader"
+import RequestState from "@/components/RequestState"
 import { useState, useRef, useMemo, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
@@ -20,7 +22,7 @@ export default function CookMode() {
   const navigate = useNavigate()
   const dishId = Number(id)
 
-  const { data: dish } = useQuery({
+  const { data: dish , error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["dish", dishId],
     queryFn: () => dishesApi.get(dishId),
     enabled: !!dishId,
@@ -95,7 +97,10 @@ export default function CookMode() {
     setCurrentStep(idx)
   }
 
-  if (!dish) return <div className="bg-[#1A1A2E] min-h-screen text-white flex items-center justify-center">加载中...</div>
+  if (loadError) return <div><PageHeader title="烹饪步骤" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
+
+  if (!Number.isSafeInteger(dishId) || dishId <= 0) return <div><PageHeader title="菜谱链接无效" onBack={() => navigate(-1)} /><p className="p-6 text-text2">请返回菜谱列表后重新打开。</p></div>
+  if (!dish) return <div><PageHeader title="烹饪步骤" onBack={() => navigate(-1)} /><RequestState /></div>
 
   const step = steps[currentStep]
   const progress = steps.length > 0 ? ((currentStep + 1) / steps.length) * 100 : 0

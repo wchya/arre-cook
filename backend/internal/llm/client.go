@@ -216,7 +216,16 @@ type streamChunk struct {
 	} `json:"error"`
 }
 
-var httpClient = &http.Client{Timeout: 120 * time.Second}
+var httpClient = &http.Client{
+	Timeout: 75 * time.Second,
+	// Do not forward the configured provider credential to redirect destinations.
+	CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+}
+
+const maxResponseBytes = 1024 * 1024
+const maxContentBytes = 16 * 1024
+const maxToolCalls = 8
+const maxToolArgumentBytes = 32 * 1024
 
 // Stream 发起一轮流式对话；onDelta 收到正文增量时回调。
 func Stream(ctx context.Context, s Settings, req Request, onDelta func(string)) (*Result, error) {
@@ -236,12 +245,11 @@ func Stream(ctx context.Context, s Settings, req Request, onDelta func(string)) 
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("连接 AI 服务失败: %w", err)
+		return nil, errors.New("连接 AI 服务失败，请稍后再试")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return nil, fmt.Errorf("AI 服务返回 %d: %s", resp.StatusCode, strings.TrimSpace(string(msg)))
+		return nil, fmt.Errorf("AI 服务暂时不可用（状态 %d）", resp.StatusCode)
 	}
 
 	res := &Result{}
@@ -249,7 +257,8 @@ func Stream(ctx context.Context, s Settings, req Request, onDelta func(string)) 
 	maxIndex := -1
 	var content strings.Builder
 
-	scanner := bufio.NewScanner(resp.Body)
+	limited := &io.LimitedReader{R: resp.Body, N: maxResponseBytes + 1}
+	scanner := bufio.NewScanner(limited)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -265,16 +274,22 @@ func Stream(ctx context.Context, s Settings, req Request, onDelta func(string)) 
 			continue
 		}
 		if chunk.Error != nil {
-			return nil, errors.New(chunk.Error.Message)
+			return nil, errors.New("AI 服务处理请求失败，请稍后再试")
 		}
 		for _, ch := range chunk.Choices {
 			if ch.Delta.Content != "" {
+				if content.Len()+len(ch.Delta.Content) > maxContentBytes {
+					return nil, errors.New("AI 回复过长，请简化问题后重试")
+				}
 				content.WriteString(ch.Delta.Content)
 				if onDelta != nil {
 					onDelta(ch.Delta.Content)
 				}
 			}
 			for _, tc := range ch.Delta.ToolCalls {
+				if tc.Index < 0 || tc.Index >= maxToolCalls {
+					return nil, errors.New("AI 工具调用超出限制")
+				}
 				c := calls[tc.Index]
 				if c == nil {
 					c = &ToolCall{Type: "function"}
@@ -289,6 +304,9 @@ func Stream(ctx context.Context, s Settings, req Request, onDelta func(string)) 
 				if tc.Function.Name != "" {
 					c.Function.Name += tc.Function.Name
 				}
+				if len(c.ID) > 128 || len(c.Function.Name) > 128 || len(c.Function.Arguments)+len(tc.Function.Arguments) > maxToolArgumentBytes {
+					return nil, errors.New("AI 工具参数超出限制")
+				}
 				c.Function.Arguments += tc.Function.Arguments
 			}
 			if ch.FinishReason != "" {
@@ -296,8 +314,14 @@ func Stream(ctx context.Context, s Settings, req Request, onDelta func(string)) 
 			}
 		}
 	}
-	if err := scanner.Err(); err != nil && !errors.Is(err, context.Canceled) {
-		return nil, fmt.Errorf("读取 AI 响应失败: %w", err)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if limited.N <= 0 {
+		return nil, errors.New("AI 响应超出大小限制")
+	}
+	if scanner.Err() != nil {
+		return nil, errors.New("读取 AI 响应失败，请稍后再试")
 	}
 	res.Content = content.String()
 	for i := 0; i <= maxIndex; i++ {

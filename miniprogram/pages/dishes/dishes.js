@@ -81,13 +81,8 @@ Page({
     const requestedScope = wx.getStorageSync("ninimenu_dishes_scope") === "mine" ? "mine" : ""
     if (requestedScope) wx.removeStorageSync("ninimenu_dishes_scope")
     const start = () => {
-      if (!this._booted) {
-        this._booted = true
-        this.loadMeta()
-        this.reload()
-      } else {
-        this.loadToday()
-      }
+      this.reload({ preserveScroll: Boolean(this._booted && !scopeChanged) })
+      this._booted = true
     }
     const scopeChanged = requestedScope && requestedScope !== this.data.scope
     if (scopeChanged) {
@@ -99,19 +94,21 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: "ss-menu · 选菜加餐，一键搞定", path: "/pages/dishes/dishes" }
+    return { title: "arre食谱推荐小助手 · 选菜加餐，一键搞定", path: "/pages/dishes/dishes" }
   },
 
   // ---------- 数据 ----------
 
   async loadMeta() {
+    const scope = this.data.scope
     const [settings, counts] = await Promise.all([
       api.get("/settings").catch(() => ({})),
-      api.get("/dishes/category-counts").catch(() => null),
+      api.get("/dishes/category-counts", { scope }).catch(() => null),
     ])
+    if (scope !== this.data.scope) return
     const countMap = {}
     if (counts && counts.categories) counts.categories.forEach((item) => { countMap[item.category] = item.count })
-    const names = stringList(settings && settings.categories, DEFAULT_CATEGORIES)
+    const names = Array.from(new Set([...stringList(settings && settings.categories, DEFAULT_CATEGORIES), ...Object.keys(countMap)]))
     const categories = [{ name: "全部", count: counts ? counts.total : 0 }].concat(names.map((name) => ({ name, count: countMap[name] || 0 })))
     this._countMap = countMap
     this.setData({ categories, tastes: ["全部"].concat(stringList(settings && settings.tastes, DEFAULT_TASTES)) })
@@ -123,15 +120,16 @@ Page({
     if (this.data.taste !== "全部") params.taste = this.data.taste
     if (this.data.keyword) params.search = this.data.keyword
     if (this.data.scope) params.scope = this.data.scope
+    if (this.data.scope === "mine") delete params.enabled
     return params
   },
 
-  async reload() {
+  async reload(options = {}) {
     const requestId = ++this._requestId
     this._page = 1
-    this.setData({ loading: true, error: "", scrollTop: this.data.scrollTop === 0 ? 0.01 : 0 })
+    this.setData({ loading: true, error: "", scrollTop: options.preserveScroll ? this.data.scrollTop : this.data.scrollTop === 0 ? 0.01 : 0 })
     try {
-      const [result] = await Promise.all([api.get("/dishes", this.params(1)), this.loadToday()])
+      const [result] = await Promise.all([api.get("/dishes", this.params(1)), this.loadToday(), this.loadMeta()])
       if (requestId !== this._requestId) return
       this._items = result.items || []
       this.render(result.total || 0)

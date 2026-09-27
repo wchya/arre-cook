@@ -1,0 +1,7 @@
+<view class="state {{compact ? 'state--compact' : ''}}" aria-role="status">
+  <icon wx:if="{{error}}" name="circle-alert" size="56" color="primary" />
+  <view wx:else class="state__skeleton"></view>
+  <view class="state__title">{{error ? '暂时没能加载内容' : '正在准备内容…'}}</view>
+  <view wx:if="{{error}}" class="state__desc">{{error}}</view>
+  <button wx:if="{{error}}" class="state__retry" disabled="{{retrying}}" bindtap="retry">{{retrying ? '重试中…' : '重新加载'}}</button>
+</view>

@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Search, Shield, UserRound, Users, UserX } from "lucide-react"
@@ -12,7 +13,7 @@ export default function AdminUsers() {
   const [input, setInput] = useState("")
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
-  const { data, isLoading, isError } = useQuery({ queryKey: ["admin-users", search, page], queryFn: () => adminApi.users({ search, page: String(page), page_size: "20" }) })
+  const { data, isLoading, isError , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["admin-users", search, page], queryFn: () => adminApi.users({ search, page: String(page), page_size: "20" }) })
   const updateMutation = useMutation({
     mutationFn: ({ id, disabled }: { id: number; disabled: boolean }) => adminApi.updateUser(id, { disabled }),
     onSuccess: () => {
@@ -21,6 +22,8 @@ export default function AdminUsers() {
     },
     onError: (error) => toast.error(errorMessage(error, "更新失败")),
   })
+
+  if (loadError) return <div><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   return (
     <div>

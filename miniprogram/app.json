@@ -23,11 +23,12 @@
     "pages/family/family",
     "pages/account/account",
     "pages/photo-wall/photo-wall",
-    "pages/legal/legal"
+    "pages/legal/legal",
+    "pages/about/about"
   ],
   "window": {
     "navigationStyle": "custom",
-    "navigationBarTitleText": "ss-menu",
+    "navigationBarTitleText": "arre食谱推荐小助手",
     "navigationBarBackgroundColor": "@bg",
     "navigationBarTextStyle": "@navTxt",
     "backgroundColor": "@bg",
@@ -42,15 +43,30 @@
     "backgroundColor": "#FFFFFF",
     "borderStyle": "white",
     "list": [
-      { "pagePath": "pages/home/home", "text": "首页" },
-      { "pagePath": "pages/dishes/dishes", "text": "菜谱" },
-      { "pagePath": "pages/history/history", "text": "记录" },
-      { "pagePath": "pages/me/me", "text": "我的" }
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/dishes/dishes",
+        "text": "菜谱"
+      },
+      {
+        "pagePath": "pages/history/history",
+        "text": "记录"
+      },
+      {
+        "pagePath": "pages/me/me",
+        "text": "我的"
+      }
     ]
   },
   "style": "v2",
   "darkmode": true,
   "themeLocation": "theme.json",
   "__usePrivacyCheck__": true,
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "usingComponents": {
+    "request-state": "/components/request-state/index"
+  }
 }

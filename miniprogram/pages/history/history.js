@@ -1,4 +1,5 @@
 const api = require("../../utils/api")
+const recordsApi = require("../../utils/records")
 const session = require("../../utils/session")
 const ui = require("../../utils/ui")
 const media = require("../../utils/media")
@@ -114,14 +115,17 @@ Page({
   },
 
   async loadMonth() {
+    const requestId = this._monthRequest = (this._monthRequest || 0) + 1
+    this.setData({ monthLoading: true, monthError: "" })
     const { year, month } = this.data
     const range = monthRange(year, month)
+    this.buildCalendar()
     try {
       const [records, ratings] = await Promise.all([
-        api.get("/records", { date_from: range.from, date_to: range.to, pageSize: 100 }),
+        recordsApi.forDates(range.from, range.to),
         api.get("/day-ratings", { date_from: range.from, date_to: range.to }),
       ])
-      if (year !== this.data.year || month !== this.data.month) return
+      if (requestId !== this._monthRequest) return
       const byDate = {}
       ;(records.items || []).forEach((record) => {
         if (!byDate[record.meal_date]) byDate[record.meal_date] = []
@@ -132,8 +136,11 @@ Page({
       this._records = byDate
       this._ratings = ratingByDate
     } catch (error) {
-      ui.toast(error.message || "记录加载失败")
+      if (requestId === this._monthRequest) this.setData({ monthError: error.message || "记录加载失败" })
+    } finally {
+      if (requestId === this._monthRequest) this.setData({ monthLoading: false })
     }
+    if (requestId !== this._monthRequest) return
     this.buildCalendar()
     this.applySelected()
   },
@@ -147,10 +154,11 @@ Page({
   },
 
   async loadRecent() {
+    this.setData({ recentError: "" })
     try {
       const result = await api.get("/records", { pageSize: 5 })
       this.setData({ recent: (result.items || []).map(toRecordView) })
-    } catch (_) { /* ignore */ }
+    } catch (error) { this.setData({ recentError: error.message || "最近记录加载失败" }) }
   },
 
   // ---------- 日历 ----------

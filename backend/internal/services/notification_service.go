@@ -199,7 +199,7 @@ func AnnounceDeploymentWithNotes(version, releaseNotes string) error {
 		rows := make([]models.Notification, 0, len(ids))
 		for _, id := range ids {
 			rows = append(rows, models.Notification{
-				UserID: id, Type: "system_update", Title: "ss-menu 已更新",
+				UserID: id, Type: "system_update", Title: "arre食谱推荐小助手 已更新",
 				Content: content, Link: "/notifications",
 			})
 		}

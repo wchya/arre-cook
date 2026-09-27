@@ -76,31 +76,33 @@
             <view wx:elif="{{keyword}}" class="group__head group__head--result"><text>“{{keyword}}” 共 {{total}} 道</text></view>
 
             <view wx:for="{{group.items}}" wx:key="id" class="row-dish" hover-class="row-dish--press" hover-stay-time="60">
-              <view class="thumb" data-id="{{item.id}}" bindtap="openDish">
+              <view class="thumb" data-id="{{item.id}}" bindtap="openDish" aria-role="button" aria-label="查看{{item.name}}">
                 <dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="52" />
               </view>
               <view class="info">
-                <view class="info__top" data-id="{{item.id}}" bindtap="openDish">
-                  <text class="info__name">{{item.name}}</text>
-                  <text wx:if="{{item.isPrivate}}" class="chip chip-sm chip-purple private-tag">私房</text>
+                <view class="info__top">
+                  <view class="info__title" data-id="{{item.id}}" bindtap="openDish" aria-role="button" aria-label="查看{{item.name}}">
+                    <text class="info__name">{{item.name}}</text>
+                    <text wx:if="{{item.isPrivate}}" class="chip chip-sm chip-purple private-tag">私房</text>
+                  </view>
+                  <view class="fav {{item.favorite ? 'is-on anim-heartbeat' : ''}}" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation bindtap="toggleFav" aria-role="button" aria-label="{{item.favorite ? '取消收藏' : '收藏'}}{{item.name}}">
+                    <icon name="heart" size="32" stroke="2.2" color="{{item.favorite ? 'primary' : 'text3'}}" fill="{{item.favorite}}" />
+                  </view>
                 </view>
                 <view class="info__meta" data-id="{{item.id}}" bindtap="openDish">
                   <text>{{item.category}}</text>
-                  <block wx:if="{{item.cookTime}}"><view class="dot"></view><text>{{item.cookTime}}分钟</text></block>
-                  <view class="dot"></view><text class="c-{{item.diffTone}}">{{item.diffLabel}}</text>
-                  <block wx:if="{{item.taste}}"><view class="dot"></view><text class="truncate">{{item.taste}}</text></block>
+                  <text wx:if="{{item.cookTime}}">{{item.cookTime}}分钟</text>
+                  <text class="c-{{item.diffTone}}">{{item.diffLabel}}</text>
+                  <text wx:if="{{item.taste}}" class="truncate">{{item.taste}}</text>
                 </view>
                 <view class="info__actions">
-                  <view class="meal-toggle {{lunchIds[item.id] ? 'is-lunch' : ''}} {{pending['lunch' + item.id] ? 'is-pending' : ''}}" data-id="{{item.id}}" data-meal="lunch" bindtap="toggleMeal" hover-class="tap-active" hover-stay-time="60">
+                  <view class="meal-toggle {{lunchIds[item.id] ? 'is-lunch' : ''}} {{pending['lunch' + item.id] ? 'is-pending' : ''}}" data-id="{{item.id}}" data-meal="lunch" bindtap="toggleMeal" hover-class="tap-active" hover-stay-time="60" aria-role="button" aria-label="{{lunchIds[item.id] ? '移出' : '加入'}}午餐">
                     <icon name="{{lunchIds[item.id] ? 'minus' : 'plus'}}" size="18" stroke="3" color="{{lunchIds[item.id] ? 'white' : 'text2'}}" />
                     <text>🍳 午餐</text>
                   </view>
-                  <view class="meal-toggle {{dinnerIds[item.id] ? 'is-dinner' : ''}} {{pending['dinner' + item.id] ? 'is-pending' : ''}}" data-id="{{item.id}}" data-meal="dinner" bindtap="toggleMeal" hover-class="tap-active" hover-stay-time="60">
+                  <view class="meal-toggle {{dinnerIds[item.id] ? 'is-dinner' : ''}} {{pending['dinner' + item.id] ? 'is-pending' : ''}}" data-id="{{item.id}}" data-meal="dinner" bindtap="toggleMeal" hover-class="tap-active" hover-stay-time="60" aria-role="button" aria-label="{{dinnerIds[item.id] ? '移出' : '加入'}}晚餐">
                     <icon name="{{dinnerIds[item.id] ? 'minus' : 'plus'}}" size="18" stroke="3" color="{{dinnerIds[item.id] ? 'white' : 'text2'}}" />
                     <text>🍲 晚餐</text>
-                  </view>
-                  <view class="fav {{item.favorite ? 'is-on anim-heartbeat' : ''}}" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation bindtap="toggleFav" aria-role="button" aria-label="{{item.favorite ? '取消收藏' : '收藏'}}">
-                    <icon name="heart" size="32" stroke="2.2" color="{{item.favorite ? 'primary' : 'text4'}}" fill="{{item.favorite}}" />
                   </view>
                 </view>
               </view>

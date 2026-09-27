@@ -109,13 +109,14 @@ Page({
   onShareAppMessage() {
     const dish = this.data.dish
     return {
-      title: dish ? `${dish.name} · 今天就做这道` : "ss-menu · 今天吃什么",
+      title: dish ? `${dish.name} · 今天就做这道` : "arre食谱推荐小助手 · 今天吃什么",
       path: `/pages/dish/dish?id=${this.data.id}`,
       imageUrl: dish && dish.cover ? dish.cover : undefined,
     }
   },
 
   async load() {
+    this.setData({ loadError: "", loading: true })
     this.setData({ loading: true, notFound: false })
     try {
       const raw = await api.get(`/dishes/${this.data.id}`)
@@ -126,6 +127,7 @@ Page({
       this.loadToday()
       this.loadSimilar(raw)
     } catch (error) {
+      this.setData({ loadError: error.message || "内容暂时无法加载，请重试" })
       this.setData({ notFound: error.status === 404, loading: false })
       if (error.status !== 404) ui.toast(error.message || "菜品加载失败")
     }

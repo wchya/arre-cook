@@ -19,6 +19,7 @@ import (
 func Setup(r *gin.Engine) {
 	r.MaxMultipartMemory = config.C.MaxUploadSize + 1<<20
 	r.Use(mw.SecurityHeaders())
+	r.Use(mw.AIIngress())
 	r.Use(mw.CORSMiddleware())
 	r.Use(mw.LoggerMiddleware())
 
@@ -32,7 +33,7 @@ func Setup(r *gin.Engine) {
 	mcp.GET("", handlers.MCPGet)
 	mcp.DELETE("", handlers.MCPDelete)
 
-	api := r.Group("/api")
+	api := r.Group("/api", mw.NumericPathIDs())
 
 	// ---------- 公开 ----------
 	api.GET("/app-info", handlers.GetAppInfo)
@@ -102,7 +103,8 @@ func Setup(r *gin.Engine) {
 
 		// 站内 AI 助手
 		app.GET("/assistant/status", handlers.GetAssistantStatus)
-		app.POST("/assistant/chat", mw.ChatRateLimit(20), handlers.AssistantChat)
+		// Short burst protection is separate from the persistent per-account daily quota.
+		app.POST("/assistant/chat", mw.ChatRateLimit(60), handlers.AssistantChat)
 		app.GET("/assistant/sessions", handlers.ListAssistantSessions)
 		app.GET("/assistant/sessions/:id", handlers.GetAssistantMessages)
 		app.DELETE("/assistant/sessions/:id", handlers.DeleteAssistantSession)

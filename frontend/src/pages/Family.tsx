@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -34,14 +35,14 @@ export default function Family() {
   const [itemName, setItemName] = useState("")
   const [amount, setAmount] = useState("")
   const [search, setSearch] = useState("")
-  const { data, isLoading } = useQuery({ queryKey: ["family"], queryFn: familyApi.get })
+  const { data, isLoading , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["family"], queryFn: familyApi.get })
   const hasFamily = !!data?.family
   const isOwner = data?.role === "owner"
-  const { data: plan = [] } = useQuery({ queryKey: ["family-plan"], queryFn: () => familyApi.plan(), enabled: hasFamily })
-  const { data: shopping = [] } = useQuery({ queryKey: ["family-shopping"], queryFn: familyApi.shopping, enabled: hasFamily })
-  const { data: shared } = useQuery({ queryKey: ["family-dishes"], queryFn: () => dishesApi.list({ scope: "family", pageSize: "100" }), enabled: hasFamily })
-  const { data: privateDishes } = useQuery({ queryKey: ["my-dishes-family"], queryFn: () => dishesApi.list({ scope: "mine", pageSize: "100" }), enabled: hasFamily && tab === "dishes" })
-  const { data: publicDishes } = useQuery({ queryKey: ["public-dishes-family", search], queryFn: () => dishesApi.list({ scope: "public", search, pageSize: "100" }), enabled: hasFamily && tab === "plan" })
+  const { data: plan = [], error: planError, isLoading: planLoading, refetch: retryPlan } = useQuery({ queryKey: ["family-plan"], queryFn: () => familyApi.plan(), enabled: hasFamily })
+  const { data: shopping = [], error: shoppingError, isLoading: shoppingLoading, refetch: retryShopping } = useQuery({ queryKey: ["family-shopping"], queryFn: familyApi.shopping, enabled: hasFamily })
+  const { data: shared, error: sharedError, isLoading: sharedLoading, refetch: retryShared } = useQuery({ queryKey: ["family-dishes"], queryFn: () => dishesApi.list({ scope: "family", pageSize: "100" }), enabled: hasFamily })
+  const { data: privateDishes, error: privateError, isLoading: privateLoading, refetch: retryPrivate } = useQuery({ queryKey: ["my-dishes-family"], queryFn: () => dishesApi.list({ scope: "mine", pageSize: "100" }), enabled: hasFamily && tab === "dishes" })
+  const { data: publicDishes, error: publicError, isLoading: publicLoading, refetch: retryPublic } = useQuery({ queryKey: ["public-dishes-family", search], queryFn: () => dishesApi.list({ scope: "public", search, pageSize: "100" }), enabled: hasFamily && tab === "plan" })
   const choices = useMemo(() => [...(shared?.items || []), ...(publicDishes?.items || [])], [shared, publicDishes])
   const dates = useMemo(() => Array.from({ length: 7 }, (_, i) => localDate(i)), [])
 
@@ -80,6 +81,8 @@ export default function Family() {
       setBusy(false)
     }
   }
+
+  if (loadError) return <div><PageHeader title="我的家庭" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   return (
     <div className="min-h-dvh bg-bg pb-12 text-text">
@@ -134,24 +137,24 @@ export default function Family() {
               </section>
             </div>}
 
-            {tab === "plan" && <div className="space-y-5">
+            {tab === "plan" && (planError || sharedError || publicError || planLoading || sharedLoading || publicLoading ? <RequestState error={planError || sharedError || publicError} onRetry={() => { void retryPlan(); void retryShared(); void retryPublic() }} /> : <div className="space-y-5">
               <p className="text-sm text-text3">每个餐次由家庭成员共同安排。菜谱选择仅包含公共菜谱和家庭菜谱。</p>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索公共菜谱" className="h-11 w-full rounded-lg border border-border bg-card px-3 outline-none focus:border-primary" />
               <div className="divide-y divide-border border-y border-border">{dates.map((date) => <div key={date} className="py-3"><div className="mb-2 text-sm font-bold">{date.slice(5)} {date === localDate(0) ? "今天" : ""}</div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{["lunch", "dinner"].map((meal) => {
                 const selected = plan.find((p) => p.meal_date === date && p.meal_type === meal)?.dish.id || 0
                 return <label key={meal} className="flex items-center gap-2 text-sm"><span className="w-9 shrink-0 text-text3">{mealNames[meal]}</span><select value={selected} disabled={busy} onChange={(e) => void run(() => familyApi.setPlan(date, meal, Number(e.target.value)), "家庭菜单已更新")} className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-card px-2"><option value={0}>暂未安排</option>{selected && !choices.some((d) => d.id === selected) && <option value={selected}>{plan.find((p) => p.dish.id === selected)?.dish.name}</option>}{choices.map((dish) => <option key={dish.id} value={dish.id}>{dish.name}</option>)}</select></label>
               })}</div></div>)}</div>
-            </div>}
+            </div>)}
 
-            {tab === "shopping" && <div>
+            {tab === "shopping" && (shoppingError || shoppingLoading ? <RequestState error={shoppingError} onRetry={() => { void retryShopping() }} /> : <div>
               <form onSubmit={(e) => { e.preventDefault(); if (itemName.trim()) void run(async () => { await familyApi.addShopping(itemName.trim(), amount.trim()); setItemName(""); setAmount("") }, "已加入买菜清单") }} className="mb-5 flex gap-2"><input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="食材" className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-card px-3" /><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="数量" className="h-11 w-20 rounded-lg border border-border bg-card px-2" /><button disabled={!itemName.trim() || busy} aria-label="添加食材" title="添加食材" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50"><Plus size={20} /></button></form>
-              {shopping.length === 0 ? <p className="py-8 text-center text-sm text-text3">买菜清单还没有食材</p> : <div className="divide-y divide-border border-y border-border">{shopping.map((item) => <div key={item.id} className="flex min-h-12 items-center gap-3"><button onClick={() => void run(() => familyApi.checkShopping(item.id, !item.checked), "已更新")} aria-label={item.checked ? "标记未购买" : "标记已购买"} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border ${item.checked ? "border-mint bg-mint text-white" : "border-border2"}`}>{item.checked && <Check size={15} />}</button><div className={`min-w-0 flex-1 truncate text-sm ${item.checked ? "text-text3 line-through" : ""}`}>{item.name} {item.amount}</div><button onClick={() => void run(() => familyApi.deleteShopping(item.id), "已删除")} title="删除" aria-label={`删除${item.name}`} className="p-2 text-text3"><Trash2 size={16} /></button></div>)}</div>}
-            </div>}
+              {shopping.length === 0 ? <p className="py-8 text-center text-sm text-text3">买菜清单还没有食材</p> : <div className="divide-y divide-border border-y border-border">{shopping.map((item) => <div key={item.id} className="flex min-h-12 items-center gap-3"><button onClick={() => void run(() => familyApi.checkShopping(item.id, !item.checked), "已更新")} aria-label={item.checked ? "标记未购买" : "标记已购买"} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded border ${item.checked ? "border-mint bg-mint text-white" : "border-border2"}`}>{item.checked && <Check size={15} />}</button><div className={`min-w-0 flex-1 truncate text-sm ${item.checked ? "text-text3 line-through" : ""}`}>{item.name} {item.amount}</div><button onClick={() => void run(() => familyApi.deleteShopping(item.id), "已删除")} title="删除" aria-label={`删除${item.name}`} className="p-2 text-text3"><Trash2 size={16} /></button></div>)}</div>}
+            </div>)}
 
-            {tab === "dishes" && <div className="space-y-6">
+            {tab === "dishes" && (sharedError || privateError || sharedLoading || privateLoading ? <RequestState error={sharedError || privateError} onRetry={() => { void retryShared(); void retryPrivate() }} /> : <div className="space-y-6">
               <section><h2 className="mb-2 text-base font-bold">家庭菜谱</h2>{!shared?.items.length ? <p className="text-sm text-text3">还没有共享的菜谱</p> : <div className="divide-y divide-border border-y border-border">{shared.items.map((dish) => <DishRow key={dish.id} dish={dish} onOpen={() => navigate(`/dishes/${dish.id}`)} action={<button disabled={busy} onClick={() => void run(() => familyApi.importIngredients(dish.id), "食材已加入家庭买菜清单")} className="shrink-0 text-xs font-semibold text-mint disabled:opacity-50">加入买菜清单</button>} />)}</div>}</section>
               <section><h2 className="mb-2 text-base font-bold">分享我的私房菜</h2><div className="divide-y divide-border border-y border-border">{privateDishes?.items.map((dish) => <DishRow key={dish.id} dish={dish} onOpen={() => navigate(`/dishes/${dish.id}`)} action={<button disabled={busy} onClick={() => void run(() => familyApi.shareDish(dish.id), "已复制到家庭菜谱")} className="shrink-0 text-xs font-semibold text-primary disabled:opacity-50">分享到家庭</button>} />)}</div>{!privateDishes?.items.length && <p className="text-sm text-text3">先创建私房菜，再分享给家庭。</p>}<button onClick={() => navigate("/dishes/new")} className="mt-3 flex items-center gap-1 text-sm font-semibold text-primary"><Plus size={16} />新建私房菜</button></section>
-            </div>}
+            </div>)}
           </>
         )}
       </main>

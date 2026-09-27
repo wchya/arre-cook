@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Clock3, Inbox, X } from "lucide-react"
@@ -14,7 +15,7 @@ export default function Suggestions() {
   const queryClient = useQueryClient()
   const [showHistory, setShowHistory] = useState(false)
   const status = showHistory ? "all" : "pending"
-  const { data: suggestions = [], isLoading, isError } = useQuery({ queryKey: ["suggestions", status], queryFn: () => suggestionsApi.list(status) })
+  const { data: suggestions = [], isLoading, isError , error: loadError, refetch: retryLoad } = useQuery({ queryKey: ["suggestions", status], queryFn: () => suggestionsApi.list(status) })
   const resolveMutation = useMutation({
     mutationFn: ({ id, accept, meal_type }: { id: number; accept: boolean; meal_type?: "lunch" | "dinner" }) => {
       const suggestion = suggestions.find((item) => item.id === id)
@@ -28,6 +29,8 @@ export default function Suggestions() {
     },
     onError: (error) => toast.error(errorMessage(error, "操作失败")),
   })
+
+  if (loadError) return <div><PageHeader title="AI 建议" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   return (
     <div className="min-h-dvh bg-bg pb-8">

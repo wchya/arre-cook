@@ -236,6 +236,8 @@ Page({
     this.setData({ agreed: !this.data.agreed, consentHint: false })
   },
 
+  openAbout() { wx.navigateTo({ url: "/pages/about/about" }) },
+
   openTerms() {
     wx.navigateTo({ url: "/pages/legal/legal?type=terms" })
   },
@@ -422,7 +424,7 @@ Page({
     try { wx.setStorageSync(api.SESSION_KEY, result.token) } catch (_) { /* ignore */ }
     session.setUser(result.user || null)
     const name = result.user && result.user.nickname
-    ui.toast(result.created ? "欢迎加入 ss-menu 🎉" : name ? `欢迎回来，${name}` : "登录成功")
+    ui.toast(result.created ? "欢迎加入 arre食谱推荐小助手 🎉" : name ? `欢迎回来，${name}` : "登录成功")
     session.enterAfterLogin(this._redirect)
   },
 })

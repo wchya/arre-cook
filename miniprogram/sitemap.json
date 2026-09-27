@@ -1,4 +1,4 @@
 {
-  "desc": "ss-menu mini program pages",
+  "desc": "arre食谱推荐小助手 mini program pages",
   "rules": [{ "action": "allow", "page": "*" }]
 }

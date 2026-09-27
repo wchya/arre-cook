@@ -16,6 +16,7 @@ export default function Account() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [deleteConfirm, setDeleteConfirm] = useState("")
+  const [exporting, setExporting] = useState(false)
   const passwordMutation = useMutation({
     mutationFn: () => meApi.changePassword({ old_password: oldPassword, new_password: newPassword }),
     onSuccess: (result) => {
@@ -45,17 +46,21 @@ export default function Account() {
   })
 
   async function exportData() {
+    if (exporting) return
+    setExporting(true)
     try {
       const data = await meApi.export()
       const file = new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" })
       const url = URL.createObjectURL(file)
       const anchor = document.createElement("a")
       anchor.href = url
-      anchor.download = `nini-menu-data-${new Date().toISOString().slice(0, 10)}.json`
+      anchor.download = `arre-cook-data-${new Date().toISOString().slice(0, 10)}.json`
       anchor.click()
-      URL.revokeObjectURL(url)
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (error) {
       toast.error(errorMessage(error, "导出失败"))
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -64,6 +69,10 @@ export default function Account() {
     <div className="min-h-dvh bg-bg pb-8">
       <PageHeader title="账号与安全" subtitle="登录方式、数据导出与账号管理" icon={ShieldCheck} onBack={() => navigate(-1)} />
       <main className="mx-auto max-w-[640px] space-y-4 px-5 py-5">
+        <section className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5" aria-label="个人信息">
+          {user?.avatar ? <img src={user.avatar} alt="当前头像" className="h-16 w-16 rounded-2xl object-cover" /> : <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary-light text-2xl font-bold text-primary">{(user?.nickname || "我").slice(0, 1)}</span>}
+          <div className="min-w-0"><h2 className="truncate text-lg font-bold">{user?.nickname || "未命名"}</h2><p className="mt-1 truncate text-sm text-text2">{user?.email || user?.username || "微信用户"}</p><p className="mt-1 text-xs text-text3">{user?.wechat_bound ? "已绑定微信" : ""}{user?.wechat_bound && user?.has_password ? " · " : ""}{user?.has_password ? "已设置密码" : ""}</p></div>
+        </section>
         <section className="rounded-lg border border-border bg-card p-4">
           <h2 className="text-sm font-bold">登录邮箱</h2>
           <p className="mt-1 break-all text-sm text-text2">{user?.email || "未绑定邮箱"}</p>
@@ -82,7 +91,7 @@ export default function Account() {
         <section className="rounded-lg border border-border bg-card p-4">
           <h2 className="text-sm font-bold">个人数据</h2>
           <p className="mt-1 text-xs leading-5 text-text3">导出包含用餐记录、私房菜、偏好、AI 对话和建议。</p>
-          <button onClick={() => void exportData()} className="mt-3 flex h-10 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold text-text2 hover:bg-bg"><Download size={15} />导出我的数据</button>
+          <button onClick={() => void exportData()} disabled={exporting} className="mt-3 flex h-11 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold text-text2 hover:bg-bg disabled:opacity-50"><Download size={15} />{exporting ? "正在导出…" : "导出我的数据"}</button>
         </section>
 
         <section className="rounded-lg border border-border bg-card p-4">

@@ -1,3 +1,4 @@
+import RequestState from "@/components/RequestState"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -51,12 +52,12 @@ export default function Favorites() {
   const [sortBy, setSortBy] = useState<SortKey>("favorite")
   const [search, setSearch] = useState("")
 
-  const { data: overview, isLoading } = useQuery({
+  const { data: overview, isLoading , error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["favorites", "overview"],
     queryFn: () => favoritesApi.overview(),
   })
 
-  const items = overview?.items ?? []
+  const items = useMemo(() => overview?.items ?? [], [overview])
   const stats = overview?.stats
   const categories = overview?.categories ?? []
 
@@ -93,6 +94,8 @@ export default function Favorites() {
         return dateValue(b.favorite_created_at) - dateValue(a.favorite_created_at)
       })
   }, [activeCategory, items, search, sortBy])
+
+  if (loadError) return <div><PageHeader title="收藏" onBack={() => navigate(-1)} /><RequestState error={loadError} onRetry={() => { void retryLoad() }} /></div>
 
   return (
     <div className="animate-fadeUp min-h-full bg-bg">

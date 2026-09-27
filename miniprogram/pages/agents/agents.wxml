@@ -1,6 +1,7 @@
 <nav-bar title="AI 连接" subtitle="把食谱数据安全地交给智能体" icon="plug" />
+<request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
-<view class="content anim-fade-up">
+<view wx:if="{{!loadError}}" class="content anim-fade-up">
   <view class="conn-hero">
     <view class="conn-hero__title"><icon name="shield-check" size="34" stroke="2.4" color="purple" /><text>只属于你的数据通道</text></view>
     <view class="conn-hero__item">每个令牌只能访问<text class="bold">你本人</text>的数据，且只能做你勾选的事</view>
@@ -82,7 +83,7 @@
 <sheet show="{{createOpen}}" title="新建智能体令牌" bind:close="closeCreate">
   <view class="sheet-body conn-create">
     <view class="field-label">给它起个名字</view>
-    <view class="field is-focus"><input class="field-input" value="{{name}}" maxlength="32" placeholder="例如 Hermes、DeepSeek" placeholder-class="placeholder" cursor-spacing="140" bindinput="onNameInput" /></view>
+    <view class="field is-focus"><input adjust-position="{{false}}" class="field-input" value="{{name}}" maxlength="32" placeholder="例如 Hermes、DeepSeek" placeholder-class="placeholder" cursor-spacing="140" bindinput="onNameInput" /></view>
     <view class="chips mt-16">
       <view wx:for="{{nameSuggestions}}" wx:key="*this" class="chip chip-ghost" hover-class="tap-active" data-name="{{item}}" bindtap="pickName">{{item}}</view>
     </view>
@@ -124,7 +125,7 @@
 
 <sheet show="{{renameOpen}}" title="重命名令牌" bind:close="closeRename">
   <view class="sheet-body">
-    <view class="field is-focus"><input class="field-input" value="{{renameName}}" maxlength="32" focus="{{renameOpen}}" placeholder="令牌名称" placeholder-class="placeholder" cursor-spacing="140" bindinput="onRenameInput" bindconfirm="saveRename" /></view>
+    <view class="field is-focus"><input adjust-position="{{false}}" class="field-input" value="{{renameName}}" maxlength="32" focus="{{renameOpen}}" placeholder="令牌名称" placeholder-class="placeholder" cursor-spacing="140" bindinput="onRenameInput" bindconfirm="saveRename" /></view>
     <view class="flex gap-20 mt-32">
       <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeRename">取消</view>
       <view class="btn btn-primary flex-1 {{renameName && !renaming ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveRename">

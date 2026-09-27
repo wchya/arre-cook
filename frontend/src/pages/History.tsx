@@ -8,6 +8,7 @@ import type { MealRecord, DayRating } from "@/types"
 import StatCard from "@/components/StatCard"
 import SectionHeader from "@/components/SectionHeader"
 import PageHeader from "@/components/PageHeader"
+import RequestState from "@/components/RequestState"
 import PhotoViewer from "@/components/PhotoViewer"
 import SwipeDeleteRow from "@/components/SwipeDeleteRow"
 import { cardShadow } from "@/components/Card"
@@ -73,8 +74,8 @@ export default function History() {
     mutationFn: (id: number) => recordsApi.delete(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["records"] })
-      const prev = qc.getQueryData(["records"])
-      qc.setQueryData(["records"], (old: unknown) => {
+      const prev = qc.getQueriesData({ queryKey: ["records"] })
+      qc.setQueriesData({ queryKey: ["records"] }, (old: unknown) => {
         if (!old || typeof old !== "object" || old === null) return old
         const o = old as { items?: MealRecord[] }
         if (!o.items) return old
@@ -89,7 +90,7 @@ export default function History() {
       toast.success("已删除")
     },
     onError: (_err, _id, context) => {
-      if (context?.prev) qc.setQueryData(["records"], context.prev)
+      context?.prev.forEach(([key, value]) => qc.setQueryData(key, value))
       toast.error("删除失败")
     },
   })
@@ -152,14 +153,18 @@ export default function History() {
   })
 
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: () => statsApi.get() })
-  const { data: recordsData } = useQuery({
-    queryKey: ["records"],
-    queryFn: () => recordsApi.list({ pageSize: "100" }),
-  })
-
   const selectedDateKey = selectedDay !== null ? `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}` : ""
   const monthStartKey = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-01`
   const monthEndKey = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(new Date(calYear, calMonth + 1, 0).getDate()).padStart(2, "0")}`
+
+  const { data: recordsData, error: recordsError, isLoading: recordsLoading, refetch: reloadRecords } = useQuery({
+    queryKey: ["records", "month", monthStartKey],
+    queryFn: () => recordsApi.forDates(monthStartKey, monthEndKey),
+  })
+  const { data: recentData, error: recentError, refetch: reloadRecent } = useQuery({
+    queryKey: ["records", "recent"],
+    queryFn: () => recordsApi.list({ pageSize: "5" }),
+  })
 
   const { data: dayRatingData } = useQuery({
     queryKey: ["day-rating", selectedDateKey],
@@ -173,7 +178,8 @@ export default function History() {
     queryFn: () => dayRatingApi.list({ date_from: monthStartKey, date_to: monthEndKey }),
   })
 
-  const records = recordsData?.items || []
+  const records = useMemo(() => recordsData?.items || [], [recordsData])
+  const recent = recentData?.items || []
 
   const recordByDate = useMemo(() => {
     const m = new Map<string, MealRecord[]>()
@@ -380,8 +386,8 @@ export default function History() {
           <div className="flex items-center justify-between mb-2.5">
             <div className="text-base font-bold">{calYear} 年 {calMonth + 1} 月</div>
             <div className="flex gap-2">
-              <button onClick={() => changeMonth(-1)} className="w-7 h-7 rounded-full bg-bg flex items-center justify-center text-sm transition-all active:bg-primary-light">←</button>
-              <button onClick={() => changeMonth(1)} className="w-7 h-7 rounded-full bg-bg flex items-center justify-center text-sm transition-all active:bg-primary-light">→</button>
+              <button onClick={() => changeMonth(-1)} aria-label="上个月" className="w-11 h-11 rounded-full bg-bg flex items-center justify-center text-sm transition-all active:bg-primary-light">←</button>
+              <button onClick={() => changeMonth(1)} aria-label="下个月" className="w-11 h-11 rounded-full bg-bg flex items-center justify-center text-sm transition-all active:bg-primary-light">→</button>
             </div>
           </div>
           <div className="grid grid-cols-7 gap-1 text-center">
@@ -398,7 +404,8 @@ export default function History() {
                 <button
                   key={i}
                   onClick={() => cell.isCurrentMonth && setSelectedDay(cell.day)}
-                  className={`h-7 flex items-center justify-center rounded-full text-[12px] cursor-pointer transition-all relative ${!cell.isCurrentMonth ? "text-text4" : ""} ${cell.isToday ? "font-bold text-primary" : ""} ${hasRecord ? "after:content-[''] after:absolute after:bottom-[2px] after:w-1 after:h-1 after:rounded-full " + (hasLunch && hasDinner ? "after:bg-gradient-to-r after:from-primary after:to-mint after:w-2 after:h-1 after:rounded-sm" : hasLunch ? "after:bg-primary" : "after:bg-mint") : ""} ${isSelected ? "bg-primary text-white font-bold after:bg-white" : "active:bg-primary-light"}`}
+                  aria-label={cell.dateKey} aria-pressed={isSelected} disabled={!cell.isCurrentMonth}
+                  className={`h-11 flex items-center justify-center rounded-full text-[12px] cursor-pointer transition-all relative ${!cell.isCurrentMonth ? "text-text4" : ""} ${cell.isToday ? "font-bold text-primary" : ""} ${hasRecord ? "after:content-[''] after:absolute after:bottom-[2px] after:w-1 after:h-1 after:rounded-full " + (hasLunch && hasDinner ? "after:bg-gradient-to-r after:from-primary after:to-mint after:w-2 after:h-1 after:rounded-sm" : hasLunch ? "after:bg-primary" : "after:bg-mint") : ""} ${isSelected ? "bg-primary text-white font-bold after:bg-white" : "active:bg-primary-light"}`}
                 >
                   {cell.day}
                   {homeMoodEmoji && <span className="absolute -top-0.5 right-0 text-[10px] leading-none">{homeMoodEmoji}</span>}
@@ -408,7 +415,8 @@ export default function History() {
           </div>
         </div>
 
-        {selectedDay !== null && (
+        {(recordsError || recordsLoading) && <RequestState error={recordsError} onRetry={() => { void reloadRecords() }} compact />}
+        {selectedDay !== null && !recordsError && !recordsLoading && (
           <div className={`bg-card rounded-2xl overflow-hidden mb-5 ${cardShadow} border border-border animate-pop-soft`}>
             <div className="px-4 py-3 bg-primary-light text-sm font-semibold text-primary flex items-center justify-between">
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -508,7 +516,8 @@ export default function History() {
 
         <SectionHeader title="最近记录" />
         <div className="flex flex-col gap-2.5">
-          {records.slice(0, 5).map((r) => (
+          {recentError && <RequestState error={recentError} onRetry={() => { void reloadRecent() }} compact />}
+          {recent.map((r) => (
             <SwipeRowCard key={r.id} onDelete={() => deleteMut.mutate(r.id)}>
               <div className="p-3.5 px-4 flex items-center gap-3.5 w-full text-left cursor-pointer transition-all active:bg-primary-light">
                 <span onClick={() => navigate(`/dishes/${r.dish_id}`)} className={`w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden ${r.meal_type === "lunch" ? "bg-primary-light" : "bg-mint-light"}`}>
@@ -529,7 +538,7 @@ export default function History() {
               </div>
             </SwipeRowCard>
           ))}
-          {records.length === 0 && (
+          {!recentError && recent.length === 0 && (
             <div className="text-center py-12">
               <span className="text-[56px] block mb-4 animate-float">📅</span>
               <div className="text-base font-semibold mb-1.5">还没有记录</div>

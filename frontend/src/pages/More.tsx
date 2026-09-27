@@ -1,15 +1,14 @@
+import RequestState from "@/components/RequestState"
 import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { achievementsApi, weekPlanApi, shoppingListApi, settingsApi, recordsApi } from "@/api"
-import { useAuthStore } from "@/store/useAuthStore"
-import { asString } from "@/lib/utils"
+import { weekPlanApi, shoppingListApi, recordsApi } from "@/api"
 import { Flip, gsap, motionDuration, useGSAP } from "@/lib/gsap"
 import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
 import PageHeader from "@/components/PageHeader"
-import type { Achievement, WeekDayPlan, ShoppingCategory, MealRecord } from "@/types"
+import type { WeekDayPlan, ShoppingCategory, MealRecord } from "@/types"
 import toast from "react-hot-toast"
-import { Menu } from "lucide-react"
+import { ShoppingBasket } from "lucide-react"
 
 function getTodayStr() {
   const d = new Date()
@@ -133,14 +132,10 @@ function WeekDayCard({ day, todayStr, tomorrowStr, navigate, onCardClick }: {
 export default function More() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn)
 
-  const { data: rawAchievements } = useQuery({ queryKey: ["achievements"], queryFn: () => achievementsApi.list() })
-  const achievements = Array.isArray(rawAchievements) ? rawAchievements : []
-  const { data: weekPlan } = useQuery({ queryKey: ["week-plan"], queryFn: () => weekPlanApi.get() })
-  const { data: rawShoppingList } = useQuery({ queryKey: ["shopping-list"], queryFn: () => shoppingListApi.get(), staleTime: 0 })
+  const { data: weekPlan, error: weekError, isLoading: weekLoading, refetch: reloadWeek } = useQuery({ queryKey: ["week-plan"], queryFn: () => weekPlanApi.get() })
+  const { data: rawShoppingList, error: shoppingError, isLoading: shoppingLoading, refetch: reloadShopping } = useQuery({ queryKey: ["shopping-list"], queryFn: () => shoppingListApi.get(), staleTime: 0 })
   const shoppingList = rawShoppingList ?? []
-  const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: () => settingsApi.get() })
 
   const [showAllWeekDays, setShowAllWeekDays] = useState(false)
   const [modalDay, setModalDay] = useState<WeekDayPlan | null>(null)
@@ -222,19 +217,6 @@ export default function More() {
     },
   })
 
-  const settingsMut = useMutation({
-    mutationFn: (s: Record<string, string>) => settingsApi.update(s),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings"] })
-      toast.success("已更新")
-    },
-  })
-
-  function toggleSetting(key: string, currentVal: string) {
-    const newVal = currentVal === "1" ? "0" : "1"
-    settingsMut.mutate({ [key]: newVal })
-  }
-
   function handleConfirmRecord(day: WeekDayPlan) {
     const data: Partial<MealRecord>[] = []
     day.lunch.forEach((d) => data.push({ dish_id: d.id, dish_name: d.name, meal_type: "lunch", meal_date: day.date }))
@@ -242,7 +224,6 @@ export default function More() {
     if (data.length > 0) recordMut.mutate(data)
   }
 
-  const unlockedCount = achievements.filter((a: Achievement) => a.is_unlocked).length
   const totalChecked = shoppingList.reduce((acc: number, cat: ShoppingCategory) => acc + cat.items.filter((item) => item.checked).length, 0)
   const totalInStock = shoppingList.reduce((acc: number, cat: ShoppingCategory) => acc + cat.items.filter((item) => item.in_stock).length, 0)
   const totalItems = shoppingList.reduce((acc: number, cat: ShoppingCategory) => acc + cat.items.length, 0)
@@ -278,44 +259,11 @@ export default function More() {
     setShowAllWeekDays((value) => !value)
   })
 
-  const previewAchievements = achievements
-    .slice()
-    .sort((a: Achievement, b: Achievement) => {
-      if (a.is_unlocked !== b.is_unlocked) return a.is_unlocked ? -1 : 1
-      return a.id - b.id
-    })
-    .slice(0, 3)
-
   return (
     <div className="animate-fadeUp">
-      <PageHeader title="更多" subtitle="一周菜单、买菜清单和设置" icon={Menu} />
+      <PageHeader title="一周菜单与买菜清单" subtitle="7 天午晚餐 · 食材自动合并" icon={ShoppingBasket} onBack={() => navigate(-1)} />
 
       <div className="px-5 py-4 max-w-[640px] mx-auto">
-        <div className="flex items-center justify-between mb-3.5">
-          <div className="text-lg font-bold">🏆 成就墙</div>
-          <span className="text-xs text-text3 font-medium">{unlockedCount}/{achievements.length} 已解锁</span>
-        </div>
-        <div className="grid grid-cols-3 gap-3 mb-2">
-          {previewAchievements.map((a: Achievement) => (
-            <div
-              key={a.id}
-              onClick={() => navigate("/achievements")}
-              className={`bg-card rounded-2xl p-4 pt-5 text-center shadow-[0_1px_3px_rgba(0,0,0,.04),0_4px_12px_rgba(0,0,0,.04)] border transition-all relative overflow-hidden cursor-pointer active:scale-95 ${a.is_unlocked ? "border-primary/20" : "border-border opacity-35 grayscale-[.9]"}`}
-            >
-              {a.is_unlocked && <div className="absolute top-0 left-0 right-0 h-[3px] bg-primary" />}
-              <span className="text-[32px] block mb-1.5">{a.icon}</span>
-              <div className="text-xs font-semibold mb-0.5">{a.name}</div>
-              <div className="text-[10px] text-text2">{a.description}</div>
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={() => navigate("/achievements")}
-          className="w-full py-2 text-sm font-medium text-primary bg-primary-light/50 rounded-xl mb-7 transition-all active:scale-98"
-        >
-          查看更多成就 ›
-        </button>
-
         <div className="flex items-center justify-between mb-3.5">
           <div className="text-lg font-bold">📅 一周菜单</div>
           <button
@@ -326,6 +274,7 @@ export default function More() {
             {regenerateMut.isPending ? "生成中..." : "🔄 重新生成"}
           </button>
         </div>
+        {(weekError || weekLoading) && <RequestState error={weekError} onRetry={() => { void reloadWeek() }} compact />}
         <div ref={weekListRef} className="flex flex-col gap-2.5 mb-1">
           {displayDays.map((day: WeekDayPlan) => (
             <div
@@ -356,7 +305,7 @@ export default function More() {
           )}
         </div>
         <div className="bg-card rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,.04),0_4px_12px_rgba(0,0,0,.04)] border border-border mb-7">
-          {shoppingList.length === 0 ? (
+          {shoppingError || shoppingLoading ? <RequestState error={shoppingError} onRetry={() => { void reloadShopping() }} compact /> : shoppingList.length === 0 ? (
             <div className="py-5 px-4 text-center text-sm text-text3">暂无买菜清单，点菜后自动生成今日+明日食材</div>
           ) : (
             shoppingList.map((cat: ShoppingCategory, ci: number) => (
@@ -366,8 +315,9 @@ export default function More() {
                   <div key={ii} className={`flex items-center gap-2.5 py-1.5 text-sm ${item.in_stock ? "opacity-70" : ""}`}>
                     <button
                       onClick={() => checkMut.mutate({ item_name: item.name, meal_date: todayStr, checked: !item.checked })}
-                      disabled={item.in_stock}
-                      className={`w-[22px] h-[22px] rounded-md border-2 flex items-center justify-center text-xs flex-shrink-0 transition-all ${item.checked ? "bg-mint border-mint text-white" : item.in_stock ? "bg-yellow-light border-yellow text-yellow" : "border-border2 text-transparent"}`}
+                      aria-label={`${item.checked ? "取消已买" : "标记已买"}：${item.name}`} aria-pressed={item.checked}
+                      disabled={item.in_stock || checkMut.isPending}
+                      className={`w-11 h-11 rounded-md border-2 flex items-center justify-center text-xs flex-shrink-0 transition-all ${item.checked ? "bg-mint border-mint text-white" : item.in_stock ? "bg-yellow-light border-yellow text-yellow" : "border-border2 text-transparent"}`}
                     >{item.in_stock ? "家" : "✓"}</button>
                     <span className={`transition-all ${item.checked || item.in_stock ? "line-through text-text3" : ""}`}>{item.name}</span>
                     <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
@@ -375,7 +325,7 @@ export default function More() {
                       <button
                         onClick={() => inventoryMut.mutate({ item_name: item.name, in_stock: !item.in_stock })}
                         disabled={inventoryMut.isPending}
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all active:scale-95 disabled:opacity-60 ${item.in_stock ? "bg-yellow-light text-yellow border-yellow/30" : "bg-bg text-text3 border-border"}`}
+                        className={`min-h-11 px-3 py-1.5 rounded-full text-[10px] font-semibold border transition-all active:scale-95 disabled:opacity-60 ${item.in_stock ? "bg-yellow-light text-yellow border-yellow/30" : "bg-bg text-text3 border-border"}`}
                       >
                         {item.in_stock ? "家中有" : "库存"}
                       </button>
@@ -387,38 +337,7 @@ export default function More() {
           )}
         </div>
 
-        {isLoggedIn && (
-          <>
-            <div className="flex items-center justify-between mb-3.5 mt-7">
-              <div className="text-lg font-bold">⚙ 设置</div>
-            </div>
-            <div className="bg-card rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,.04),0_4px_12px_rgba(0,0,0,.04)] border border-border">
-              <button onClick={() => toast(`推荐去重天数：${asString(settings?.repeat_days, "3")}天`)} className="w-full flex items-center justify-between px-4 py-3.5 border-b border-border transition-all active:bg-bg text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-[10px] bg-primary-light flex items-center justify-center text-base">📅</div>
-                  <div><div className="text-sm font-medium">推荐去重</div><div className="text-[11px] text-text2">近{asString(settings?.repeat_days, "3")}天吃过的菜不优先推荐</div></div>
-                </div>
-                <span className="text-text3 text-sm flex items-center gap-1">{asString(settings?.repeat_days, "3")}天 ›</span>
-              </button>
-              <button onClick={() => toggleSetting("voice_enabled", asString(settings?.voice_enabled, "1"))} className="w-full flex items-center justify-between px-4 py-3.5 border-b border-border transition-all active:bg-bg text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-[10px] bg-mint-light flex items-center justify-center text-base">🔊</div>
-                  <div><div className="text-sm font-medium">语音播报</div><div className="text-[11px] text-text2">做菜时语音朗读步骤</div></div>
-                </div>
-                <div className={`w-11 h-6 rounded-xl relative cursor-pointer transition-all ${settings?.voice_enabled !== "0" ? "bg-primary" : "bg-border2"}`}>
-                  <div className={`absolute top-[2px] w-5 h-5 rounded-full bg-white shadow-sm transition-all ${settings?.voice_enabled !== "0" ? "left-[22px]" : "left-[2px]"}`} />
-                </div>
-              </button>
-               <button onClick={() => navigate(isLoggedIn ? "/admin/dashboard" : "/admin/login")} className="w-full flex items-center justify-between px-4 py-3.5 transition-all active:bg-bg text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-[10px] bg-pink-light flex items-center justify-center text-base">🔒</div>
-                  <div><div className="text-sm font-medium">管理模式</div><div className="text-[11px] text-text2">管理菜品、推荐语、成就</div></div>
-                </div>
-                <span className="text-text3 text-sm">›</span>
-              </button>
-            </div>
-          </>
-        )}
+
       </div>
 
       {modalDay && (
