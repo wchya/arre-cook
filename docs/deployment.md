@@ -44,12 +44,12 @@ docker run --rm --network web-arrebyte_default \
 博客服务器 `/home/ubuntu/web-arrebyte/.env` 已有 QQ 邮箱的 `MAIL_HOST`、`MAIL_PORT`、`MAIL_USERNAME` 和 `MAIL_PASSWORD`。在本仓库根目录运行 Compose 时，让它读取博客和应用两份环境文件；博客 SMTP 变量会传给菜谱容器，博客数据库等变量不会传入。菜谱的 Garage 凭据必须填写 `COOK_S3_ACCESS_KEY` / `COOK_S3_SECRET_KEY`，Compose 不会复用博客的 `S3_ACCESS_KEY`。博客当前使用 `smtp.qq.com:587`（STARTTLS），`.env.example` 已对齐：
 
 ```sh
-APP_VERSION=2 \
+APP_VERSION="$(./scripts/next-version.sh)" \
 APP_RELEASE_NOTES="优化站内信详情查看体验；修复头像选择无响应问题；新增我的私房菜入口" \
 docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --build
 ```
 
-服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络，通过 `http://garage:3900` 访问对象存储。若博客项目名改变，在 `.env` 中调整 `BLOG_DOCKER_NETWORK`。每次部署都要把递增的数字版本传给 `APP_VERSION`（例如 `2`，用户会看到 `v2`），并把面向用户的变更摘要传给 `APP_RELEASE_NOTES`（多条可用“；”分隔）。服务内部仍会用版本值判断是否已通知，同一版本重启不会重复发送。摘要为空时使用“本次更新了一些内容，并修复了一些 bug。”。
+服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络。每次部署运行 `./scripts/next-version.sh` 生成下一版语义版本：`fix` 或普通改动递增 patch，`feat` 递增 minor，提交标题或正文包含 `BREAKING`/`!` 递增 major。确认后将该版本写入 `VERSION` 并提交，再把它传给 `APP_VERSION`，用户会看到 `vX.Y.Z`。摘要为空时使用“本次更新了一些内容，并修复了一些 bug。”。
 
 ## Garage 单机运行与备份
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -133,17 +134,8 @@ func displayDeploymentVersion(raw string) string {
 	if strings.HasPrefix(strings.ToLower(raw), "v") {
 		raw = strings.TrimSpace(raw[1:])
 	}
-	if raw != "" {
-		allDigits := true
-		for _, r := range raw {
-			if r < '0' || r > '9' {
-				allDigits = false
-				break
-			}
-		}
-		if allDigits {
-			return "v" + raw
-		}
+	if matched, _ := regexp.MatchString(`^[0-9]+(?:\.[0-9]+){0,2}$`, raw); matched {
+		return "v" + raw
 	}
 	return "v1"
 }
