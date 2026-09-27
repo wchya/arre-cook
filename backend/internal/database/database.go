@@ -132,6 +132,17 @@ func VisibleDishes(uid uint) func(*gorm.DB) *gorm.DB {
 	}
 }
 
+// AuthoredDishes is the user's collection, including recipes created in a
+// family they can still access. Authorship alone never grants family access.
+func AuthoredDishes(uid uint) func(*gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if uid == 0 {
+			return db.Where("1 = 0")
+		}
+		return db.Scopes(VisibleDishes(uid)).Where("owner_id = ?", uid)
+	}
+}
+
 // ensureBootstrapAdmin 首次启动时创建管理员：用户名 ADMIN_USERNAME + 密码 ADMIN_PASSWORD（兜底登录），
 // 若配置了 ADMIN_EMAIL 则同时绑定该邮箱，之后可直接用邮箱验证码登录。
 func ensureBootstrapAdmin() (uint, error) {

@@ -18,9 +18,13 @@ import (
 // 菜品可见性：公共菜谱、本人私房菜，以及当前家庭明确共享的菜谱。
 
 func dishScope(c *gin.Context) *gorm.DB {
-	q := database.DB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid(c)))
+	q := database.DB.Model(&models.Dish{})
+	if c.Query("scope") == "mine" {
+		return q.Scopes(database.AuthoredDishes(uid(c)))
+	}
+	q = q.Scopes(database.VisibleDishes(uid(c)))
 	switch c.Query("scope") {
-	case "mine":
+	case "private": // Personal originals that can be copied into a family.
 		q = q.Where("owner_id = ? AND family_id = 0", uid(c))
 	case "public":
 		q = q.Where("owner_id = 0 AND family_id = 0")
@@ -349,7 +353,7 @@ type CategoryCount struct {
 func GetDishCategoryCounts(c *gin.Context) {
 	var counts []CategoryCount
 	query := dishScope(c)
-	if c.Query("scope") != "mine" {
+	if c.Query("scope") != "mine" && c.Query("scope") != "private" {
 		query = query.Where("enabled = ?", true)
 	}
 	if err := query.
@@ -365,7 +369,7 @@ func GetDishCategoryCounts(c *gin.Context) {
 	for _, category := range counts {
 		total += category.Count
 	}
-	if err := database.DB.Model(&models.Dish{}).Where("owner_id = ? AND family_id = 0", uid(c)).Count(&mine).Error; err != nil {
+	if err := database.DB.Model(&models.Dish{}).Scopes(database.AuthoredDishes(uid(c))).Count(&mine).Error; err != nil {
 		utils.InternalError(c, "分类统计加载失败")
 		return
 	}

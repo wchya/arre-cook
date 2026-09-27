@@ -289,7 +289,7 @@ function DishCatalogue({ scope }: { scope: string }) {
     <div className="animate-fadeUp flex flex-col h-full">
       <PageHeader
         title={RECIPE_SCOPES.find((item) => item.value === scope)?.label}
-        subtitle={scope === "mine" ? "仅自己可见，共享食谱在家庭查看" : "选菜加餐，一键搞定"}
+        subtitle={scope === "mine" ? "你创建的菜谱，包含家庭里的做法" : "选菜加餐，一键搞定"}
         icon={UtensilsCrossed}
         actions={
            <HeaderIconButton onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/me/preferences")} aria-label={isAdmin ? "管理设置" : "饮食偏好"}>
@@ -373,8 +373,8 @@ function DishCatalogue({ scope }: { scope: string }) {
               ) : listError && allDishes.length === 0 ? <RequestState error={listError} onRetry={() => { void refetch() }} compact /> : allDishes.length === 0 ? (
                 <div className="text-center py-16">
                   <span className="text-[56px] block mb-4 animate-float">🍽</span>
-                  <div className="text-base font-semibold mb-1.5">{scope === "mine" && !search && activeCategory === "全部" && activeTaste === "全部" ? "还没有个人私房菜" : "当前范围没有找到菜品"}</div>
-                  <div className="text-[13px] text-text2">{scope === "mine" ? "已共享的做法在家庭菜谱中，公共菜谱可切换到全部查看。" : "可以清除筛选，重新查看全部菜谱。"}</div>
+                  <div className="text-base font-semibold mb-1.5">{scope === "mine" && !search && activeCategory === "全部" && activeTaste === "全部" ? "还没有创建菜谱" : "当前范围没有找到菜品"}</div>
+                  <div className="text-[13px] text-text2">{scope === "mine" ? "这里显示你创建的个人菜谱和仍可访问的家庭菜谱，也可以切换到全部查看公共菜谱。" : "可以清除筛选，重新查看全部菜谱。"}</div>
                   <div className="mt-4 flex flex-col items-center gap-2">
                     <button type="button" className="btn-secondary" onClick={() => changeScope("")}>查看全部菜谱</button>
                     {scope === "mine" && <>
@@ -617,6 +617,7 @@ function DishRow({ dish, isFav, isLunch, isDinner, onToggleFav, onToggleMeal, on
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-text2 mb-2">
+          {!!dish.family_id && <span className="rounded bg-mint-light px-1.5 py-0.5 text-mint">家庭共享</span>}
           <span className="whitespace-nowrap">{dish.category}</span>
           {dish.cook_time > 0 && <span className="whitespace-nowrap">{dish.cook_time}分钟</span>}
           <span className={`whitespace-nowrap ${diffColor(dish.difficulty)}`}>{diffLabel(dish.difficulty)}</span>

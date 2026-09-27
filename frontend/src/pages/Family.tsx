@@ -41,7 +41,7 @@ export default function Family() {
   const { data: plan = [], error: planError, isLoading: planLoading, refetch: retryPlan } = useQuery({ queryKey: ["family-plan"], queryFn: () => familyApi.plan(), enabled: hasFamily })
   const { data: shopping = [], error: shoppingError, isLoading: shoppingLoading, refetch: retryShopping } = useQuery({ queryKey: ["family-shopping"], queryFn: familyApi.shopping, enabled: hasFamily })
   const { data: shared, error: sharedError, isLoading: sharedLoading, refetch: retryShared } = useQuery({ queryKey: ["family-dishes"], queryFn: () => dishesApi.list({ scope: "family", pageSize: "100" }), enabled: hasFamily })
-  const { data: privateDishes, error: privateError, isLoading: privateLoading, refetch: retryPrivate } = useQuery({ queryKey: ["my-dishes-family"], queryFn: () => dishesApi.list({ scope: "mine", pageSize: "100" }), enabled: hasFamily && tab === "dishes" })
+  const { data: privateDishes, error: privateError, isLoading: privateLoading, refetch: retryPrivate } = useQuery({ queryKey: ["my-dishes-family"], queryFn: () => dishesApi.list({ scope: "private", pageSize: "100" }), enabled: hasFamily && tab === "dishes" })
   const { data: publicDishes, error: publicError, isLoading: publicLoading, refetch: retryPublic } = useQuery({ queryKey: ["public-dishes-family", search], queryFn: () => dishesApi.list({ scope: "public", search, pageSize: "100" }), enabled: hasFamily && tab === "plan" })
   const choices = useMemo(() => [...(shared?.items || []), ...(publicDishes?.items || [])], [shared, publicDishes])
   const dates = useMemo(() => Array.from({ length: 7 }, (_, i) => localDate(i)), [])

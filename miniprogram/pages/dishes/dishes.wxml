@@ -1,5 +1,5 @@
 <view class="screen">
-  <nav-bar icon="utensils-crossed" title="{{scope === 'mine' ? '我的私房菜' : scope === 'family' ? '家庭菜谱' : scope === 'public' ? '公共菜谱' : '全部菜谱'}}" subtitle="{{scope === 'mine' ? '仅自己可见，共享食谱在家庭查看' : '选菜加餐，一键搞定'}}" theme="plain">
+  <nav-bar icon="utensils-crossed" title="{{scope === 'mine' ? '我的私房菜' : scope === 'family' ? '家庭菜谱' : scope === 'public' ? '公共菜谱' : '全部菜谱'}}" subtitle="{{scope === 'mine' ? '你创建的菜谱，包含家庭里的做法' : '选菜加餐，一键搞定'}}" theme="plain">
     <view class="nav-add" hover-class="tap-active" bindtap="createDish" aria-role="button" aria-label="新建私房菜">
       <icon name="plus" size="34" stroke="2.4" color="primary" />
     </view>
@@ -65,7 +65,7 @@
         </view>
 
         <view wx:elif="{{!groups.length}}" class="list-state">
-          <empty emoji="🍽" title="{{scope === 'mine' && !keyword && category === '全部' && taste === '全部' ? '还没有个人私房菜' : '当前范围没有找到菜品'}}" desc="{{scope === 'mine' ? '已共享的做法在家庭菜谱中，公共菜谱可切换到全部查看。' : '可以清除筛选，重新查看全部菜谱。'}}" compact>
+          <empty emoji="🍽" title="{{scope === 'mine' && !keyword && category === '全部' && taste === '全部' ? '还没有创建菜谱' : '当前范围没有找到菜品'}}" desc="{{scope === 'mine' ? '这里显示你创建的个人菜谱和仍可访问的家庭菜谱，也可以切换到全部查看公共菜谱。' : '可以清除筛选，重新查看全部菜谱。'}}" compact>
             <view class="scope-actions">
               <view class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="showAllDishes" aria-role="button">查看全部菜谱</view>
               <view wx:if="{{scope === 'mine'}}" class="btn btn-soft btn-sm" hover-class="tap-active" bindtap="openFamilyRecipes" aria-role="button">查看家庭菜谱</view>
@@ -88,6 +88,7 @@
                   <view class="info__title" data-id="{{item.id}}" bindtap="openDish" aria-role="button" aria-label="查看{{item.name}}">
                     <text class="info__name">{{item.name}}</text>
                     <text wx:if="{{item.isPrivate}}" class="chip chip-sm chip-purple private-tag">私房</text>
+                    <text wx:if="{{item.isFamily}}" class="chip chip-sm chip-mint private-tag">家庭共享</text>
                   </view>
                   <view class="fav {{item.favorite ? 'is-on anim-heartbeat' : ''}}" data-id="{{item.id}}" hover-class="tap-active" hover-stay-time="60" hover-stop-propagation bindtap="toggleFav" aria-role="button" aria-label="{{item.favorite ? '取消收藏' : '收藏'}}{{item.name}}">
                     <icon name="heart" size="32" stroke="2.2" color="{{item.favorite ? 'primary' : 'text3'}}" fill="{{item.favorite}}" />
