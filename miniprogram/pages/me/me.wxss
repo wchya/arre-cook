@@ -9,6 +9,7 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .avatar--initial { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #F59A6B, var(--primary)); color: #fff; font-size: 56rpx; font-weight: 900; }
 .avatar__cam { position: absolute; right: -8rpx; bottom: -8rpx; display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; border-radius: 50%; background: var(--card); box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, .12); }
 .avatar__spin { width: 24rpx; height: 24rpx; }
+.nickname-input { display: block; width: 100%; min-height: 88rpx; box-sizing: border-box; line-height: 44rpx; }
 .profile__info { flex: 1; min-width: 0; }
 .profile__name { display: flex; align-items: center; gap: 10rpx; max-width: 100%; color: var(--text); font-size: 42rpx; font-weight: 900; letter-spacing: -.5rpx; }
 .profile__email { margin-top: 2rpx; color: var(--text2); font-size: 24rpx; }

@@ -112,6 +112,8 @@ Page({
       const user = await api.put("/me", { avatar: raw })
       session.setUser(user)
       this.applyUser(user)
+      // Keep the account page's cached profile in sync when it is opened next.
+      try { wx.setStorageSync("ninimenu_profile_refresh", Date.now()) } catch (_) { /* ignore */ }
       ui.toast("头像已更新", "success")
     } catch (error) {
       ui.toast(error.message || "头像上传失败")

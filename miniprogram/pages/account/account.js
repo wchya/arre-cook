@@ -2,6 +2,7 @@ const api = require("../../utils/api")
 const ui = require("../../utils/ui")
 const session = require("../../utils/session")
 const fmt = require("../../utils/format")
+const media = require("../../utils/media")
 
 // 导出数据里各分类的计数，用于导出弹层的摘要展示。
 const EXPORT_FIELDS = [
@@ -70,6 +71,7 @@ Page({
       memberSince: user.created_at ? fmt.monthDay(user.created_at) : "",
       lastLogin: user.last_login_at ? fmt.relativeDate(user.last_login_at) : "",
     })
+    this.setData({ "user.avatar": media.assetUrl(user.avatar) })
   },
 
   // ---------- 修改 / 设置密码 ----------

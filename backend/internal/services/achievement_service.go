@@ -195,7 +195,9 @@ func SyncAutoAchievements(uid uint) {
 	}
 
 	var autoAchievements []models.Achievement
-	database.DB.Where("condition = ? AND code IN ?", "auto", codes).Find(&autoAchievements)
+	// `condition` is a reserved keyword in MySQL; quote it explicitly so the
+	// same query works on both MySQL and SQLite.
+	database.DB.Where("`condition` = ? AND code IN ?", "auto", codes).Find(&autoAchievements)
 	if len(autoAchievements) == 0 {
 		return
 	}

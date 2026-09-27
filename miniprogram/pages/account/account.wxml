@@ -5,7 +5,8 @@
 
   <block wx:else>
     <view class="card identity">
-      <view class="identity__avatar">{{initial}}</view>
+      <image wx:if="{{user.avatar}}" class="identity__avatar identity__avatar--image" src="{{user.avatar}}" mode="aspectFill" />
+      <view wx:else class="identity__avatar">{{initial}}</view>
       <view class="flex-1">
         <view class="identity__name truncate">{{user.nickname || '未命名'}}</view>
         <view class="identity__sub truncate">{{user.email || user.username || '微信用户'}}</view>
