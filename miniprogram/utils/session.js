@@ -49,11 +49,13 @@ function logout(reason) {
   wx.reLaunch({ url: `/pages/login/login?reason=${reason || "logout"}` })
 }
 
-// 自定义 TabBar 选中态：每个 Tab 页 onShow 时同步。
-function syncTabBar(page, index) {
+// 每个 Tab 页 onShow 时同步选中态与可见性，避免弹层关闭后菜单仍被隐藏。
+function syncTabBar(page, index, hidden = false) {
   if (typeof page.getTabBar !== "function") return
   const tabBar = page.getTabBar()
-  if (tabBar && tabBar.data.selected !== index) tabBar.setData({ selected: index })
+  if (tabBar && (tabBar.data.selected !== index || tabBar.data.hidden !== hidden)) {
+    tabBar.setData({ selected: index, hidden })
+  }
 }
 
 function isTabPage(route) {

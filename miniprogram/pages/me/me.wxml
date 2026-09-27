@@ -155,29 +155,29 @@
       </view>
       <view class="foot">ss-menu · 你的数据只属于你</view>
     </view>
-    <view wx:if="{{!nameOpen}}" class="tabbar-spacer"></view>
+    <view class="tabbar-spacer"></view>
   </scroll-view>
-
-  <sheet show="{{nameOpen}}" title="修改昵称" bind:close="closeName">
-    <view class="sheet-body">
-      <view class="field is-focus">
-        <input class="field-input nickname-input" type="text" value="{{nickname}}" maxlength="20" focus="{{nameOpen}}" placeholder="1-20 个字" placeholder-class="placeholder" cursor-spacing="120" bindinput="onNameInput" bindconfirm="saveName" />
-      </view>
-      <view class="field-hint">可以直接使用微信昵称</view>
-      <view class="flex gap-20 mt-32 nickname-actions">
-        <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeName">取消</view>
-        <view class="btn btn-primary flex-1 nickname-save {{nickname && !savingName ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveName">
-          <view wx:if="{{savingName}}" class="spinner"></view><text wx:else>保存</text>
-        </view>
-      </view>
-    </view>
-  </sheet>
-
-  <sheet show="{{repeatOpen}}" title="推荐去重天数" subtitle="这几天内吃过的菜，推荐时会先避开" bind:close="closeRepeat">
-    <view class="sheet-body">
-      <view class="grid-4">
-        <view wx:for="{{repeatOptions}}" wx:key="*this" class="repeat {{(item === '0' && !repeatDays) || repeatDays === item ? 'is-active' : ''}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseRepeat">{{item === '0' ? '默认' : item + ' 天'}}</view>
-      </view>
-    </view>
-  </sheet>
 </view>
+
+<sheet show="{{nameOpen}}" title="修改昵称" solid="{{true}}" keyboard-height="{{nameKeyboardHeight}}" bind:opened="onNameOpened" bind:closed="onNameClosed" bind:close="closeName">
+  <view class="sheet-body">
+    <view class="field is-focus">
+      <input class="field-input nickname-input" type="text" value="{{nickname}}" maxlength="20" focus="{{nameFocus}}" adjust-position="{{false}}" placeholder="1-20 个字" placeholder-class="placeholder" cursor-spacing="24" confirm-type="done" bindinput="onNameInput" bindconfirm="saveName" bindkeyboardheightchange="onNameKeyboardHeightChange" />
+    </view>
+    <view class="field-hint">可以直接使用微信昵称</view>
+  </view>
+  <view slot="footer" class="nickname-actions">
+    <button class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeName">取消</button>
+    <button class="btn btn-primary flex-1 nickname-save {{nickname && !savingName ? '' : 'is-disabled'}}" disabled="{{!nickname || savingName}}" hover-class="tap-active" bindtap="saveName">
+      <view wx:if="{{savingName}}" class="spinner"></view><text wx:else>保存</text>
+    </button>
+  </view>
+</sheet>
+
+<sheet show="{{repeatOpen}}" title="推荐去重天数" subtitle="这几天内吃过的菜，推荐时会先避开" bind:close="closeRepeat">
+  <view class="sheet-body">
+    <view class="grid-4">
+      <view wx:for="{{repeatOptions}}" wx:key="*this" class="repeat {{(item === '0' && !repeatDays) || repeatDays === item ? 'is-active' : ''}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseRepeat">{{item === '0' ? '默认' : item + ' 天'}}</view>
+    </view>
+  </view>
+</sheet>

@@ -10,6 +10,7 @@ const TABS = [
 Component({
   data: {
     selected: 0,
+    hidden: false,
     left: TABS.slice(0, 2).map((tab, index) => ({ ...tab, index })),
     right: TABS.slice(2).map((tab, index) => ({ ...tab, index: index + 2 })),
     isIOS: false,

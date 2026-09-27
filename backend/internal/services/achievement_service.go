@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"log"
 	"ninimenu/internal/achievements"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 const achievementSyncDelay = 300 * time.Millisecond
@@ -194,10 +197,11 @@ func SyncAutoAchievements(uid uint) {
 		codes = append(codes, code)
 	}
 
-	var autoAchievements []models.Achievement
-	// `condition` is a reserved keyword in MySQL; quote it explicitly so the
-	// same query works on both MySQL and SQLite.
-	database.DB.Where("`condition` = ? AND code IN ?", "auto", codes).Find(&autoAchievements)
+	autoAchievements, err := findAutoAchievements(database.DB, codes)
+	if err != nil {
+		log.Printf("查询自动成就失败（用户 %d）：%v", uid, err)
+		return
+	}
 	if len(autoAchievements) == 0 {
 		return
 	}
@@ -230,6 +234,17 @@ func SyncAutoAchievements(uid uint) {
 	if len(newUnlocks) > 0 {
 		database.DB.Create(&newUnlocks)
 	}
+}
+
+func findAutoAchievements(db *gorm.DB, codes []string) ([]models.Achievement, error) {
+	if len(codes) == 0 {
+		return nil, nil
+	}
+	var items []models.Achievement
+	// 交给 GORM 引用列名，避免 MySQL 将 condition 解析为保留字。
+	err := db.Where(&models.Achievement{Condition: "auto"}).
+		Where("code IN ?", codes).Find(&items).Error
+	return items, err
 }
 
 func buildAchievementSnapshot(uid uint) achievementSnapshot {

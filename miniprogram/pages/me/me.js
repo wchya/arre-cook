@@ -22,6 +22,8 @@ Page({
     repeatDays: "",
     repeatOptions: REPEAT_OPTIONS,
     nameOpen: false,
+    nameFocus: false,
+    nameKeyboardHeight: 0,
     nickname: "",
     savingName: false,
     repeatOpen: false,
@@ -36,13 +38,26 @@ Page({
   },
 
   onUnload() {
+    this.resetNameEditor()
     if (this._offTheme) this._offTheme()
   },
 
   onShow() {
-    session.syncTabBar(this, 3)
+    this._pageVisible = true
+    session.syncTabBar(this, 3, this.data.nameOpen || Boolean(this._nameClosing))
     if (!session.requireLogin()) return
     this.load()
+  },
+
+  onHide() {
+    this.resetNameEditor()
+  },
+
+  resetNameEditor() {
+    this._pageVisible = false
+    this._nameClosing = false
+    this.setData({ nameOpen: false, nameFocus: false, nameKeyboardHeight: 0 })
+    session.syncTabBar(this, 3)
   },
 
   async onRefresh() {
@@ -124,10 +139,32 @@ Page({
 
   openName() {
     const user = this.data.user
-    this.setData({ nameOpen: true, nickname: user ? user.nickname || "" : "" })
+    this._nameClosing = false
+    session.syncTabBar(this, 3, true)
+    this.setData({ nameOpen: true, nameFocus: false, nameKeyboardHeight: 0, nickname: user ? user.nickname || "" : "" })
   },
 
-  closeName() { this.setData({ nameOpen: false }) },
+  onNameOpened() {
+    if (this.data.nameOpen) this.setData({ nameFocus: true })
+  },
+
+  onNameKeyboardHeightChange(event) {
+    if (!this.data.nameOpen) return
+    this.setData({ nameKeyboardHeight: Math.max(0, Number(event.detail.height) || 0) })
+  },
+
+  closeName() {
+    if (!this.data.nameOpen) return
+    this._nameClosing = true
+    this.setData({ nameOpen: false, nameFocus: false, nameKeyboardHeight: 0 })
+    wx.hideKeyboard({ fail: () => {} })
+  },
+
+  onNameClosed() {
+    this._nameClosing = false
+    if (this._pageVisible) session.syncTabBar(this, 3, this.data.nameOpen)
+  },
+
   onNameInput(event) { this.setData({ nickname: event.detail.value }) },
 
   async saveName() {
@@ -138,7 +175,7 @@ Page({
       const user = await api.put("/me", { nickname })
       session.setUser(user)
       this.applyUser(user)
-      this.setData({ nameOpen: false })
+      this.closeName()
       ui.toast("已更新", "success")
     } catch (error) {
       ui.toast(error.message || "保存失败")

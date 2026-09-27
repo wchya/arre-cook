@@ -3,6 +3,7 @@
 // 把手 / 标题区支持下拉关闭：拖过 120px 或快速下滑即触发 close，否则回弹。
 const DISMISS_DISTANCE = 120
 const DISMISS_VELOCITY = 0.6 // px/ms
+const TRANSITION_MS = 380
 
 Component({
   options: { multipleSlots: true },
@@ -15,6 +16,8 @@ Component({
     handle: { type: Boolean, value: true },
     maskClosable: { type: Boolean, value: true },
     zIndex: { type: Number, value: 500 },
+    solid: { type: Boolean, value: false },
+    keyboardHeight: { type: Number, value: 0 },
   },
 
   data: { visible: false, active: false, dragY: 0, dragging: false, maskOpacity: 1, isIOS: false },
@@ -31,22 +34,33 @@ Component({
       const app = getApp()
       if (app && app.globalData.isIOS) this.setData({ isIOS: true })
     },
-    detached() { clearTimeout(this._timer) },
+    detached() {
+      clearTimeout(this._timer)
+      clearTimeout(this._openedTimer)
+    },
   },
 
   methods: {
     open() {
       clearTimeout(this._timer)
+      clearTimeout(this._openedTimer)
       if (this.data.visible && this.data.active) return
       this.setData({ visible: true, dragY: 0, dragging: false }, () => {
-        this._timer = setTimeout(() => this.setData({ active: true }), 30)
+        this._timer = setTimeout(() => {
+          this.setData({ active: true }, () => {
+            this._openedTimer = setTimeout(() => this.triggerEvent("opened"), TRANSITION_MS)
+          })
+        }, 30)
       })
     },
     hide() {
       if (!this.data.visible) return
       clearTimeout(this._timer)
+      clearTimeout(this._openedTimer)
       this.setData({ active: false, dragY: 0, dragging: false })
-      this._timer = setTimeout(() => this.setData({ visible: false }), 320)
+      this._timer = setTimeout(() => {
+        this.setData({ visible: false }, () => this.triggerEvent("closed"))
+      }, TRANSITION_MS)
     },
     onMask() {
       if (this.data.maskClosable) this.triggerEvent("close")

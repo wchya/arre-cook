@@ -49,7 +49,7 @@ APP_RELEASE_NOTES="优化站内信详情查看体验；修复头像选择无响�
 docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --build
 ```
 
-服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络。每次部署运行 `./scripts/next-version.sh` 生成下一版语义版本：`fix` 或普通改动递增 patch，`feat` 递增 minor，提交标题或正文包含 `BREAKING`/`!` 递增 major。确认后将该版本写入 `VERSION` 并提交，再把它传给 `APP_VERSION`，用户会看到 `vX.Y.Z`。摘要为空时使用“本次更新了一些内容，并修复了一些 bug。”。
+服务器已存在 `web-arrebyte_default` 网络，Garage 在其中有 `garage` 服务别名。生产菜谱容器已接入该网络。每次部署运行 `./scripts/next-version.sh`，只根据上次更新 `VERSION` 之后的提交计算版本：`fix` 或普通改动递增 patch，`feat` 递增 minor，提交标题中的 `!:` 或正文中的 `BREAKING CHANGE:` / `BREAKING-CHANGE:` 递增 major。没有新提交时保持当前版本，避免重复通知。将发布版本写入 `VERSION` 并提交，再把它传给 `APP_VERSION`，用户会看到 `vX.Y.Z`。摘要为空时使用“本次更新了一些内容，并修复了一些 bug。”。
 
 ## Garage 单机运行与备份
 
