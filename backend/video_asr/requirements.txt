@@ -1,0 +1,10 @@
+# CPython 3.12, Linux amd64 / arm64. Binary wheels only; no PyTorch or web server.
+numpy==2.5.3 \
+    --hash=sha256:b7e18c623bb5c95acb3b3328861272816ba199fb531921c5d6d0b675f1fde9e3 \
+    --hash=sha256:76c2c1e6bfa5c84adc6434dfbf013aa92096a7985221762c8f11fedfd20fff58
+sherpa-onnx==1.13.8 \
+    --hash=sha256:6949773017647febc0c3696dffb2c67dd3febd4737b87e3dd135a42773704a06 \
+    --hash=sha256:2520b1e7b779a29a493a8cec893612218dfad7304786bf3f64df2ff7ac6c3302
+sherpa-onnx-core==1.13.8 \
+    --hash=sha256:4da90acf435373d7b2ba9cc0be806e7e274d28f63f5780880b5dea6721626e36 \
+    --hash=sha256:a51a03d55c376c32e15dd63ea852236042ba91a5cd73e253bbf7cf21f6582ba9

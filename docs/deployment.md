@@ -121,7 +121,11 @@ curl -fsS http://127.0.0.1:9925/healthz
 
 v0.10.0 增加持久的每日额度与并发租约表，启动时自动迁移。管理员可配置每账号每日 0–20 次（默认 20）和全站每日 0–10000 次（默认 200）。上线前须备份 MySQL，保留旧镜像，并在升级后检查两个新表及 `/api/assistant/status` 返回的额度。完整规则见 [助手安全与额度](assistant-safety.md)。
 
-视频提炼版本增加 `video_platform_budgets` 表，启动时自动创建，不迁移或重写菜谱数据。发布前仍须备份数据库并保留当前镜像。未配置 `VIDEO_ASR_URL` / `VIDEO_ASR_API_KEY` / `VIDEO_ASR_MODEL` 时只尝试公开字幕，并提供粘贴字幕入口；不要将 CPA 文本模型密钥填作转写密钥。配置与验收项见 [视频做法提炼](video-recipes.md)。
+视频提炼使用 `video_platform_budgets` 表保存平台读取预算，不迁移或重写菜谱数据。发布前须备份数据库并保留当前镜像。默认 `VIDEO_ASR_PROVIDER=remote` 且没有完整远端配置时只尝试字幕，提供粘贴文稿入口；不要将 CPA 文本模型密钥填作转写密钥。
+
+本地免费文字提取使用 `VIDEO_ASR_PROVIDER=local`，在现有应用容器内按需启动 SenseVoice 子进程，不部署其他服务。发布前运行 `python3 backend/video_asr/download_models.py --destination models/video-asr`，确认三个模型文件的大小和 SHA-256 符合锁定清单。网络不通时可从可联网机器传入已验证文件。模型目录只读挂载，不放入 Git；工作目录是 64 MiB tmpfs。Linux amd64 / arm64 的宿主需要支持 Landlock 和默认容器 seccomp，不能通过关闭沙箱让转写启用。
+
+本地模式启动任务至少需要 768 MiB 可用内存，单进程同时只运行一个转写任务，RSS 超过 512 MiB 则终止。当前小内存服务器不应直接增大并发或复制 ASR 实例。首次状态请求会校验依赖、模型和沙箱；发布后检查 `/api/assistant/video-recipe/status` 的 `asr_enabled=true`，再少量验证真实视频。配置与验收项见 [视频做法提炼](video-recipes.md)。回滚仅切换应用镜像和配置，保留模型文件与原数据库；本轮没有新增菜谱迁移。
 
 生产环境优先使用线上 Hermes / DSH 已在使用的 CPA 配置。应用容器以只读方式挂载 DSH 的 `llm-override.json`，运行时读取其中的 `baseUrl`、`apiKey`、`model` 和 `completionsPath`，访问同一个 CPA OpenAI 兼容接口；CPA 密钥不会写入菜谱仓库、数据库或日志。服务器 `/home/ubuntu/arre-cook/.env` 应包含：
 

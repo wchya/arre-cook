@@ -7,6 +7,7 @@ import { dishesApi, favoritesApi, recordsApi, behaviorApi } from "@/api"
 import { useAuthStore } from "@/store/useAuthStore"
 import { asArray } from "@/lib/utils"
 import { getDishImageUrl, getDishEmoji } from "@/lib/dish-image"
+import { videoLink } from "@/lib/video-link"
 import PhotoViewer from "@/components/PhotoViewer"
 import PageHeader, { HeaderIconButton } from "@/components/PageHeader"
 import SectionHeader from "@/components/SectionHeader"
@@ -102,22 +103,6 @@ function getMasteryLevel(count: number): { label: string; icon: string; color: s
   if (count >= 6) return { label: "熟练", icon: "🔥", color: "text-primary bg-primary-light border-primary/20" }
   if (count >= 3) return { label: "入门", icon: "✨", color: "text-mint bg-mint-light border-mint/20" }
   return { label: "初学", icon: "🌱", color: "text-purple bg-purple-light border-purple/20" }
-}
-
-function videoPlatform(url: string, meta: Dish["video_meta"]): { name: string; supported: boolean } {
-  if (meta?.supported) return { name: meta.platform_name, supported: true }
-  try {
-    const host = new URL(url).hostname.toLowerCase().replace(/\.$/, "")
-    if (host === "bilibili.com" || host.endsWith(".bilibili.com") || host === "b23.tv" || host.endsWith(".b23.tv")) {
-      return { name: "哔哩哔哩", supported: true }
-    }
-    if (host === "douyin.com" || host.endsWith(".douyin.com") || host === "iesdouyin.com" || host.endsWith(".iesdouyin.com")) {
-      return { name: "抖音", supported: true }
-    }
-  } catch {
-    // Invalid historical links are shown as unsupported instead of breaking the detail page.
-  }
-  return { name: "视频链接", supported: false }
 }
 
 export default function DishDetail() {
@@ -221,7 +206,7 @@ export default function DishDetail() {
   const dishTags = asArray<string>(dish.tags).filter(Boolean)
   const mastery = getMasteryLevel(dishStats.total_count)
   const hasMoodData = dishStats.yum_percent + dishStats.ok_percent + dishStats.no_percent > 0
-  const video = dish.video_url ? videoPlatform(dish.video_url, dish.video_meta) : null
+  const video = videoLink(dish.video_meta?.url) || videoLink(dish.video_url)
 
   return (
     <div className="min-h-screen bg-bg">
@@ -336,14 +321,14 @@ export default function DishDetail() {
           </div>
         )}
 
-        {dish.video_url && video && (
+        {dish.video_url && (
           <div className="mb-5">
-            {video.supported ? (
-              <button onClick={() => window.open(dish.video_url, "_blank", "noopener,noreferrer")}
+            {video ? (
+              <a href={video.url} target="_blank" rel="noopener noreferrer"
                 className="w-full py-2.5 px-5 rounded-full text-sm font-semibold bg-pink-light text-pink border border-pink/30 transition-all active:scale-97 flex items-center justify-center gap-2">
                 <ExternalLink size={16} />
                 {`在${video.name}打开`}
-              </button>
+              </a>
             ) : (
               <div className="rounded-xl border border-border bg-bg px-4 py-3 text-center text-xs text-text3">目前仅支持抖音和哔哩哔哩播放</div>
             )}

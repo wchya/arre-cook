@@ -166,7 +166,7 @@ Page({
       canEdit: Boolean(access.can_edit),
       deleteMode: access.delete_mode || "none",
       pendingRequestId: access.pending_request_id || 0,
-      videoMeta: this.decorateMeta(raw.video_meta),
+      videoMeta: this.decorateMeta(raw.video_meta, raw.video_url),
       gallery,
       galleryIndex: 0,
       chips,
@@ -177,19 +177,22 @@ Page({
   },
 
   // video_meta（服务端抓取的链接预览）转视图模型；封面转成可加载地址。
-  decorateMeta(meta) {
-    if (!meta || typeof meta !== "object") return null
-    const knownPlatform = meta.platform === "bilibili" || meta.platform === "douyin"
+  decorateMeta(meta, rawURL) {
+    if (!meta || typeof meta !== "object") meta = null
+    const link = video.platform(meta && meta.url) || video.platform(rawURL)
+    if (!meta && !link) return null
+    meta = meta || {}
     return {
-      url: meta.url || "",
-      platform: meta.platform || "unsupported",
-      platformName: meta.platform_name || "链接",
-      supported: Boolean(meta.supported || knownPlatform),
+      url: link ? link.url : "",
+      platform: link ? link.key : "unsupported",
+      platformName: link ? link.name : "链接",
+      supported: Boolean(link),
       title: meta.title || "",
       cover: media.assetUrl(meta.cover),
       author: meta.author || "",
       duration: meta.duration || "",
-      playable: Boolean(meta.playable && (meta.supported || knownPlatform)),
+      playable: Boolean(meta.playable && link && video.canOpenDirectly()),
+      actionLabel: video.actionLabel(link && link.url),
     }
   },
 
@@ -393,9 +396,9 @@ Page({
   },
 
   openVideo() {
-    const url = this.data.dish && this.data.dish.videoUrl
-    if (!url) return
-    if (!video.open(url, () => ui.toast("链接已复制，请在浏览器中打开"))) {
+    const link = video.platform(this.data.videoMeta && this.data.videoMeta.url) || video.platform(this.data.dish && this.data.dish.videoUrl)
+    if (!link) { ui.toast("目前仅支持抖音和哔哩哔哩视频"); return }
+    if (!video.open(link.url, (name) => ui.toast("链接已复制，请到" + name + "打开"))) {
       ui.toast("目前仅支持抖音和哔哩哔哩视频")
     }
   },

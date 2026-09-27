@@ -17,9 +17,15 @@ import (
 
 // ASR uses separate, server-only credentials. A text-model/CPA key is never
 // implicitly reused or sent to an endpoint supplied by the user or platform.
-type ASRSettings struct{ URL, APIKey, Model string }
+type ASRSettings struct {
+	URL, APIKey, Model string
+	Local              *LocalASR
+}
 
 func (s ASRSettings) Enabled() bool {
+	if s.Local != nil {
+		return s.Local.Ready()
+	}
 	u, err := url.Parse(s.URL)
 	return err == nil && u.Scheme == "https" && ValidatePublicURL(u) == nil && u.RawQuery == "" && u.Fragment == "" && s.APIKey != "" && s.Model != ""
 }
@@ -27,6 +33,9 @@ func (s ASRSettings) Enabled() bool {
 func (s ASRSettings) cacheKey() string {
 	if !s.Enabled() {
 		return "subtitle-only"
+	}
+	if s.Local != nil {
+		return s.Local.cacheKey()
 	}
 	digest := sha256.Sum256([]byte(s.URL + "\n" + s.Model))
 	return hex.EncodeToString(digest[:])
@@ -54,11 +63,20 @@ func mediaFormat(data []byte) (string, string, error) {
 	}
 }
 
-func transcribe(ctx context.Context, settings ASRSettings, data []byte, gate Gate) (string, error) {
-	return transcribeWithClient(ctx, settings, data, gate, PublicHTTPClient(40*time.Second))
+func transcribe(ctx context.Context, settings ASRSettings, data []byte, gate Gate, beforeAI func() error) (string, error) {
+	if settings.Local != nil {
+		return settings.Local.transcribe(ctx, data, gate, beforeAI)
+	}
+	client := PublicHTTPClient(40 * time.Second)
+	client.Transport.(*http.Transport).ResponseHeaderTimeout = 40 * time.Second
+	return transcribeRemote(ctx, settings, data, gate, client, beforeAI)
 }
 
 func transcribeWithClient(ctx context.Context, settings ASRSettings, data []byte, gate Gate, client *http.Client) (string, error) {
+	return transcribeRemote(ctx, settings, data, gate, client, nil)
+}
+
+func transcribeRemote(ctx context.Context, settings ASRSettings, data []byte, gate Gate, client *http.Client, beforeAI func() error) (string, error) {
 	if !settings.Enabled() {
 		return "", problem("transcript_required", "语音转写尚未配置，可粘贴字幕提炼")
 	}
@@ -68,6 +86,11 @@ func transcribeWithClient(ctx context.Context, settings ASRSettings, data []byte
 	}
 	if err := gate.Acquire(ctx, "asr"); err != nil {
 		return "", err
+	}
+	if beforeAI != nil {
+		if err := beforeAI(); err != nil {
+			return "", err
+		}
 	}
 	var body bytes.Buffer
 	w := multipart.NewWriter(&body)

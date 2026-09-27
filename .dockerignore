@@ -6,9 +6,13 @@ backend/data
 backend/uploads_backup
 dist
 dist-win
+models
+backend/video_asr/__pycache__
+backend/video_asr/.venv
 *.tar.gz
 .env
 env.bak
+docs/private.*.key
 README*.md
 CHANGELOG.md
 img

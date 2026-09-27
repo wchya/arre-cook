@@ -202,7 +202,7 @@ Page({
         stepsText: steps,
         remark: dish.remark || "",
         videoUrl: dish.video_url || "",
-        videoMeta: this.decorateMeta(dish.video_meta),
+        videoMeta: this.decorateMeta(dish.video_meta, dish.video_url),
         alreadyFamily: Boolean(dish.family_id),
         tags: media.asArray(dish.tags).filter((x) => typeof x === "string"),
         imageUrl: dish.image_url || "",
@@ -226,7 +226,8 @@ Page({
     const value = e.detail.value
     if (value !== this.data.videoUrl) {
       this.cancelVideoImport()
-      this.setData({ videoResult: null, videoImportError: "", videoMeta: null })
+      this._lastPreviewUrl = ""
+      this.setData({ videoResult: null, videoImportError: "", videoMeta: this.decorateMeta(null, value) })
     }
     this.updateForm({ videoUrl: value })
     if (this._videoTimer) clearTimeout(this._videoTimer)
@@ -239,19 +240,22 @@ Page({
   },
 
   // 把服务端 link-preview / video_meta 转成视图模型；封面转成可加载的绝对地址。
-  decorateMeta(meta) {
-    if (!meta || typeof meta !== "object") return null
-    const knownPlatform = meta.platform === "bilibili" || meta.platform === "douyin"
+  decorateMeta(meta, rawURL) {
+    if (!meta || typeof meta !== "object") meta = null
+    const link = video.platform(meta && meta.url) || video.platform(rawURL)
+    if (!meta && !link) return null
+    meta = meta || {}
     return {
-      url: meta.url || "",
-      platform: meta.platform || "web",
-      platformName: meta.platform_name || "链接",
-      supported: Boolean(meta.supported || knownPlatform),
+      url: link ? link.url : "",
+      platform: link ? link.key : "unsupported",
+      platformName: link ? link.name : "链接",
+      supported: Boolean(link),
       title: meta.title || "",
       cover: media.assetUrl(meta.cover),
       author: meta.author || "",
       duration: meta.duration || "",
-      playable: Boolean(meta.playable && (meta.supported || knownPlatform)),
+      playable: Boolean(meta.playable && link && video.canOpenDirectly()),
+      actionLabel: video.actionLabel(link && link.url),
     }
   },
 
@@ -267,9 +271,9 @@ Page({
     this.setData({ videoChecking: true })
     try {
       const meta = await api.get("/link-preview", { url })
-      if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoMeta: this.decorateMeta(meta) })
+      if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoMeta: this.decorateMeta(meta, url) })
     } catch (_) {
-      if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoMeta: null })
+      if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoMeta: this.decorateMeta(null, url) })
     } finally {
       if (!this._disposed && this.data.videoUrl.trim() === url) this.setData({ videoChecking: false })
     }
@@ -280,9 +284,9 @@ Page({
   },
 
   openVideoLink() {
-    const url = this.data.videoMeta && this.data.videoMeta.url || this.data.videoUrl.trim()
-    if (!url) return
-    if (!video.open(url, () => ui.toast("链接已复制，请在浏览器中打开"))) {
+    const link = video.platform(this.data.videoMeta && this.data.videoMeta.url) || video.platform(this.data.videoUrl)
+    if (!link) { ui.toast("目前仅支持抖音和哔哩哔哩视频"); return }
+    if (!video.open(link.url, (name) => ui.toast("链接已复制，请到" + name + "打开"))) {
       ui.toast("目前仅支持抖音和哔哩哔哩视频")
     }
   },

@@ -20,6 +20,7 @@ type Metadata struct {
 	Cover    string `json:"cover"`
 	Author   string `json:"author"`
 	Duration int    `json:"duration"`
+	AID      int64  `json:"-"`
 	CID      int64  `json:"-"`
 	BVID     string `json:"-"`
 	Subtitle string `json:"-"`
@@ -134,7 +135,7 @@ func (r *Reader) Transcript(ctx context.Context, raw, manual string, asr ASRSett
 			}
 		} else {
 			if !asr.Enabled() {
-				return response{}, problem("transcript_required", "此视频没有可读取的公开字幕，语音转写尚未配置；可粘贴字幕或视频文稿继续提炼")
+				return response{}, problem("transcript_required", "平台未返回可读取的字幕文件；画面上的字幕无法直接当作字幕文件读取。本站尚未启用语音转写，可先粘贴字幕或文稿提炼")
 			}
 			if meta.Duration <= 0 {
 				return response{}, problem("unknown_duration", "无法确认视频时长，请粘贴字幕提炼")
@@ -157,12 +158,9 @@ func (r *Reader) Transcript(ctx context.Context, raw, manual string, asr ASRSett
 			if _, _, err := mediaFormat(res.Body); err != nil {
 				return response{}, err
 			}
-			if err := beforeAI(); err != nil {
-				return response{}, err
-			}
 			status("正在将视频语音转成文字…")
 			source.Method = "audio"
-			source.Text, err = transcribe(ctx, asr, res.Body, r.client.gate)
+			source.Text, err = transcribe(ctx, asr, res.Body, r.client.gate, beforeAI)
 			if err != nil {
 				return response{}, err
 			}
@@ -246,6 +244,10 @@ func (r *Reader) biliMetadata(ctx context.Context, in Input) (Metadata, error) {
 	if strings.HasPrefix(in.ID, "av") && data.AID.String() != strings.TrimLeft(strings.TrimPrefix(in.ID, "av"), "0") {
 		return Metadata{}, problem("video_mismatch", "未能确认目标视频，请检查链接")
 	}
+	aid, err := data.AID.Int64()
+	if err != nil || aid <= 0 {
+		return Metadata{}, problem("video_mismatch", "未能确认目标视频，请检查链接")
+	}
 	for _, page := range data.Pages {
 		if page.Page != in.Page || page.CID <= 0 {
 			continue
@@ -254,38 +256,61 @@ func (r *Reader) biliMetadata(ctx context.Context, in Input) (Metadata, error) {
 		if len(data.Pages) > 1 {
 			title += " · " + page.Part
 		}
-		return Metadata{URL: in.URL, Platform: in.Platform, Title: title, Cover: secureResource(data.Pic), Author: data.Owner.Name, Duration: page.Duration, CID: page.CID, BVID: data.BVID}, nil
+		return Metadata{URL: in.URL, Platform: in.Platform, Title: title, Cover: secureResource(data.Pic), Author: data.Owner.Name, Duration: page.Duration, AID: aid, CID: page.CID, BVID: data.BVID}, nil
 	}
 	return Metadata{}, problem("invalid_part", "未找到视频的这一分 P，请检查链接")
 }
 
 func (r *Reader) biliSubtitle(ctx context.Context, meta Metadata) (string, error) {
-	var data struct {
-		Subtitle struct {
-			Subtitles []struct {
-				URL    string `json:"subtitle_url"`
-				Lang   string `json:"lan"`
-				Locked bool   `json:"is_lock"`
-			} `json:"subtitles"`
-		} `json:"subtitle"`
+	// The player endpoint can omit public AI subtitles. The DM metadata endpoint
+	// exposes them for some videos without login; both use the selected part's CID.
+	endpoints := []string{
+		fmt.Sprintf("/x/v2/dm/view?aid=%d&oid=%d&type=1", meta.AID, meta.CID),
+		"/x/player/v2?bvid=" + url.QueryEscape(meta.BVID) + "&cid=" + strconv.FormatInt(meta.CID, 10),
 	}
-	endpoint := "/x/player/v2?bvid=" + url.QueryEscape(meta.BVID) + "&cid=" + strconv.FormatInt(meta.CID, 10)
-	if err := r.biliJSON(ctx, endpoint, &data); err != nil {
-		return "", err
+	for _, endpoint := range endpoints {
+		var data biliSubtitles
+		if err := r.biliJSON(ctx, endpoint, &data); err != nil {
+			// Do not try alternate endpoints after transport errors or platform blocks.
+			return "", err
+		}
+		if selected := data.choose(); selected != "" {
+			return selected, nil
+		}
 	}
-	selected := ""
+	return "", nil
+}
+
+type biliSubtitles struct {
+	Subtitle struct {
+		Subtitles []struct {
+			URL    string `json:"subtitle_url"`
+			Lang   string `json:"lan"`
+			Locked bool   `json:"is_lock"`
+		} `json:"subtitles"`
+	} `json:"subtitle"`
+}
+
+func (data biliSubtitles) choose() string {
+	selected, best := "", 5
 	for _, sub := range data.Subtitle.Subtitles {
 		if sub.Locked || sub.URL == "" {
 			continue
 		}
-		if selected == "" {
-			selected = sub.URL
+		rank := 2
+		switch {
+		case strings.HasPrefix(sub.Lang, "zh"):
+			rank = 0
+		case strings.HasPrefix(sub.Lang, "ai-zh"):
+			rank = 1
+		case strings.HasPrefix(sub.Lang, "ai-"):
+			rank = 3
 		}
-		if strings.HasPrefix(sub.Lang, "zh") || strings.HasPrefix(sub.Lang, "ai-zh") {
-			return sub.URL, nil
+		if rank < best {
+			selected, best = sub.URL, rank
 		}
 	}
-	return selected, nil
+	return selected
 }
 
 func (r *Reader) biliMedia(ctx context.Context, meta Metadata) (string, error) {

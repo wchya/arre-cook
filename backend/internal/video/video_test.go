@@ -189,9 +189,9 @@ func TestSubtitleContentAndCorrectBilibiliPart(t *testing.T) {
 	client, gate := testClient(func(req *http.Request) (*http.Response, error) {
 		switch req.URL.Path {
 		case "/x/web-interface/view":
-			return httpResult(req, 200, `{"code":0,"data":{"bvid":"BV1abCDefGh1","title":"标题不能当做法","pages":[{"cid":111,"page":1,"duration":10},{"cid":222,"page":2,"duration":60}]}}`), nil
-		case "/x/player/v2":
-			cidOK = req.URL.Query().Get("cid") == "222"
+			return httpResult(req, 200, `{"code":0,"data":{"aid":123,"bvid":"BV1abCDefGh1","title":"标题不能当做法","pages":[{"cid":111,"page":1,"duration":10},{"cid":222,"page":2,"duration":60}]}}`), nil
+		case "/x/v2/dm/view":
+			cidOK = req.URL.Query().Get("oid") == "222" && req.URL.Query().Get("aid") == "123" && req.URL.Query().Get("type") == "1"
 			return httpResult(req, 200, `{"code":0,"data":{"subtitle":{"subtitles":[{"lan":"zh-CN","subtitle_url":"//aisubtitle.hdslb.com/sub.json"}]}}}`), nil
 		case "/sub.json":
 			return httpResult(req, 200, `{"body":[{"content":"`+transcript+`"}]}`), nil

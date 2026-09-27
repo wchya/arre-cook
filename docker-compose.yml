@@ -8,6 +8,11 @@ services:
     image: arre-cook/ninimenu:latest
     container_name: arre-cook-ninimenu
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     ports:
       - "127.0.0.1:9925:8080"
     networks:
@@ -60,6 +65,9 @@ services:
       VIDEO_ASR_URL: ${VIDEO_ASR_URL:-}
       VIDEO_ASR_API_KEY: ${VIDEO_ASR_API_KEY:-}
       VIDEO_ASR_MODEL: ${VIDEO_ASR_MODEL:-}
+      VIDEO_ASR_PROVIDER: ${VIDEO_ASR_PROVIDER:-remote}
+      VIDEO_ASR_MODEL_DIR: /app/models/video-asr
+      VIDEO_ASR_WORK_DIR: /app/video-work
       WECHAT_APPID: ${WECHAT_APPID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
       AGENT_RATE_LIMIT: ${AGENT_RATE_LIMIT:-120}
@@ -69,6 +77,9 @@ services:
       - ninimenu-data:/app/data
       - ninimenu-uploads:/app/uploads
       - ${CPA_CONFIG_PATH:-/dev/null}:/run/cpa/provider-config:ro
+      - ./models/video-asr:/app/models/video-asr:ro
+    tmpfs:
+      - /app/video-work:size=64m,mode=0700,uid=1000,gid=1000,noexec,nosuid,nodev
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1 || exit 1"]
       interval: 30s

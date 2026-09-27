@@ -128,7 +128,7 @@ function miniEditor() {
   vm.runInNewContext(fs.readFileSync(path.join(root, 'miniprogram/utils/recipe-draft.js'), 'utf8'), { module: draftModule, wx })
   const api = { token: () => 'fixture', get: async () => ({ enabled: true, quota: { remaining: 19 } }), post: async (_path, data) => { saved = data; return { id: 1 } } }
   const deps = {
-    api, ui: { toast() {}, haptic() {} }, video: {}, session: {}, dish: {},
+    api, ui: { toast() {}, haptic() {} }, video: require(path.join(root, 'miniprogram/utils/video.js')), session: {}, dish: {},
     media: { asArray: value => Array.isArray(value) ? value : [], assetUrl: value => value },
     'recipe-text': require(path.join(root, 'miniprogram/utils/recipe-text.js')),
     'recipe-import': require(path.join(root, 'miniprogram/utils/recipe-import.js')),

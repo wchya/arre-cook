@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { LoaderCircle, WandSparkles } from "lucide-react"
+import { ExternalLink, LoaderCircle, WandSparkles } from "lucide-react"
 import { linkPreviewApi } from "@/api"
 import { ApiError, errorMessage } from "@/api/client"
 import { extractVideoRecipe, videoRecipeStatus, type VideoRecipeResult, type VideoRecipeStatus } from "@/api/video-recipe"
 import type { AssistantQuota, DishVideoMeta } from "@/types"
+import { videoLink } from "@/lib/video-link"
 
 interface Props {
   url: string
@@ -83,12 +84,14 @@ export default function VideoRecipeImport({ url, userId, disabled, onStart, onBu
   }
   const shown = report && (report.input === url || report.result.source.url === url) ? report : null
   const meta = preview?.input === url ? preview.meta : null
+  const playback = videoLink(meta?.url) || videoLink(url)
   return <div className="space-y-3 rounded-xl border border-border bg-bg p-3.5">
     {meta && <div className="flex items-start gap-3">
       {meta.cover && <img src={meta.cover} alt="" referrerPolicy="no-referrer" className="h-16 w-20 shrink-0 rounded-lg object-cover" />}
       <div className="min-w-0 text-xs leading-relaxed"><div className="font-semibold text-primary">{meta.platform_name}{meta.duration ? ` · ${meta.duration}` : ""}</div><p className="break-words text-text">{meta.title}</p>{meta.author && <p className="text-text2">{meta.author}</p>}</div>
     </div>}
-    <div><div className="text-sm font-semibold">从视频提炼做法</div><p className="mt-1 text-xs leading-relaxed text-text2">支持 10 分钟以内的公开视频。{status.data?.asr_enabled ? "字幕或视频将交给 AI 服务提炼。" : "优先读取公开字幕并交给 AI 提炼；无法读取时，可粘贴字幕或文稿。"}仅填入空白项，核对后再保存。</p></div>
+    {playback && <a href={playback.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary underline underline-offset-4"><ExternalLink size={14} />在{playback.name}打开视频</a>}
+    <div><div className="text-sm font-semibold">从视频提炼做法</div><p className="mt-1 text-xs leading-relaxed text-text2">支持 10 分钟以内的公开视频。{status.data?.asr_enabled ? "优先读取字幕，无字幕时识别视频语音，再整理做法。" : "优先读取公开字幕并交给 AI 提炼；无法读取时，可粘贴字幕或文稿。"}仅填入空白项，核对后再保存。</p></div>
     <button type="button" className="min-h-11 text-xs font-semibold text-primary underline underline-offset-4" disabled={busy} onClick={() => { setManual(!manual); setError("") }}>{manual ? "返回视频自动读取" : "粘贴字幕或视频文稿"}</button>
     {manual && <label className="block text-xs font-semibold">字幕 / 视频文稿<textarea aria-label="字幕 / 视频文稿" value={transcript} maxLength={8000} disabled={busy} onChange={(event) => setTranscript(event.target.value)} placeholder="粘贴这道菜的完整做法，不必整理格式（20–8000 字）" className="mt-2 min-h-32 w-full rounded-xl border border-border bg-card p-3 text-sm font-normal leading-relaxed outline-none focus:border-primary" /><span className="text-text2">{transcript.length} / 8000 字 · 文稿将用于 AI 提炼</span></label>}
     {status.isError && <p className="text-xs text-text2">提炼服务状态加载失败。<button type="button" className="min-h-11 text-primary underline" onClick={() => { void status.refetch() }}>重新加载</button></p>}

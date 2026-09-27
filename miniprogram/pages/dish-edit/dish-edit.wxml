@@ -111,19 +111,19 @@
         <view class="de-vp__body">
           <view class="de-vp__badges">
             <text class="chip chip-sm chip-primary">{{videoMeta.platformName}}</text>
-            <text wx:if="{{videoMeta.supported}}" class="chip chip-sm chip-mint">可播放</text>
+            <text wx:if="{{videoMeta.supported}}" class="chip chip-sm chip-mint">平台视频</text>
             <text wx:else class="chip chip-sm chip-pink">暂不支持</text>
             <text wx:if="{{videoMeta.duration}}" class="de-vp__dur">{{videoMeta.duration}}</text>
           </view>
           <view class="de-vp__title">{{videoMeta.title || '已识别链接'}}</view>
           <view wx:if="{{videoMeta.author}}" class="de-vp__author">{{videoMeta.author}}</view>
-          <view class="de-vp__hint"><icon name="external-link" size="22" stroke="2.4" color="text3" /><text>{{videoMeta.supported ? '点击打开平台播放' : '目前仅支持抖音和哔哩哔哩'}}</text></view>
+          <view class="de-vp__hint"><icon name="external-link" size="22" stroke="2.4" color="text3" /><text>{{videoMeta.supported ? videoMeta.actionLabel : '目前仅支持抖音和哔哩哔哩'}}</text></view>
         </view>
       </view>
       <view class="field-hint">仅支持抖音 / 哔哩哔哩，粘贴后自动识别平台、标题与封面</view>
       <view class="de-import">
         <view class="de-import__title">从视频提炼做法</view>
-        <view class="field-hint">支持 10 分钟以内的公开视频。{{videoASREnabled ? '字幕或视频将交给 AI 服务提炼。' : '优先读取公开字幕并交给 AI 提炼；无法读取时，可粘贴字幕或文稿。'}}仅填入空白项，核对后再保存。</view>
+        <view class="field-hint">支持 10 分钟以内的公开视频。{{videoASREnabled ? '优先读取字幕，无字幕时识别视频语音，再整理做法。' : '优先读取公开字幕并交给 AI 提炼；无法读取时，可粘贴字幕或文稿。'}}仅填入空白项，核对后再保存。</view>
         <button class="de-import__link" disabled="{{videoImportBusy}}" bindtap="toggleVideoTranscript">{{showVideoTranscript ? '返回视频自动读取' : '粘贴字幕或视频文稿'}}</button>
         <view wx:if="{{showVideoTranscript}}">
           <view class="field-label">字幕 / 视频文稿</view>

@@ -8,6 +8,7 @@ import (
 	"ninimenu/internal/models"
 	"ninimenu/internal/services"
 	"ninimenu/internal/utils"
+	"ninimenu/internal/video"
 	"strings"
 	"time"
 
@@ -185,6 +186,9 @@ func (r *CreateDishRequest) apply(d *models.Dish) {
 	d.ImageURL = r.ImageURL
 	d.Images = jsonOr(r.Images, "[]")
 	d.VideoURL = r.VideoURL
+	if in, err := video.Parse(r.VideoURL); err == nil {
+		d.VideoURL = in.URL
+	}
 	d.Category = strings.TrimSpace(r.Category)
 	d.MealType = r.MealType
 	d.Taste = strings.TrimSpace(r.Taste)
