@@ -91,7 +91,7 @@ function upload(filePath) {
       fail(error) {
         const raw = String((error && error.errMsg) || "")
         if (/domain list|域名|url not in domain/i.test(raw)) {
-          reject(new Error("图片上传失败：请在微信公众平台把 cook.arrebyte.top 加入 request 合法域名"))
+          reject(new Error("图片上传失败：请在微信公众平台将 https://cook.arrebyte.top 同时加入 request 合法域名和 uploadFile 合法域名"))
           return
         }
         if (/timeout|超时/i.test(raw)) {
