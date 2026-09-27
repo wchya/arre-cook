@@ -164,7 +164,7 @@
         <input class="field-input nickname-input" type="text" value="{{nickname}}" maxlength="20" focus="{{nameOpen}}" placeholder="1-20 个字" placeholder-class="placeholder" cursor-spacing="120" bindinput="onNameInput" bindconfirm="saveName" />
       </view>
       <view class="field-hint">可以直接使用微信昵称</view>
-      <view class="flex gap-20 mt-32">
+      <view class="flex gap-20 mt-32 nickname-actions">
         <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeName">取消</view>
         <view class="btn btn-primary flex-1 {{nickname && !savingName ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveName">
           <view wx:if="{{savingName}}" class="spinner"></view><text wx:else>保存</text>
