@@ -1,6 +1,6 @@
 # 助手安全与额度
 
-适用于 v0.10.0 的 Web、小程序站内对话及外部食谱工具接口。
+适用于 v0.10.x 的 Web、小程序站内对话及外部食谱工具接口。
 
 ## 使用次数
 
@@ -61,7 +61,7 @@ HTTP 代理必须覆盖来自公网的伪造转发头，并正确传递客户端
 | 本地检查拒绝或非法参数 | 400 | 展示原因，不消费每日次数 |
 | SSE 中的模型审核或处理失败 | `error`，随后 `done` | 展示友好提示，已受理请求计入次数 |
 
-SSE 事件顺序：`quota` → `status` → `session` → `status` / `tool_start` / `tool_end` → `delta` → 可选 `cards` → `done`。审核被拒绝时可能只有 `quota`、`status`、`error`、`done`。客户端必须兼容无工具、无卡片和中途失败。
+SSE 事件顺序：`quota` → `status` → `session` → `status` / `tool_start` / `tool_end` → `delta` → 可选带 `card` 的 `tool_end` → `done`。v0.10.1 为兼容尚未升级的微信版本，审核后的卡片使用既有 `tool_end.card` 格式；新客户端也支持 `cards` 事件，但服务端不同时发送两种格式，避免重复。审核被拒绝时可能只有 `quota`、`status`、`error`、`done`。客户端必须兼容无工具、无卡片和中途失败。
 
 `quota` 包含 `limit`、`used`、`remaining`、`reset_at`，全站暂停或用完时附带 `blocked_reason: "site_limit"`。即使个人 `remaining > 0`，存在 `blocked_reason` 也禁止发送。
 

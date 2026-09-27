@@ -87,6 +87,37 @@ func TestPageAssistantQuotaSharedAcrossClientsAndSessionDeletion(t *testing.T) {
 	}
 }
 
+func TestAssistantCardsRemainReadableByReleasedMiniPrograms(t *testing.T) {
+	_, token, err := testutil.NewUser("assistant-legacy-cards@example.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := chatRequest(t, token, "MicroMessenger", map[string]any{"message": "推荐一道晚餐"})
+	if res.Code != http.StatusOK {
+		t.Fatalf("chat failed: %d", res.Code)
+	}
+	text := res.Body.String()
+	cardCount := 0
+	for _, frame := range strings.Split(text, "\n\n") {
+		if !strings.HasPrefix(frame, "event: tool_end\n") {
+			continue
+		}
+		var event struct {
+			Card json.RawMessage `json:"card"`
+		}
+		data := strings.TrimPrefix(strings.SplitN(frame, "\n", 2)[1], "data: ")
+		if json.Unmarshal([]byte(data), &event) == nil && len(event.Card) > 0 && string(event.Card) != "null" {
+			cardCount++
+		}
+	}
+	if cardCount == 0 {
+		t.Fatal("released clients receive no approved recipe cards")
+	}
+	if strings.Contains(text, "event: cards") {
+		t.Fatal("sending both formats would duplicate cards in newer clients")
+	}
+}
+
 func TestAssistantQuotaInvalidRequestsAndAdminPermissions(t *testing.T) {
 	user, token, err := testutil.NewUser("quota-validation@qq.com")
 	if err != nil {

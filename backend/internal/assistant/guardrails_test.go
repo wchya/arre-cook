@@ -94,11 +94,18 @@ func TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites
 		t.Fatal(err)
 	}
 	p := &auth.Principal{User: &user, Kind: auth.KindUser, Scopes: auth.NewScopeSet(auth.AllScopes)}
-	for _, scenario := range []string{"approved", "blocked_input", "blocked_output", "injected_write", "blocked_write", "metadata"} {
+	var dish models.Dish
+	if err := database.DB.Scopes(database.VisibleDishes(user.ID)).Where("name <> ?", "番茄炒蛋").First(&dish).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, scenario := range []string{"approved", "approved_cards", "blocked_input", "blocked_output", "blocked_cards", "injected_write", "blocked_write", "metadata"} {
 		t.Run(scenario, func(t *testing.T) {
 			var generated atomic.Int32
 			var reviewed atomic.Bool
 			leaked := "OUTSIDE_RECIPE_SECRET_RESULT"
+			if scenario == "blocked_cards" {
+				leaked = dish.Name
+			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				var req llm.Request
 				if json.NewDecoder(r.Body).Decode(&req) != nil {
@@ -113,7 +120,7 @@ func TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites
 					if data.Stage == "output" {
 						reviewed.Store(true)
 					}
-					if scenario == "blocked_input" || (scenario == "blocked_output" && data.Stage == "output") || (scenario == "blocked_write" && data.Stage == "tool") {
+					if scenario == "blocked_input" || ((scenario == "blocked_output" || scenario == "blocked_cards") && data.Stage == "output") || (scenario == "blocked_write" && data.Stage == "tool") {
 						respondText(w, "BLOCK")
 					} else {
 						respondText(w, "ALLOW")
@@ -128,6 +135,8 @@ func TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites
 					fmt.Fprint(w, `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"attack","function":{"name":"set_favorite","arguments":"{\"dish_id\":1,\"favorite\":true}"}}]},"finish_reason":"tool_calls"}]}`+"\n\ndata: [DONE]\n\n")
 				} else if scenario == "metadata" && round == 1 {
 					fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":%q,\"function\":{\"name\":\"get_preferences\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n", leaked)
+				} else if (scenario == "approved_cards" || scenario == "blocked_cards") && round == 1 {
+					fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"dish-result\",\"function\":{\"name\":\"get_dish\",\"arguments\":%q}}]},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n", fmt.Sprintf(`{"dish_id":%d}`, dish.ID))
 				} else if scenario == "blocked_output" {
 					respondText(w, leaked)
 				} else {
@@ -147,7 +156,8 @@ func TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites
 			err := Run(context.Background(), p, 0, question, func(event string, data any) {
 				raw, _ := json.Marshal(data)
 				events = append(events, event+":"+string(raw))
-				if (event == "delta" || event == "cards") && scenario == "approved" && !reviewed.Load() {
+				cardEvent := event == "tool_end" && data.(map[string]any)["card"] != nil
+				if (event == "delta" || event == "cards" || cardEvent) && (scenario == "approved" || scenario == "approved_cards") && !reviewed.Load() {
 					t.Error("reply streamed before output approval")
 				}
 			})
@@ -167,7 +177,10 @@ func TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites
 			if scenario == "approved" && !strings.Contains(joined, "先炒鸡蛋") {
 				t.Fatal("approved answer missing")
 			}
-			if scenario == "blocked_output" && !strings.Contains(joined, "未能通过") {
+			if scenario == "approved_cards" && !strings.Contains(joined, dish.Name) {
+				t.Fatalf("approved card missing: dish=%d owner=%d events=%s", dish.ID, dish.OwnerID, joined)
+			}
+			if (scenario == "blocked_output" || scenario == "blocked_cards") && !strings.Contains(joined, "未能通过") {
 				t.Fatal("unsafe answer was not replaced")
 			}
 			if scenario == "injected_write" || scenario == "blocked_write" {

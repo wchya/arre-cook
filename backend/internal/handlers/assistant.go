@@ -43,7 +43,7 @@ func GetAssistantStatus(c *gin.Context) {
 	})
 }
 
-// AssistantChat POST /api/assistant/chat：先返回 quota/status/工具进度，审核通过后返回 delta/cards，最后 done。
+// AssistantChat POST /api/assistant/chat：先返回 quota/status/工具进度，审核后返回正文和兼容旧客户端的卡片，最后 done。
 func AssistantChat(c *gin.Context) {
 	var req struct {
 		SessionID uint   `json:"session_id"`

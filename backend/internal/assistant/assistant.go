@@ -171,8 +171,10 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 		return errors.New("回复保存失败，请稍后查看对话记录")
 	}
 	emit("delta", map[string]any{"text": reply})
-	if len(cards) > 0 {
-		emit("cards", map[string]any{"cards": cards})
+	for index, card := range cards {
+		// Older released mini-programs only understand cards on tool_end.
+		// Emit them here, after approval, with server-generated metadata.
+		emit("tool_end", map[string]any{"id": fmt.Sprintf("approved-card-%d", index), "name": "recipe_result", "ok": true, "card": card})
 	}
 	emit("done", map[string]any{"session_id": session.ID, "message_id": msg.ID})
 	return nil
@@ -391,12 +393,22 @@ func cardFromResult(tool string, raw []byte) *Card {
 		return c
 	case "get_dish":
 		var r struct {
-			Dish models.Dish `json:"dish"`
+			Dish struct {
+				models.Dish
+				Images      json.RawMessage `json:"images"`
+				Ingredients json.RawMessage `json:"ingredients"`
+				Seasonings  json.RawMessage `json:"seasonings"`
+				Steps       json.RawMessage `json:"steps"`
+				Tags        json.RawMessage `json:"tags"`
+			} `json:"dish"`
 		}
 		if json.Unmarshal(raw, &r) != nil || r.Dish.ID == 0 {
 			return nil
 		}
-		return &Card{Type: "dishes", Title: "做法", Items: []CardItem{{Dish: services.ToDishCard(r.Dish)}}}
+		// The API emits arrays, while the database model stores JSON as strings.
+		dish := r.Dish.Dish
+		dish.Images, dish.Ingredients = string(r.Dish.Images), string(r.Dish.Ingredients)
+		return &Card{Type: "dishes", Title: "做法", Items: []CardItem{{Dish: services.ToDishCard(dish)}}}
 	case "log_meal":
 		var r struct {
 			DishName string `json:"dish_name"`
