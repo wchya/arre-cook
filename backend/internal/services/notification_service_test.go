@@ -48,7 +48,7 @@ func TestAnnounceDeploymentWithNotesUsesReadableSummary(t *testing.T) {
 	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Order("id DESC").First(&notice).Error; err != nil {
 		t.Fatal(err)
 	}
-	want := "系统已更新到版本 notes-build。\n\n本次更新：\n- 优化站内信详情查看体验\n- 修复头像选择无响应问题"
+	want := "系统已更新到版本 v1。\n\n本次更新：\n- 优化站内信详情查看体验\n- 修复头像选择无响应问题"
 	if notice.Content != want {
 		t.Fatalf("notice content = %q, want %q", notice.Content, want)
 	}
@@ -67,7 +67,15 @@ func TestAnnounceDeploymentWithNotesFallsBackWhenEmpty(t *testing.T) {
 	if err := database.DB.Where("user_id = ? AND title = ?", user.ID, "ss-menu 已更新").Order("id DESC").First(&notice).Error; err != nil {
 		t.Fatal(err)
 	}
-	if notice.Content != "系统已更新到版本 fallback-build。\n\n本次更新了一些内容，并修复了一些 bug。" {
+	if notice.Content != "系统已更新到版本 v1。\n\n本次更新了一些内容，并修复了一些 bug。" {
 		t.Fatalf("fallback notice content = %q", notice.Content)
+	}
+}
+
+func TestDisplayDeploymentVersion(t *testing.T) {
+	for raw, want := range map[string]string{"2": "v2", "v003": "v003", "v7": "v7", "commit-abc": "v1"} {
+		if got := displayDeploymentVersion(raw); got != want {
+			t.Fatalf("displayDeploymentVersion(%q) = %q, want %q", raw, got, want)
+		}
 	}
 }

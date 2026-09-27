@@ -125,10 +125,34 @@ func PublishNotification(uid uint, kind, title, content, link string) (int64, er
 
 const defaultDeploymentNotes = "本次更新了一些内容，并修复了一些 bug。"
 
+// displayDeploymentVersion keeps the internal build marker private while giving
+// users a stable version label. Numeric values are rendered as vN; non-numeric
+// build markers use the generic v1 label until a numeric APP_VERSION is supplied.
+func displayDeploymentVersion(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(strings.ToLower(raw), "v") {
+		raw = strings.TrimSpace(raw[1:])
+	}
+	if raw != "" {
+		allDigits := true
+		for _, r := range raw {
+			if r < '0' || r > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits {
+			return "v" + raw
+		}
+	}
+	return "v1"
+}
+
 // deploymentNoticeContent turns deployment notes into a short, readable notice. Notes
 // are supplied by the deployment environment so the server never exposes commit
 // messages or internal file names to end users.
 func deploymentNoticeContent(version, rawNotes string) string {
+	version = displayDeploymentVersion(version)
 	lines := strings.FieldsFunc(strings.TrimSpace(rawNotes), func(r rune) bool {
 		return r == '\n' || r == '\r' || r == ';' || r == '；'
 	})
