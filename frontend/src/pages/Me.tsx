@@ -119,7 +119,7 @@ export default function Me() {
       <div className="relative overflow-hidden bg-gradient-to-br from-[#FFE9DE] via-primary-light to-bg px-5 pb-6" style={{ paddingTop: "calc(20px + env(safe-area-inset-top))" }}>
         <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-primary/15 blur-2xl" />
         <div className="relative mx-auto flex max-w-[640px] items-center gap-4">
-          <button onClick={() => fileRef.current?.click()} className="relative shrink-0" aria-label="更换头像">
+          <label htmlFor="avatar-upload" className="relative block shrink-0 cursor-pointer" aria-label="更换头像">
             {user.avatar ? (
               <img src={user.avatar} alt="" className="h-[68px] w-[68px] rounded-[24px] object-cover shadow-[0_10px_24px_rgba(232,115,74,.25)] ring-4 ring-white/70" />
             ) : (
@@ -130,8 +130,8 @@ export default function Me() {
             <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-card text-text2 shadow">
               <Camera size={13} strokeWidth={2.4} />
             </span>
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onAvatar} />
+          </label>
+          <input id="avatar-upload" ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={onAvatar} />
           <div className="min-w-0 flex-1">
             <button onClick={() => { setNickname(user.nickname); setEditingName(true) }} className="flex max-w-full items-center gap-1.5 text-left">
               <span className="truncate text-[21px] font-black tracking-tight text-text">{user.nickname}</span>

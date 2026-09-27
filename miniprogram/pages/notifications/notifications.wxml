@@ -17,7 +17,14 @@
       <text class="note__content" user-select>{{item.content}}</text>
       <view class="note__meta">{{item.label}} · {{item.time}}</view>
     </view>
-    <icon wx:if="{{item.link}}" name="chevron-right" size="30" color="text4" />
+    <icon name="chevron-right" size="30" color="text4" />
   </view>
   <view class="safe-space"></view>
 </view>
+
+<sheet show="{{detailOpen}}" title="{{detail ? detail.title : ''}}" subtitle="{{detail ? detail.label + ' · ' + detail.time : ''}}" bind:close="closeDetail">
+  <view wx:if="{{detail}}" class="notice-detail">
+    <view class="notice-detail__icon tone-{{detail.tone}}"><icon name="{{detail.icon}}" size="42" stroke="2.3" color="{{detail.color}}" /></view>
+    <text class="notice-detail__content" user-select>{{detail.content}}</text>
+  </view>
+</sheet>

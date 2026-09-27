@@ -1,7 +1,6 @@
 const api = require("../../utils/api")
 const session = require("../../utils/session")
 const ui = require("../../utils/ui")
-const route = require("../../utils/route")
 const fmt = require("../../utils/format")
 
 const META = {
@@ -25,7 +24,7 @@ function timeLabel(raw) {
 }
 
 Page({
-  data: { loading: true, items: [], unread: 0, marking: false },
+  data: { loading: true, items: [], unread: 0, marking: false, detail: null, detailOpen: false },
 
   onLoad() {
     if (!session.requireLogin("/pages/notifications/notifications")) return
@@ -42,7 +41,7 @@ Page({
       const result = await api.get("/notifications", { pageSize: 50 })
       const items = (result.items || []).map((item) => {
         const meta = META[item.type] || META.system_update
-        return { ...meta, id: item.id, title: item.title, content: item.content, link: item.link || "", linkable: Boolean(route.resolve(item.link)), read: Boolean(item.read_at), time: timeLabel(item.created_at) }
+        return { ...meta, id: item.id, title: item.title, content: item.content, read: Boolean(item.read_at), time: timeLabel(item.created_at) }
       })
       this.setData({ items, unread: result.unread || 0 })
     } catch (error) {
@@ -61,10 +60,10 @@ Page({
       this.setData({ [`items[${index}].read`]: true, unread: Math.max(0, this.data.unread - 1) })
       api.post(`/notifications/${id}/read`).catch(() => null)
     }
-    if (item.link && !route.open(item.link)) {
-      wx.setClipboardData({ data: item.link, success: () => ui.toast("链接已复制") })
-    }
+    this.setData({ detail: item, detailOpen: true })
   },
+
+  closeDetail() { this.setData({ detailOpen: false }) },
 
   async markAll() {
     if (!this.data.unread || this.data.marking) return
