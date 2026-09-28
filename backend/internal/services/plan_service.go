@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -24,11 +23,6 @@ type WeekDayPlan struct {
 type WeekPlan struct {
 	Days []WeekDayPlan `json:"days"`
 }
-
-var (
-	planCache = map[uint]*WeekPlan{}
-	planMu    sync.RWMutex
-)
 
 func getCurrentWeekKey() string {
 	now := time.Now()
@@ -58,24 +52,14 @@ func getUserSettingInt(uid uint, key string, fallback int) int {
 	return fallback
 }
 
-// GetCachedWeekPlan 用户本周菜单：内存 → 用户设置缓存 → 重新生成。
+// GetCachedWeekPlan 从持久缓存读取本周菜单，过期才重新生成。
+// 不在进程内重复保留每个用户的完整菜谱，避免内存随访问过的账号数增长。
 func GetCachedWeekPlan(uid uint) *WeekPlan {
 	weekKey := getCurrentWeekKey()
 
-	planMu.RLock()
-	if p := planCache[uid]; p != nil && len(p.Days) > 0 && p.Days[0].Date >= weekKey {
-		planMu.RUnlock()
-		return withFavorites(uid, p)
-	}
-	planMu.RUnlock()
-
 	if raw := database.GetUserSetting(uid, "week_plan_cache", ""); raw != "" {
-		var plan WeekPlan
-		if json.Unmarshal([]byte(raw), &plan) == nil && len(plan.Days) > 0 && plan.Days[0].Date >= weekKey {
-			planMu.Lock()
-			planCache[uid] = &plan
-			planMu.Unlock()
-			return withFavorites(uid, &plan)
+		if plan, err := decodeCachedWeekPlan(raw); err == nil && len(plan.Days) > 0 && plan.Days[0].Date >= weekKey {
+			return withFavorites(uid, plan)
 		}
 	}
 
@@ -90,40 +74,36 @@ func RegenerateWeekPlan(uid uint) *WeekPlan {
 
 // InvalidateWeekPlan 菜品变更后让用户的周菜单下次重新生成。
 func InvalidateWeekPlan(uid uint) {
-	planMu.Lock()
-	delete(planCache, uid)
-	planMu.Unlock()
 	database.DB.Where("user_id = ? AND `key` = ?", uid, "week_plan_cache").Delete(&models.UserSetting{})
 }
 
 func saveWeekPlanCache(uid uint, plan *WeekPlan) {
 	data, _ := json.Marshal(plan)
 	_ = database.SetUserSetting(uid, "week_plan_cache", string(data))
-	planMu.Lock()
-	planCache[uid] = plan
-	planMu.Unlock()
 }
 
-// withFavorites 返回带当前收藏状态的副本（缓存里的收藏状态可能已过期）。
+// withFavorites 刷新请求独享菜单的收藏状态，不需要再复制整份菜谱。
 func withFavorites(uid uint, plan *WeekPlan) *WeekPlan {
 	if plan == nil {
 		return &WeekPlan{Days: []WeekDayPlan{}}
 	}
 	favs := FavoriteIDSet(uid)
-	out := &WeekPlan{Days: make([]WeekDayPlan, len(plan.Days))}
-	for i, day := range plan.Days {
-		d := WeekDayPlan{Date: day.Date, DayName: day.DayName}
-		d.Lunch = append([]models.Dish{}, day.Lunch...)
-		d.Dinner = append([]models.Dish{}, day.Dinner...)
+	for i := range plan.Days {
+		d := &plan.Days[i]
+		if d.Lunch == nil {
+			d.Lunch = []models.Dish{}
+		}
+		if d.Dinner == nil {
+			d.Dinner = []models.Dish{}
+		}
 		for j := range d.Lunch {
 			d.Lunch[j].Favorite = favs[d.Lunch[j].ID]
 		}
 		for j := range d.Dinner {
 			d.Dinner[j].Favorite = favs[d.Dinner[j].ID]
 		}
-		out.Days[i] = d
 	}
-	return out
+	return plan
 }
 
 func GenerateWeekPlan(uid uint) (*WeekPlan, error) {

@@ -56,6 +56,7 @@ chmod +x ninimenu
 | `APP_VERSION` | 空 | 语义版本 `X.Y.Z`（用户看到 `vX.Y.Z`）；由 `scripts/next-version.sh` 根据改动类型递增 |
 | `APP_RELEASE_NOTES` | 空 | 面向用户的更新摘要，多条用“；”分隔；为空时使用通用更新文案 |
 | `PORT` | `8080` | 服务端口 |
+| `GOMEMLIMIT` | Compose：`256MiB` | Go 运行时内存软目标；非容器运行需在启动进程前导出，不包含本地 ASR 子进程、数据库或对象存储，也不是 RSS 硬上限 |
 | `ADMIN_EMAIL` | 空 | 初始管理员邮箱；旧单用户数据迁移给该管理员 |
 | `ADMIN_USERNAME` | `admin` | 初始管理员用户名 |
 | `ADMIN_PASSWORD` | 仅开发有默认值 | 仅用于首次创建管理员和密码登录兜底；生产环境必须显式设置强密码 |
@@ -83,10 +84,14 @@ chmod +x ninimenu
 
 手机上传的截图和照片通常是体积很大的 PNG 格式。系统在上传时自动处理：
 
-1. **原图备份** — 原始文件保存到 `BACKUP_DIR`（默认 `uploads_backup/YYYY/MM/DD/`）
+1. **原图备份** — 本地存储模式保存到 `BACKUP_DIR/u/<用户ID>/YYYY/MM/DD/`（`BACKUP_DIR` 默认 `uploads_backup`）；S3 模式只保存压缩结果
 2. **压缩转换** — EXIF 方向修正 + 缩放（不超过 `COMPRESS_MAX_DIM`）+ 转 JPG（`JPEG_QUALITY` 质量）
 3. **返回压缩 URL** — 前端拿到的是压缩后的 JPG 路径
-4. **容错回退** — 如果压缩失败，自动使用原图
+4. **容错回退** — 普通压缩失败时使用原图；超过像素限制的图片直接拒绝，不回退保存
+
+上传在读取文件前取得处理位置：单应用进程同时处理 1 张图片，最多 4 个请求等待、每个最多 5 秒；超出时返回 `429` 和重试提示。使用流式 multipart，只保留一份文件缓冲，不把整个表单载入内存或写入临时文件。单请求只接收一个 `image` 文件，文件仍受 `MAX_UPLOAD_SIZE_MB` 限制，表单开销最多额外 64 KiB、最多 8 个部分。文件或请求超限返回 `413`。
+
+完整解码前检查图片头：最多 2400 万像素、单边不超过 16384 像素；超限返回 `400`，客户端需缩小图片再上传。缩放后复用 NRGBA 像素缓冲铺白底并编码，保持 EXIF 方向修正和 Lanczos 缩放。
 
 PNG 截图转 JPG quality=85 通常减少 70-90% 体积，视觉几乎无损。
 
@@ -98,6 +103,14 @@ PNG 截图转 JPG quality=85 通常减少 70-90% 体积，视觉几乎无损。
 上传失败时前端会展示后端返回的具体错误信息（如"图片大小不能超过5MB"），而非通用提示。
 
 小程序端还必须在微信公众平台配置 request、uploadFile 合法域名和隐私保护指引（见 [微信小程序指南](docs/miniprogram.md)）；代码无法绕过这两个平台开关。
+
+## 运行内存
+
+周菜单只保留数据库中的 `week_plan_cache`，不再按用户永久保留进程内副本；每次读取增加一次用户设置查询，仍复用当周菜单并刷新当前收藏状态。
+
+Compose 默认给 Go 运行时设置 `GOMEMLIMIT=256MiB`，使其在接近目标时更积极回收内存。该配置不预分配 256 MiB，也不限制 Python 语音识别或整个容器；不要据此将容器硬限制设为 256 MiB。本地 ASR 仍需要至少 768 MiB 可用余量才能启动。进一步降低 Go 目标前，应检查 GC CPU 和请求延迟。
+
+局部内存分配对比可运行 `go test ./internal/imaging ./internal/handlers -run '^$' -bench 'Benchmark(CompressJPEG|ReadUploadImage)' -benchmem`。`B/op` 是每次操作累计分配的字节数，不是应用 RSS 峰值；整机容量仍需在 Linux 部署环境结合实际并发测量。
 
 ## 品牌资源
 

@@ -1,6 +1,74 @@
 package services
 
-import "testing"
+import (
+	"encoding/json"
+	"ninimenu/internal/database"
+	"ninimenu/internal/models"
+	"ninimenu/internal/testutil"
+	"strings"
+	"testing"
+)
+
+func TestWeekPlanPersistentCacheIsolationAndFavorites(t *testing.T) {
+	alice, _, err := testutil.NewUser("plan-memory-alice@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, _, err := testutil.NewUser("plan-memory-bob@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := func(name string) *WeekPlan {
+		return &WeekPlan{Days: []WeekDayPlan{{Date: getCurrentWeekKey(), Lunch: []models.Dish{{ID: 1, Name: name, Ingredients: `[{"name":"鸡蛋","amount":"2个"}]`, VideoMeta: `{"title":"做菜视频"}`}}}}}
+	}
+	saveWeekPlanCache(alice.ID, plan("Alice menu"))
+	saveWeekPlanCache(bob.ID, plan("Bob menu"))
+	first := GetCachedWeekPlan(alice.ID)
+	if len(first.Days) != 1 || first.Days[0].Lunch[0].Name != "Alice menu" {
+		t.Fatal("persistent plan was regenerated")
+	}
+	if dish := first.Days[0].Lunch[0]; dish.Ingredients != plan("").Days[0].Lunch[0].Ingredients || dish.VideoMeta != plan("").Days[0].Lunch[0].VideoMeta {
+		t.Fatal("JSON columns or video metadata were lost from the persisted plan")
+	}
+	first.Days[0].Lunch[0].Name = "client edit"
+	if err := database.DB.Create(&models.Favorite{UserID: alice.ID, DishID: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	second, other := GetCachedWeekPlan(alice.ID), GetCachedWeekPlan(bob.ID)
+	if second.Days[0].Lunch[0].Name != "Alice menu" || !second.Days[0].Lunch[0].Favorite {
+		t.Fatalf("menu or current favorite was lost: %+v", second)
+	}
+	if other.Days[0].Lunch[0].Name != "Bob menu" || other.Days[0].Lunch[0].Favorite {
+		t.Fatalf("another user's menu/favorite leaked: %+v", other)
+	}
+	InvalidateWeekPlan(alice.ID)
+	if database.GetUserSetting(alice.ID, "week_plan_cache", "") != "" || database.GetUserSetting(bob.ID, "week_plan_cache", "") == "" {
+		t.Fatal("cache invalidation must affect only its owner")
+	}
+}
+
+func TestWeekPlanCacheReadsLegacyStringAndCurrentArrayFields(t *testing.T) {
+	for _, raw := range []string{
+		`{"days":[{"date":"2026-09-28","lunch":[{"id":1,"images":"[\"photo.jpg\"]","ingredients":"[{\"name\":\"米饭\"}]","seasonings":"[]","steps":"[]","tags":"[]"}]}]}`,
+		`{"days":[{"date":"2026-09-28","lunch":[{"id":1,"images":["photo.jpg"],"ingredients":[{"name":"米饭"}],"seasonings":[],"steps":[],"tags":[],"video_meta":null}]}]}`,
+	} {
+		plan, err := decodeCachedWeekPlan(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dish := plan.Days[0].Lunch[0]
+		if dish.Images != `["photo.jpg"]` || dish.Ingredients != `[{"name":"米饭"}]` || dish.VideoMeta != "" {
+			t.Fatalf("incompatible persisted JSON: %+v", dish)
+		}
+		encoded, err := json.Marshal(plan)
+		if err != nil || !json.Valid(encoded) {
+			t.Fatalf("cached plan cannot be returned to clients: %v", err)
+		}
+		if !strings.Contains(string(encoded), `"dinner":[]`) {
+			t.Fatal("empty meals must remain arrays for existing clients")
+		}
+	}
+}
 
 func TestCompactShoppingAmounts(t *testing.T) {
 	tests := []struct {

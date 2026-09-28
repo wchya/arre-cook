@@ -22,6 +22,8 @@ services:
       TZ: Asia/Shanghai
       GIN_MODE: release
       APP_ENV: production
+      # Go runtime soft limit only; local Python ASR needs additional headroom.
+      GOMEMLIMIT: ${GOMEMLIMIT:-256MiB}
       APP_RELEASE_NOTES: ${APP_RELEASE_NOTES:-}
       PORT: "8080"
       DB_DRIVER: ${DB_DRIVER:-mysql}

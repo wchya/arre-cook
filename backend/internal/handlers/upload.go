@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -33,29 +36,117 @@ var allowedImageTypes = map[string]string{
 	"image/webp": ".webp",
 }
 
+var (
+	imageUploadSlot    = make(chan struct{}, 1)
+	imageUploadWaiters = make(chan struct{}, 4)
+	errUploadBusy      = errors.New("image upload busy")
+	errUploadTooLarge  = errors.New("image upload too large")
+	errInvalidUpload   = errors.New("expected one image file")
+)
+
+// Admit before reading multipart data, so queued uploads do not retain image
+// buffers. Both the queue and wait are bounded; clients can retry a busy upload.
+func acquireImageUpload(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case imageUploadSlot <- struct{}{}:
+		return nil
+	default:
+	}
+	select {
+	case imageUploadWaiters <- struct{}{}:
+		defer func() { <-imageUploadWaiters }()
+	default:
+		return errUploadBusy
+	}
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	select {
+	case imageUploadSlot <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return errUploadBusy
+	}
+}
+
+// Stream parts into a single bounded file buffer. FormFile/ParseMultipartForm
+// would retain an additional in-memory copy (or create a temporary disk file).
+func readUploadImage(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, error) {
+	const overhead = 64 << 10
+	if limit <= 0 || r.ContentLength > limit+overhead {
+		return nil, errUploadTooLarge
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limit+overhead)
+	reader, err := r.MultipartReader()
+	if err != nil {
+		return nil, errInvalidUpload
+	}
+	var data []byte
+	seenImage := false
+	for parts := 0; ; parts++ {
+		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if parts >= 8 {
+			return nil, errInvalidUpload
+		}
+		if part.FileName() != "" {
+			if part.FormName() != "image" || seenImage {
+				return nil, errInvalidUpload
+			}
+			seenImage = true
+			var buf bytes.Buffer
+			if r.ContentLength > 0 {
+				// ReadFrom requests MinRead bytes even when checking for EOF.
+				buf.Grow(int(min(r.ContentLength, limit+1)) + bytes.MinRead)
+			}
+			if _, err := buf.ReadFrom(io.LimitReader(part, limit+1)); err != nil {
+				return nil, err
+			}
+			if int64(buf.Len()) > limit {
+				return nil, errUploadTooLarge
+			}
+			data = buf.Bytes()
+		} else if _, err := io.Copy(io.Discard, part); err != nil {
+			return nil, err
+		}
+		if err := part.Close(); err != nil {
+			return nil, err
+		}
+	}
+	if len(data) == 0 {
+		return nil, errInvalidUpload
+	}
+	return data, nil
+}
+
 // UploadImage 上传图片（任何登录用户）：内容嗅探校验 → 压缩为 JPG → 写入对象存储（或本地）。
 // 本地模式下原图另存到 BACKUP_DIR 以备恢复；对象存储模式只保存压缩结果。
 func UploadImage(c *gin.Context) {
-	file, err := c.FormFile("image")
+	if err := acquireImageUpload(c.Request.Context()); err != nil {
+		if c.Request.Context().Err() == nil {
+			c.Header("Retry-After", "5")
+			utils.Error(c, http.StatusTooManyRequests, 42900, "图片上传正忙，请稍后重试")
+		}
+		return
+	}
+	defer func() { <-imageUploadSlot }()
+	data, err := readUploadImage(c.Writer, c.Request, config.C.MaxUploadSize)
 	if err != nil {
-		utils.BadRequest(c, "请选择图片")
-		return
-	}
-	maxMB := config.C.MaxUploadSize / 1024 / 1024
-	if file.Size > config.C.MaxUploadSize {
-		utils.BadRequest(c, fmt.Sprintf("图片大小不能超过%dMB", maxMB))
-		return
-	}
-
-	src, err := file.Open()
-	if err != nil {
-		utils.BadRequest(c, "读取图片失败")
-		return
-	}
-	data, err := io.ReadAll(io.LimitReader(src, config.C.MaxUploadSize+1))
-	src.Close()
-	if err != nil || int64(len(data)) > config.C.MaxUploadSize {
-		utils.BadRequest(c, fmt.Sprintf("图片大小不能超过%dMB", maxMB))
+		var bodyLimit *http.MaxBytesError
+		if errors.Is(err, errUploadTooLarge) || errors.As(err, &bodyLimit) {
+			utils.Error(c, http.StatusRequestEntityTooLarge, 41300, fmt.Sprintf("图片大小不能超过%dMB，请缩小图片后重试", config.C.MaxUploadSize/1024/1024))
+		} else {
+			utils.BadRequest(c, "读取图片失败，请重新选择一张图片")
+		}
 		return
 	}
 
@@ -77,6 +168,9 @@ func UploadImage(c *gin.Context) {
 	body, contentType, name := data, sniffed, baseName+ext
 	if compressed, err := imgproc.CompressJPEG(data, config.C.CompressMaxDim, config.C.JpegQuality); err == nil {
 		body, contentType, name = compressed, "image/jpeg", baseName+".jpg"
+	} else if errors.Is(err, imgproc.ErrImageTooLarge) {
+		utils.BadRequest(c, "图片分辨率过高，请缩小到2400万像素以内、单边不超过16384像素后重试")
+		return
 	} else {
 		log.Printf("[upload] 压缩失败，保存原图: %v", err)
 	}
