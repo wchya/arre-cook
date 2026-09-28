@@ -2,7 +2,7 @@
 ARG APP_VERSION=unknown
 
 # ---------- Stage 1: build frontend ----------
-FROM node:20-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 # 腾讯云 npm 镜像：境内服务器直连 npmjs.org 很慢，npm ci 是构建耗时大头
 RUN npm config set registry https://registry.npmmirror.com
 WORKDIR /build

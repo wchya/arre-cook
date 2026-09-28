@@ -11,7 +11,6 @@ import (
 )
 
 var cueTime = regexp.MustCompile(`^\s*(?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{3}\s+-->\s+(?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{3}`)
-var cueNumber = regexp.MustCompile(`^\d+$`)
 var cueTags = regexp.MustCompile(`<[^>]{0,160}>`)
 
 func ValidateTranscript(text string) (string, error) {
@@ -79,7 +78,9 @@ func parseSubtitle(body []byte) (string, error) {
 				inCue = true
 				continue
 			}
-			if inCue && !cueNumber.MatchString(line) {
+			// Cue identifiers are outside the timed body. Numeric lines inside
+			// it can be ingredient quantities or cooking times and must survive.
+			if inCue {
 				lines = append(lines, html.UnescapeString(cueTags.ReplaceAllString(line, "")))
 			}
 		}

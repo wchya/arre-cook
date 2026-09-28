@@ -3,7 +3,7 @@
 ## 环境要求
 
 - Go 1.25+
-- Node.js 20.19+ 或 22.12+（Vite 8 / jsdom 30）
+- Node.js 22.22.2+（22.x），或 24.15.0+（24.x）；Docker 构建使用 Node 22（Vite 8 / jsdom 30）
 
 ## 后端开发
 

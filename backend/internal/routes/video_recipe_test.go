@@ -28,7 +28,7 @@ func TestVideoRecipeEndpointReturnsDraftWithoutSavingOrTouchingOtherUsers(t *tes
 		i := calls.Add(1)
 		text := "ALLOW"
 		if i == 2 {
-			text = `{"name":"番茄炒蛋","ingredients":[{"name":"番茄","amount":"两个","evidence":"番茄两个切块"}],"seasonings":[],"steps":[{"text":"番茄切块后下锅炒软。","time":0,"evidence":"番茄两个切块，下锅炒软"}],"cook_time":0,"remark":""}`
+			text = `{"name":"番茄炒蛋","ingredients":[{"name":"番茄","amount":"两个","evidence":{"first":1,"last":1}}],"seasonings":[],"steps":[{"text":"番茄切块后下锅炒软。","time":0,"evidence":{"first":1,"last":1}}],"cook_time":0,"remark":""}`
 		}
 		body, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"delta": map[string]string{"content": text}, "finish_reason": "stop"}}})
 		w.Header().Set("Content-Type", "text/event-stream")

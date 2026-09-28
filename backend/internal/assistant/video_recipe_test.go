@@ -15,6 +15,7 @@ import (
 
 const recipeTranscript = "今天做番茄炒蛋。番茄两个切块，鸡蛋三个打散。鸡蛋下锅炒熟后盛出。炒软番茄，加盐半勺，倒入鸡蛋炒匀即可。"
 const recipeJSON = `{"name":"番茄炒蛋","ingredients":[{"name":"番茄","amount":"两个","evidence":"番茄两个切块"},{"name":"鸡蛋","amount":"三个","evidence":"鸡蛋三个打散"}],"seasonings":[{"name":"盐","amount":"半勺","evidence":"加盐半勺"}],"steps":[{"text":"番茄切块，鸡蛋打散。","time":0,"evidence":"番茄两个切块，鸡蛋三个打散。"},{"text":"炒熟鸡蛋并盛出。","time":0,"evidence":"鸡蛋下锅炒熟后盛出。"},{"text":"炒软番茄，加盐和鸡蛋炒匀。","time":0,"evidence":"炒软番茄，加盐半勺，倒入鸡蛋炒匀即可。"}],"cook_time":0,"remark":""}`
+const citedRecipeJSON = `{"name":"番茄炒蛋","ingredients":[{"name":"番茄","amount":"两个","evidence":{"first":2,"last":2}},{"name":"鸡蛋","amount":"三个","evidence":{"first":2,"last":2}}],"seasonings":[{"name":"盐","amount":"半勺","evidence":{"first":4,"last":4}}],"steps":[{"text":"番茄切块，鸡蛋打散。","time":0,"evidence":{"first":2,"last":2}},{"text":"炒熟鸡蛋并盛出。","time":0,"evidence":{"first":3,"last":3}},{"text":"炒软番茄，加盐和鸡蛋炒匀。","time":0,"evidence":{"first":4,"last":4}}],"cook_time":0,"cook_time_evidence":null,"remark":""}`
 
 func TestVideoRecipeRejectsInventedEvidenceUnknownFieldsAndPartialJSON(t *testing.T) {
 	var recipe VideoRecipe
@@ -50,7 +51,7 @@ func TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult(t *testing.T) {
 				}
 				text, finish := "ALLOW", "stop"
 				if index == 2 {
-					text = recipeJSON
+					text = citedRecipeJSON
 				}
 				if scenario == "input_block" && index == 1 || scenario == "output_block" && index == 3 {
 					text = "BLOCK"
@@ -143,7 +144,7 @@ func TestVideoRecipeBoundsReasoningForGenerationAndSourceReview(t *testing.T) {
 			if request.MaxTokens <= 3000 || request.MaxTokens > 4096 {
 				t.Error("recipe generation budget must fit source evidence and remain bounded")
 			}
-			respondText(w, recipeJSON)
+			respondText(w, citedRecipeJSON)
 			return
 		}
 		var payload struct {
