@@ -21,7 +21,7 @@ function goalsOf(text) {
   return String(text || "").split(/[,，、\s]+/).filter(Boolean)
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     loading: true,
     saving: false,

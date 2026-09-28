@@ -1,9 +1,8 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <view class="login">
-  <view class="glow glow-a"></view>
-  <view class="glow glow-b"></view>
-  <view class="glow glow-c"></view>
 
   <view class="login__inner" style="padding-top:{{topPad}}px;">
+    <view class="login-appearance"><theme-picker /></view>
     <!-- 品牌区：与 Web 登录页一致的厨师徽标 + 大标题 -->
     <view class="brand anim-fade-up">
       <image class="brand__logo" src="/assets/chef-mark.svg" mode="aspectFit" />
@@ -78,7 +77,7 @@
           <view wx:if="{{loading === 'submit'}}" class="spinner"></view>
           <block wx:else>
             <text>登录</text>
-            <icon name="arrow-right" size="34" stroke="2.6" color="white" />
+            <icon name="arrow-right" size="34" stroke="2.6" color="on-primary" />
           </block>
         </view>
       </view>
@@ -104,7 +103,7 @@
           <view wx:if="{{loading === 'submit'}}" class="spinner"></view>
           <block wx:else>
             <text>登录</text>
-            <icon name="arrow-right" size="34" stroke="2.6" color="white" />
+            <icon name="arrow-right" size="34" stroke="2.6" color="on-primary" />
           </block>
         </view>
       </view>
@@ -114,7 +113,7 @@
     <view class="footer">
       <view class="consent {{consentShake ? 'anim-shake' : ''}} {{consentHint && !agreed ? 'is-hint' : ''}}" bindtap="toggleConsent" aria-role="checkbox" aria-checked="{{agreed}}">
         <view class="check {{agreed ? 'is-on' : ''}}">
-          <icon wx:if="{{agreed}}" name="check" size="22" stroke="3.4" color="white" />
+          <icon wx:if="{{agreed}}" name="check" size="22" stroke="3.4" color="on-primary" />
         </view>
         <view class="consent__text">我已阅读并同意<text class="link" catchtap="openTerms">《用户服务协议》</text>和<text class="link" catchtap="openPrivacy">《隐私政策》</text></view>
       </view>

@@ -2,7 +2,7 @@
 
 ## 工程配置
 
-小程序名称为「arre食谱推荐小助手」，是 `miniprogram/` 下包含 24 个页面的原生 WXML/WXSS/JavaScript 工程。登录、菜谱、家庭、个人信息和站内信等主流程直接调用 Go API，不依赖 WebView。导入微信开发者工具时选择这个目录。项目 AppID 已配置；服务端 AppSecret 只放在根目录被 Git 忽略的 `.env` 中，通过 `WECHAT_APPID` 和 `WECHAT_SECRET` 传给后端。
+小程序名称为「arre食谱推荐小助手」，是 `miniprogram/` 下包含 25 个页面的原生 WXML/WXSS/JavaScript 工程。登录、菜谱、家庭、个人信息和站内信等主流程直接调用 Go API，不依赖 WebView。导入微信开发者工具时选择这个目录。项目 AppID 已配置；服务端 AppSecret 只放在根目录被 Git 忽略的 `.env` 中，通过 `WECHAT_APPID` 和 `WECHAT_SECRET` 传给后端。
 
 默认 API 地址为 `https://cook.arrebyte.top/api`，配置在 `miniprogram/app.js` 的 `apiBase`。小程序原生登录页先尝试微信快捷登录；微信未绑定时可以用 QQ/Foxmail 邮箱验证码登录，并在同一账号上绑定新获取的 `wx.login` code。服务端从不把 AppSecret 下发给小程序。
 
@@ -57,3 +57,7 @@
 浏览器与组件模拟不能替代 iOS/Android 微信里真实的键盘、授权与图片上传测试。
 
 菜谱入口回归：`node --test scripts/tests/recipe-visibility.test.cjs`，检查私房空列表恢复、跨 Tab 清除筛选和详情返回时保留范围。服务端对应回归为 `cd backend && go test ./internal/routes -run TestPersonalRecipeCountMatchesCollectionAfterFamilySharing`。
+
+## 多主题外观
+
+首页、登录页与「我的 → 外观」可选择青柠、暖桃、海盐蓝、莓果，以及浅色、深色、跟随系统。偏好保存在当前微信设备，退出账号后保留；不改变后端饮食偏好。全站令牌、图标、下拉刷新、转盘、弹层和底栏同步更新，详细接入约定见 [界面规范](ui-guide.md#小程序主题同步)。

@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="salad" title="饮食偏好" subtitle="推荐引擎和 AI 助手都会遵守" />
 
 <view wx:if="{{loading}}" class="content">

@@ -6,7 +6,7 @@ const theme = require("../../utils/theme")
 
 const REPEAT_OPTIONS = ["1", "2", "3", "5", "7", "10", "14", "0"]
 
-Page({
+require("../../utils/theme").page({
   data: {
     topPad: 64,
     user: null,

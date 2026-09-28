@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <view class="screen">
   <nav-bar icon="utensils-crossed" title="{{scope === 'mine' ? '我的私房菜' : scope === 'family' ? '家庭菜谱' : scope === 'public' ? '公共菜谱' : '全部菜谱'}}" subtitle="{{scope === 'mine' ? '你创建的菜谱，包含家庭里的做法' : '选菜加餐，一键搞定'}}" theme="plain">
     <view class="nav-add" hover-class="tap-active" bindtap="createDish" aria-role="button" aria-label="新建私房菜">

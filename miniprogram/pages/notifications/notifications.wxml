@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="bell" title="站内信" subtitle="{{unread ? unread + ' 条未读消息' : '消息与服务提醒'}}">
   <view wx:if="{{unread}}" class="mark-all {{marking ? 'tap-fade' : ''}}" hover-class="tap-active" bindtap="markAll"><icon name="check" size="24" stroke="2.8" color="primary" /><text>全部已读</text></view>
 </nav-bar>

@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar title="AI 连接" subtitle="把食谱数据安全地交给智能体" icon="plug" />
 <request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
@@ -11,7 +12,7 @@
 
   <view class="section-head">
     <view class="section-title">已连接的智能体</view>
-    <view class="btn btn-primary btn-sm" hover-class="tap-active" bindtap="openCreate"><icon name="plus" size="26" stroke="2.6" color="white" /><text>新建令牌</text></view>
+    <view class="btn btn-primary btn-sm" hover-class="tap-active" bindtap="openCreate"><icon name="plus" size="26" stroke="2.6" color="on-primary" /><text>新建令牌</text></view>
   </view>
 
   <view wx:if="{{summary}}" class="grid-4 conn-stats">
@@ -91,7 +92,7 @@
     <view class="field-label mt-24">允许它做什么</view>
     <view class="preset-list">
       <view wx:for="{{presets}}" wx:key="key" class="preset {{presetKey === item.key ? 'is-active' : ''}}" hover-class="tap-active" data-key="{{item.key}}" bindtap="pickPreset">
-        <view class="preset__radio"><icon wx:if="{{presetKey === item.key}}" name="check" size="22" stroke="3" color="white" /></view>
+        <view class="preset__radio"><icon wx:if="{{presetKey === item.key}}" name="check" size="22" stroke="3" color="on-primary" /></view>
         <view class="flex-1"><view class="preset__title">{{item.title}}</view><view class="preset__desc">{{item.desc}}</view></view>
       </view>
     </view>

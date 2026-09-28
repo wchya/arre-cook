@@ -15,7 +15,7 @@ const EXPORT_FIELDS = [
   { key: "food_journal", label: "饮食日记" },
 ]
 
-Page({
+require("../../utils/theme").page({
   data: {
     loading: true,
     user: null,

@@ -7,7 +7,7 @@ function weightList(items) {
   return list.map((item) => ({ name: item.name, count: item.count || 0, width: Math.max(4, ((item.weight || 0) / max) * 100) }))
 }
 
-Page({
+require("../../utils/theme").page({
   data: { loading: true, error: false, profile: null, tastes: [], categories: [], topDishes: [], disliked: [] },
 
   onLoad() {

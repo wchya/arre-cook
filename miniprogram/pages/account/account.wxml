@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar title="账号与安全" subtitle="登录方式、数据导出与账号管理" icon="shield" />
 <request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
@@ -119,7 +120,7 @@
       <icon name="info" size="30" stroke="2.4" color="primary" />
       <text>已生成完整 JSON 数据，点击下方复制到剪贴板，可粘贴保存。</text>
     </view>
-    <view class="btn btn-primary btn-block mt-24" hover-class="tap-active" bindtap="copyExport"><icon name="copy" size="30" stroke="2.4" color="white" /><text>复制数据（JSON）</text></view>
+    <view class="btn btn-primary btn-block mt-24" hover-class="tap-active" bindtap="copyExport"><icon name="copy" size="30" stroke="2.4" color="on-primary" /><text>复制数据（JSON）</text></view>
   </view>
 </sheet>
 

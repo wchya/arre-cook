@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const vm = require('node:vm')
+const vm = require('./miniprogram-vm.cjs')
 const { test } = require('node:test')
 
 const root = path.resolve(__dirname, '../../miniprogram')

@@ -4,7 +4,7 @@ const session = require("../../utils/session")
 const fmt = require("../../utils/format")
 const media = require("../../utils/media")
 
-Page({
+require("../../utils/theme").page({
   data: {
     loading: true,
     hasFamily: false,

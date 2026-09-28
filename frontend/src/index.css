@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./themes.css";
 
 @theme {
   --color-bg: #FAFAF8;
@@ -42,8 +43,6 @@
 /* iOS（WebKit 独有的 -webkit-touch-callout）：真实模糊效果好，底色更通透、模糊更强，接近系统材质。 */
 @supports (-webkit-touch-callout: none) {
   :root {
-    --color-glass: rgb(250 250 248 / .68);
-    --color-glass-strong: rgb(255 255 255 / .76);
     --glass-blur: blur(30px) saturate(190%);
   }
 }
@@ -60,56 +59,6 @@
   backdrop-filter: var(--glass-blur);
 }
 
-/* 深色模式跟随系统；组件统一用语义色板，原生表单也由共用样式设置颜色。 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #131316;
-    --color-card: #1D1D22;
-    --color-primary: #F0825A;
-    --color-hero-warm: #45291D;
-    --color-primary-light: #3A2419;
-    --color-primary-dark: #D8683F;
-    --color-mint: #72CDBE;
-    --color-mint-light: #15302C;
-    --color-pink: #F4A8A0;
-    --color-pink-light: #3A2226;
-    --color-yellow: #F5D76E;
-    --color-yellow-light: #352E18;
-    --color-yellow-dark: #F2CD5C;
-    --color-purple: #A78BFA;
-    --color-purple-light: #2A2140;
-    --color-red: #EF4444;
-    --color-red-light: #3B1C1C;
-    --color-text: #ECECF1;
-    --color-text2: #A1A1AA;
-    --color-text3: #A0A0AB;
-    --color-text4: #3F3F46;
-    --color-border: #26262C;
-    --color-border2: #34343C;
-    --color-glass: rgb(19 19 22 / .78);
-    --color-glass-strong: rgb(40 40 47 / .9);
-    --color-glass-border: rgb(255 255 255 / .06);
-    --color-highlight: rgb(255 255 255 / .06);
-  }
-
-  .achievement-unlock-card {
-    border-color: rgba(255,255,255,.08);
-    background: var(--color-card);
-  }
-
-  .achievement-icon-wrap {
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 12px 28px rgba(0,0,0,.35);
-  }
-}
-
-@supports (-webkit-touch-callout: none) {
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --color-glass: rgb(19 19 22 / .62);
-      --color-glass-strong: rgb(44 44 52 / .74);
-    }
-  }
-}
 
 html {
   font-size: 16px;
@@ -213,8 +162,8 @@ button { font-variant-numeric: tabular-nums; }
   50% { transform: scale(1.08); opacity: .9; }
 }
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(232,115,74,.3); }
-  50% { box-shadow: 0 0 0 12px rgba(232,115,74,0); }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-action) 30%, transparent); }
+  50% { box-shadow: 0 0 0 12px transparent; }
 }
 @keyframes achievement-layer-in {
   from { opacity: 0; }
@@ -263,7 +212,7 @@ button { font-variant-numeric: tabular-nums; }
   width: 84px;
   height: 84px;
   animation: chef-loading-bob 1.8s ease-in-out infinite;
-  filter: drop-shadow(0 14px 24px rgba(232,115,74,.22));
+  filter: drop-shadow(0 14px 24px color-mix(in srgb, var(--color-primary-action) 22%, transparent));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -280,7 +229,7 @@ button { font-variant-numeric: tabular-nums; }
   padding: 24px;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 44%, rgba(232,115,74,.26), transparent 28%),
+    radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--color-primary-action) 26%, transparent), transparent 28%),
     rgba(26,26,46,.58);
   backdrop-filter: blur(8px);
   animation: achievement-layer-in .22s ease-out both;
@@ -311,9 +260,7 @@ button { font-variant-numeric: tabular-nums; }
   padding: 28px 24px 24px;
   border-radius: 28px;
   border: 1px solid rgba(255,255,255,.55);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.9)),
-    var(--color-card);
+  background: var(--color-card);
   box-shadow: 0 24px 80px rgba(26,26,46,.28), 0 2px 6px rgba(0,0,0,.06);
   text-align: center;
   overflow: hidden;
@@ -331,7 +278,7 @@ button { font-variant-numeric: tabular-nums; }
   width: 178px;
   height: 178px;
   border-radius: 999px;
-  border: 2px solid rgba(232,115,74,.32);
+  border: 2px solid color-mix(in srgb, var(--color-primary-action) 32%, transparent);
   animation: achievement-ring 1.4s ease-out infinite;
 }
 
@@ -345,8 +292,8 @@ button { font-variant-numeric: tabular-nums; }
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--color-primary-light), var(--color-yellow-light));
-  border: 1px solid rgba(232,115,74,.18);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 12px 28px rgba(232,115,74,.18);
+  border: 1px solid color-mix(in srgb, var(--color-primary-action) 18%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 12px 28px color-mix(in srgb, var(--color-primary-action) 18%, transparent);
 }
 
 .achievement-icon {
@@ -419,4 +366,3 @@ button { font-variant-numeric: tabular-nums; }
 .bg-primary.text-white { background-color: var(--color-primary-action); }
 .bg-mint.text-white { background-color: var(--color-mint-action); }
 .bg-pink.text-white { background-color: var(--color-pink-action); }
-@media (prefers-color-scheme: dark) { .bg-text.text-white { color: var(--color-bg); } }

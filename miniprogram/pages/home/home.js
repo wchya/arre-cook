@@ -5,26 +5,26 @@ const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
 const theme = require("../../utils/theme")
 
-// 转盘配色与 Web 端 Home.drawWheel 一致
-const WHEEL_COLORS = ["#E8734A", "#6EC6B8", "#F5D76E", "#F4A8A0", "#8B5CF6", "#F0E6FF"]
-const WHEEL_TEXT = ["#FFFFFF", "#FFFFFF", "#7A5A06", "#FFFFFF", "#FFFFFF", "#6B4FC8"]
 const SPIN_MS = 3200
 
 function buildWheel(dishes) {
   const n = dishes.length
   if (!n) return { background: "", labels: [] }
+  const t = theme.palette().tokens
+  const colors = [t["primary-action"], t["primary-light"], t.card, t.inset]
+  const texts = [t["on-primary"], t.text, t.text, t.text]
   const seg = 360 / n
-  const stops = dishes.map((_, i) => `${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${(i * seg).toFixed(2)}deg ${((i + 1) * seg).toFixed(2)}deg`)
+  const stops = dishes.map((_, i) => `${colors[i % colors.length]} ${(i * seg).toFixed(2)}deg ${((i + 1) * seg).toFixed(2)}deg`)
   const labels = dishes.map((dish, i) => ({
     id: dish.id,
     name: dish.name.length > 5 ? `${dish.name.slice(0, 5)}…` : dish.name,
     angle: (i * seg + seg / 2 - 90).toFixed(2),
-    color: WHEEL_TEXT[i % WHEEL_TEXT.length],
+    color: texts[i % texts.length],
   }))
   return { background: `conic-gradient(${stops.join(", ")})`, labels }
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     greeting: fmt.greeting(),
     unread: 0,
@@ -61,6 +61,10 @@ Page({
     this._offTheme = theme.bindRefresher(this)
     this._today = []
     this._wheelDishes = []
+    this._offWheelTheme = theme.subscribe(() => {
+      const built = buildWheel(this._wheelDishes)
+      this.setData({ wheelBg: built.background, wheelLabels: built.labels })
+    })
     this._fallback = []
     this.boot()
   },
@@ -76,6 +80,7 @@ Page({
   },
 
   onUnload() {
+    if (this._offWheelTheme) this._offWheelTheme()
     clearTimeout(this._spinTimer)
     if (this._offTheme) this._offTheme()
   },

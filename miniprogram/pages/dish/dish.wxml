@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar theme="transparent" fixed="{{true}}" opacity="{{navOpacity}}" title="{{dish ? dish.name : '菜品详情'}}" subtitle="{{dish ? dish.category : ''}}">
   <button wx:if="{{dish}}" class="btn-reset nav-action" open-type="share" hover-class="tap-active" aria-label="分享菜品">
     <icon name="share-2" size="32" stroke="2.3" color="text2" />

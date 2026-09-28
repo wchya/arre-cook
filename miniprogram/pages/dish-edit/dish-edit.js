@@ -19,7 +19,7 @@ function segStyle(index, total) {
   return `width: calc((100% - 16rpx) / ${total}); transform: translateX(${index * 100}%);`
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     topPad: 0,
     id: 0,

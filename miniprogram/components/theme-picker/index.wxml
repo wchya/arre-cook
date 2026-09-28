@@ -1,0 +1,26 @@
+<view style="{{appearanceStyle}}">
+  <button class="theme-trigger {{row ? 'theme-trigger--row' : ''}}" bindtap="open" hover-class="theme-press" aria-label="外观与主题">
+    <view class="theme-trigger__icon"><icon name="sparkles" size="32" color="primary" /></view>
+    <view class="theme-trigger__text"><view>{{row ? '外观与主题' : '换肤'}}</view><view wx:if="{{row}}" class="theme-description">{{label}}</view></view>
+    <icon wx:if="{{row}}" name="chevron-right" size="30" color="text3" />
+  </button>
+  <root-portal>
+  <sheet show="{{open}}" title="选一个今天的颜色" subtitle="让每一餐，都有喜欢的样子" bind:close="close">
+    <view class="theme-body">
+      <view class="theme-legend">配色主题</view>
+      <view class="theme-options">
+        <button wx:for="{{palettes}}" wx:key="id" class="theme-option {{selectedPalette === item.id ? 'is-selected' : ''}}" data-value="{{item.id}}" bindtap="choosePalette" aria-role="radio" aria-checked="{{selectedPalette === item.id}}" aria-label="{{item.name}}">
+          <view class="theme-preview" style="background:{{item.page}}"><view class="theme-preview__card" style="background:{{item.card}}"><view class="theme-preview__ticket" style="background:{{item.soft}}"></view><view class="theme-preview__action" style="background:{{item.action}}"></view></view></view>
+          <view class="theme-name">{{item.name}}<text wx:if="{{selectedPalette === item.id}}"> ✓</text></view>
+        </button>
+      </view>
+      <view class="theme-legend theme-legend--mode">显示模式</view>
+      <view class="theme-modes">
+        <button wx:for="{{modes}}" wx:key="id" class="theme-mode {{selectedMode === item.id ? 'is-selected' : ''}}" data-value="{{item.id}}" bindtap="chooseMode" aria-role="radio" aria-checked="{{selectedMode === item.id}}">{{item.name}}</button>
+      </view>
+      <view class="theme-storage">{{persisted ? '外观保存在当前设备，下次打开自动恢复。' : '当前设备无法保存设置，本次仍可使用所选主题。'}}</view>
+      <button class="theme-done" bindtap="close">就用这个颜色</button>
+    </view>
+  </sheet>
+  </root-portal>
+</view>

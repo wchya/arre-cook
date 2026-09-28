@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="calendar-clock" title="明天吃什么" subtitle="{{dateLabel}}" />
 
 <view wx:if="{{loading}}" class="content">
@@ -25,7 +26,7 @@
       <view class="mini"><view class="mini__value">晚餐 {{dinnerCount}} 道</view><view class="mini__label">约用时 {{dinnerMinutes ? dinnerMinutes + 'm' : '-'}}</view></view>
     </view>
     <view class="grid-2">
-      <view class="btn btn-primary {{picking ? 'is-disabled' : ''}}" hover-class="tap-active" bindtap="regenerate"><icon name="dices" size="32" stroke="2.5" color="white" /><text>重新生成</text></view>
+      <view class="btn btn-primary {{picking ? 'is-disabled' : ''}}" hover-class="tap-active" bindtap="regenerate"><icon name="dices" size="32" stroke="2.5" color="on-primary" /><text>重新生成</text></view>
       <view class="btn btn-ghost" hover-class="tap-active" bindtap="goPlan"><icon name="shopping-basket" size="32" stroke="2.35" color="text2" /><text>买菜清单</text></view>
     </view>
   </view>
@@ -103,7 +104,7 @@
   </view>
   <view class="btn btn-primary save-btn {{saving || !totalCount || (hasSaved && !hasChanges) ? 'is-disabled' : ''}}" hover-class="tap-active" bindtap="save">
     <view wx:if="{{saving}}" class="spinner"></view>
-    <block wx:else><icon name="check" size="32" stroke="2.6" color="white" /><text>{{hasSaved ? (hasChanges ? '更新菜单' : '已保存') : '保存菜单'}}</text></block>
+    <block wx:else><icon name="check" size="32" stroke="2.6" color="on-primary" /><text>{{hasSaved ? (hasChanges ? '更新菜单' : '已保存') : '保存菜单'}}</text></block>
   </view>
 </view>
 
@@ -129,7 +130,7 @@
       </view>
       <view wx:if="{{item.selectedMeal && item.selectedMeal !== pickerMeal}}" class="pick-btn pick-btn--off">已在{{item.selectedLabel}}</view>
       <view wx:elif="{{item.selectedMeal}}" class="pick-btn pick-btn--remove" hover-class="tap-active" data-id="{{item.id}}" bindtap="pickerRemove"><icon name="x" size="22" stroke="2.6" color="red" /><text>移除</text></view>
-      <view wx:else class="pick-btn {{pickerMeal === 'dinner' ? 'pick-btn--mint' : ''}}" hover-class="tap-active" data-id="{{item.id}}" bindtap="pickerAdd"><icon name="plus" size="22" stroke="2.8" color="white" /><text>加入</text></view>
+      <view wx:else class="pick-btn {{pickerMeal === 'dinner' ? 'pick-btn--mint' : ''}}" hover-class="tap-active" data-id="{{item.id}}" bindtap="pickerAdd"><icon name="plus" size="22" stroke="2.8" color="on-primary" /><text>加入</text></view>
     </view>
   </view>
 </sheet>

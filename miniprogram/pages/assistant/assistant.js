@@ -38,7 +38,7 @@ function splitWords(text) {
   return String(text || "").split(/[,，、\s]+/).map((word) => word.trim()).filter(Boolean)
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     profile: null,
     profileLoading: true,

@@ -22,7 +22,7 @@ function stringList(raw, fallback) {
   return list.length ? list : fallback
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     categories: [{ name: "全部", count: 0 }],
     tastes: ["全部"],

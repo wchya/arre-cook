@@ -11,7 +11,7 @@ const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "�
 // 给每张照片一个稳定的轻微倾斜，营造手贴照片的回忆感。
 const TILTS = [-2.5, 1.8, -1.2, 2.2, -2, 1.4, -1.6, 2.6]
 
-Page({
+require("../../utils/theme").page({
   data: { loading: true, days: [], totalDays: 0, totalPhotos: 0 },
 
   onLoad() {

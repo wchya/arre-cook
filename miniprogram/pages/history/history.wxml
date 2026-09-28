@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <view class="screen">
   <nav-bar icon="calendar-days" title="记录" subtitle="查看日历、评价和最近吃过的菜" theme="plain">
     <view class="nav-btn" hover-class="tap-active" bindtap="goPhotoWall" aria-role="button" aria-label="照片墙">

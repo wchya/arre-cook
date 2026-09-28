@@ -1,4 +1,4 @@
-<view wx:if="{{visible}}" class="sheet-root" style="z-index:{{zIndex}};">
+<view wx:if="{{visible}}" class="sheet-root" style="{{appearanceStyle}}z-index:{{zIndex}};">
   <view class="sheet-mask {{active ? 'is-active' : ''}}" style="{{dragY ? 'opacity:' + maskOpacity + ';' : ''}}" bindtap="onMask" catchtouchmove="noop"></view>
   <view class="sheet {{active ? 'is-active' : ''}} {{dragging ? 'is-dragging' : ''}} {{isIOS ? 'sheet--ios' : ''}} {{solid ? 'sheet--solid' : ''}}" style="bottom:{{effectiveKeyboardHeight}}px; max-height:calc(88vh - {{effectiveKeyboardHeight}}px); {{dragY ? 'transform:translateY(' + dragY + 'px);' : ''}}" aria-role="dialog" aria-label="{{title}}">
     <!-- 顶部把手 + 标题区可下拉关闭（iOS 风格） -->

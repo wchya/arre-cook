@@ -1,7 +1,7 @@
 .tabs { margin-bottom: 40rpx; background: var(--card); border: 1px solid var(--border); }
 .tabs .segmented-thumb { background: var(--primary-light); box-shadow: none; }
 .tabs .segmented-item.is-active { color: var(--primary); }
-.tab-badge { min-width: 32rpx; height: 32rpx; padding: 0 8rpx; border-radius: 999rpx; background: var(--primary); color: #fff; font-size: 20rpx; line-height: 32rpx; text-align: center; }
+.tab-badge { min-width: 32rpx; height: 32rpx; padding: 0 8rpx; border-radius: 999rpx; background: var(--primary-action); color: var(--on-primary); font-size: 20rpx; line-height: 32rpx; text-align: center; }
 .ml-8 { margin-left: 8rpx; }
 .spin { animation: spin .8s linear infinite; }
 .day-sk { height: 240rpx; margin-bottom: 20rpx; border-radius: 32rpx; }

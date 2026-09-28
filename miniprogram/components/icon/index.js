@@ -3,47 +3,6 @@
 const ICONS = require("../../utils/icons")
 const theme = require("../../utils/theme")
 
-const TOKENS = {
-  text: "#1A1A2E",
-  text2: "#6B7280",
-  text3: "#747880",
-  text4: "#D1D5DB",
-  primary: "#B94E2B",
-  "primary-dark": "#C85A35",
-  mint: "#227A68",
-  "mint-ink": "#227A68",
-  pink: "#F4A8A0",
-  "pink-ink": "#E07A6E",
-  yellow: "#957010",
-  "yellow-dark": "#A67912",
-  purple: "#8B5CF6",
-  red: "#DC2626",
-  wechat: "#07C160",
-  bg: "#FAFAF8",
-  white: "#FFFFFF",
-}
-
-// 深色模式取色（与 app.wxss 深色令牌一致）；图标颜色在 JS 侧解析，无法走 CSS 变量。
-const TOKENS_DARK = {
-  text: "#ECECF1",
-  text2: "#A1A1AA",
-  text3: "#A0A0AB",
-  text4: "#3F3F46",
-  primary: "#F0825A",
-  "primary-dark": "#D8683F",
-  mint: "#72CDBE",
-  "mint-ink": "#6FD8C6",
-  pink: "#F4A8A0",
-  "pink-ink": "#F3A99E",
-  yellow: "#F5D76E",
-  "yellow-dark": "#F2CD5C",
-  purple: "#A78BFA",
-  red: "#EF4444",
-  wechat: "#07C160",
-  bg: "#131316",
-  white: "#FFFFFF",
-}
-
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 const cache = {}
 
@@ -61,8 +20,8 @@ function base64(input) {
   return output
 }
 
-function build(name, color, stroke, fill, theme) {
-  const map = theme === "dark" ? TOKENS_DARK : TOKENS
+function build(name, color, stroke, fill) {
+  const map = theme.palette().tokens
   const hex = map[color] || color || map.text2
   const width = stroke || 2
   const key = `${name}|${hex}|${width}|${fill ? 1 : 0}`
@@ -93,7 +52,7 @@ Component({
   methods: {
     _paint() {
       const { name, color, stroke, fill } = this.data
-      const src = build(name, color, stroke, fill, theme.name())
+      const src = build(name, color, stroke, fill)
       if (src !== this.data.src) this.setData({ src })
     },
   },

@@ -23,7 +23,7 @@ function timeLabel(raw) {
   return fmt.relativeDate(raw)
 }
 
-Page({
+require("../../utils/theme").page({
   data: { loading: true, items: [], unread: 0, marking: false, detail: null, detailOpen: false },
 
   onLoad() {

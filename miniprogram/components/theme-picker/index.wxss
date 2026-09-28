@@ -1,0 +1,25 @@
+view, button { box-sizing: border-box; }
+button { margin: 0; padding: 0; font-family: inherit; line-height: 1.5; }
+button::after { border: 0; }
+.theme-trigger { display: flex; justify-content: center; align-items: center; gap: 12rpx; min-height: 44px; padding: 0 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--card); color: var(--primary); font-size: 24rpx; font-weight: 700; }
+.theme-trigger--row { justify-content: flex-start; width: 100%; padding: 28rpx 32rpx; border: 0; border-radius: 0; text-align: left; color: var(--text); font-size: 28rpx; }
+.theme-trigger--row .theme-trigger__icon { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; margin-right: 12rpx; border-radius: 24rpx; background: var(--primary-light); }
+.theme-trigger--row .theme-trigger__text { flex: 1; }
+.theme-description { margin-top: 2rpx; color: var(--text3); font-size: 22rpx; font-weight: 400; }
+.theme-body { padding: 12rpx 36rpx 28rpx; color: var(--text); }
+.theme-legend { margin-bottom: 20rpx; font-size: 26rpx; font-weight: 700; }
+.theme-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12rpx; }
+.theme-option { min-width: 0; padding: 8rpx; border: 4rpx solid transparent; border-radius: 32rpx; background: transparent; color: var(--text); }
+.theme-option.is-selected { border-color: var(--primary); background: var(--inset); }
+.theme-preview { height: 136rpx; padding: 18rpx 12rpx; border-radius: 20rpx; }
+.theme-preview__card { height: 100%; padding: 14rpx; border-radius: 14rpx; }
+.theme-preview__ticket { height: 42rpx; margin-bottom: 12rpx; border-radius: 6rpx; }
+.theme-preview__action { height: 14rpx; border-radius: 99rpx; }
+.theme-name { margin-top: 14rpx; font-size: 22rpx; font-weight: 600; white-space: nowrap; }
+.theme-legend--mode { margin-top: 36rpx; }
+.theme-modes { display: flex; gap: 8rpx; padding: 8rpx; border-radius: 999rpx; background: var(--inset); }
+.theme-mode { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; background: transparent; border-radius: 999rpx; color: var(--text2); font-size: 24rpx; }
+.theme-mode.is-selected { background: var(--card); color: var(--primary); font-weight: 700; }
+.theme-storage { margin: 30rpx 0; color: var(--text3); font-size: 22rpx; text-align: center; line-height: 1.8; }
+.theme-done { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; border-radius: 999rpx; background: var(--primary-action); color: var(--on-primary); font-size: 30rpx; font-weight: 700; }
+.theme-press { opacity: .8; }

@@ -8,6 +8,7 @@
     "dish-image": "/components/dish-image/index",
     "dish-card": "/components/dish-card/index",
     "confetti": "/components/confetti/index",
-    "icon": "/components/icon/index"
+    "icon": "/components/icon/index",
+    "theme-picker": "/components/theme-picker/index"
   }
 }

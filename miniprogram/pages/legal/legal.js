@@ -1,4 +1,4 @@
-Page({
+require("../../utils/theme").page({
   data: { type: "privacy", title: "隐私政策", sections: [] },
 
   onLoad(options) {

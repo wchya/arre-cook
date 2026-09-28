@@ -40,11 +40,11 @@ export default function MainLayout() {
           </section>
         ))}
       </main>
-      <nav aria-label="主导航" className="fixed inset-x-0 bottom-0 z-[100] border-t border-glass-border glass pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="主导航" className="main-navigation fixed inset-x-0 bottom-0 z-[100] border-t border-glass-border glass pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto grid h-[72px] max-w-[640px] grid-cols-5 items-center gap-1 px-3">
           {renderTab(0)}{renderTab(1)}
           <button type="button" onClick={() => navigate("/assistant/chat")} aria-label="打开 AI 食谱助手"
-            className="mx-auto flex h-14 w-14 flex-col items-center justify-center gap-1 rounded-[20px] bg-primary text-white shadow-sm transition-transform active:scale-95">
+            className="main-navigation__assistant mx-auto flex h-14 w-14 flex-col items-center justify-center gap-1 bg-primary text-white transition-transform active:scale-95">
             <Sparkles size={22} /><span className="text-[10px] font-semibold">AI 助手</span>
           </button>
           {renderTab(2)}{renderTab(3)}

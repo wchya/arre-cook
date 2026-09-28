@@ -55,9 +55,11 @@ App({
   onLaunch() {
     this.globalData.nav = readNavMetrics()
     Object.assign(this.globalData, detectEnv())
-    // 系统主题切换时更新（CSS 走媒体查询自动响应，JS 侧取色统一经 utils/theme 订阅）。
+    // 同步手动选择及系统主题，页面/组件统一经 utils/theme 订阅。
     theme.subscribe((palette) => { this.globalData.theme = palette.theme })
   },
+
+  onShow() { theme.refresh() },
 
   navMetrics() {
     if (!this.globalData.nav) this.globalData.nav = readNavMetrics()

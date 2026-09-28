@@ -1,3 +1,4 @@
+const appearance = require("../../utils/theme")
 // 底部弹层：对应 Web 端 AnimatedBottomSheet（遮罩淡入 + 面板上滑）。
 // <sheet show="{{open}}" title="标题" bind:close="closeSheet">内容<view slot="footer">底部按钮</view></sheet>
 // 把手 / 标题区支持下拉关闭：拖过 120px 或快速下滑即触发 close，否则回弹。
@@ -33,6 +34,8 @@ Component({
 
   lifetimes: {
     attached() {
+      this.setData({ appearanceStyle: appearance.palette().style })
+      this._offAppearance = appearance.subscribe((p) => this.setData({ appearanceStyle: p.style }))
       const app = getApp()
       if (app && app.globalData.isIOS) this.setData({ isIOS: true })
       this._keyboardListener = (event) => {
@@ -42,6 +45,7 @@ Component({
       if (typeof wx.onKeyboardHeightChange === "function") wx.onKeyboardHeightChange(this._keyboardListener)
     },
     detached() {
+      if (this._offAppearance) this._offAppearance()
       sheetTabs.unlock(this)
       if (typeof wx.offKeyboardHeightChange === "function") wx.offKeyboardHeightChange(this._keyboardListener)
       clearTimeout(this._timer)

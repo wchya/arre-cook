@@ -27,7 +27,7 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 
 .tastes { width: 100%; padding: 0 24rpx 16rpx; white-space: nowrap; }
 .taste { display: inline-flex; align-items: center; min-height: 44px; margin-right: 12rpx; padding: 8rpx 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--card); color: var(--text2); font-size: 22rpx; font-weight: 500; transition: background-color .2s ease, color .2s ease, border-color .2s ease; }
-.taste.is-active { border-color: var(--pink-action); background: var(--pink-action); color: #fff; }
+.taste.is-active { border-color: var(--pink-action); background: var(--pink-action); color: var(--on-primary); }
 
 .list { flex: 1; height: 0; padding: 0 24rpx; }
 .list-space { height: calc(160rpx + env(safe-area-inset-bottom)); }
@@ -54,8 +54,8 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .info__meta text { max-width: 100%; white-space: nowrap; }
 .info__actions { display: flex; align-items: center; gap: 12rpx; }
 .meal-toggle { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: center; gap: 4rpx; min-height: 44px; padding: 0 8rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--card); color: var(--text2); font-size: 22rpx; font-weight: 600; white-space: nowrap; transition: background-color .2s ease, color .2s ease, border-color .2s ease; }
-.meal-toggle.is-lunch { border-color: var(--primary-action); background: var(--primary-action); color: #fff; }
-.meal-toggle.is-dinner { border-color: var(--mint-action); background: var(--mint-action); color: #fff; }
+.meal-toggle.is-lunch { border-color: var(--primary-action); background: var(--primary-action); color: var(--on-primary); }
+.meal-toggle.is-dinner { border-color: var(--mint-action); background: var(--mint-action); color: var(--on-primary); }
 .meal-toggle.is-pending { opacity: .5; }
 .fav { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: auto; }
 
@@ -72,7 +72,7 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 /* 今日菜单悬浮条 */
 .today-bar { position: fixed; right: 24rpx; bottom: calc(144rpx + env(safe-area-inset-bottom)); left: 24rpx; z-index: 90; display: flex; align-items: center; gap: 20rpx; padding: 18rpx 20rpx 18rpx 28rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--card); box-shadow: 0 16rpx 48rpx rgba(26, 26, 46, .12); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .today-bar__icon { position: relative; }
-.today-bar__badge { position: absolute; top: -12rpx; right: -18rpx; min-width: 32rpx; height: 32rpx; padding: 0 8rpx; border-radius: 999rpx; background: var(--primary); color: #fff; font-size: 20rpx; font-weight: 700; line-height: 32rpx; text-align: center; }
+.today-bar__badge { position: absolute; top: -12rpx; right: -18rpx; min-width: 32rpx; height: 32rpx; padding: 0 8rpx; border-radius: 999rpx; background: var(--primary-action); color: var(--on-primary); font-size: 20rpx; font-weight: 700; line-height: 32rpx; text-align: center; }
 .today-bar__text { flex: 1; min-width: 0; font-size: 26rpx; }
 
 /* 今日菜单弹层 */

@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="sparkles" title="AI 推荐官" subtitle="按你的口味画像点菜，也能聊着问做法" />
 
 <view class="content page anim-fade-up">

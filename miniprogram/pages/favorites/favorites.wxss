@@ -33,7 +33,7 @@
 
 .cats { margin: 0 -40rpx 20rpx; padding: 0 40rpx 8rpx; white-space: nowrap; }
 .cat { display: inline-flex; align-items: center; gap: 10rpx; height: 80rpx; margin-right: 16rpx; padding: 0 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--card); color: var(--text2); font-size: 24rpx; font-weight: 800; vertical-align: top; transition: all .2s ease; }
-.cat.is-active { border-color: var(--primary); background: var(--primary); color: #fff; box-shadow: 0 12rpx 32rpx rgba(232, 115, 74, .18); }
+.cat.is-active { border-color: var(--primary); background: var(--primary-action); color: var(--on-primary); box-shadow: 0 12rpx 32rpx rgba(232, 115, 74, .18); }
 .cat__count { padding: 2rpx 12rpx; border-radius: 999rpx; background: var(--bg); color: var(--text3); font-size: 20rpx; line-height: 1.4; }
 .cat.is-active .cat__count { background: rgba(255, 255, 255, .18); color: #fff; }
 .tools { margin-bottom: 32rpx; padding: 16rpx; border-radius: 32rpx; }

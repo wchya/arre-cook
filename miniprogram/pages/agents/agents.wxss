@@ -48,7 +48,7 @@
 .preset { display: flex; align-items: flex-start; gap: 20rpx; padding: 24rpx; border: 3rpx solid var(--border); border-radius: 28rpx; background: var(--bg); transition: border-color .2s ease, background-color .2s ease; }
 .preset.is-active { border-color: var(--primary); background: var(--primary-light); }
 .preset__radio { display: flex; align-items: center; justify-content: center; width: 40rpx; height: 40rpx; flex-shrink: 0; margin-top: 2rpx; border: 4rpx solid var(--border2); border-radius: 50%; }
-.preset.is-active .preset__radio { border-color: var(--primary); background: var(--primary); }
+.preset.is-active .preset__radio { border-color: var(--primary-action); background: var(--primary-action); }
 .preset__title { color: var(--text); font-size: 28rpx; font-weight: 700; }
 .preset__desc { margin-top: 4rpx; color: var(--text2); font-size: 22rpx; line-height: 1.6; }
 .expire { display: flex; align-items: center; justify-content: center; height: 80rpx; border: 3rpx solid var(--border); border-radius: 24rpx; background: var(--bg); color: var(--text2); font-size: 24rpx; font-weight: 700; }

@@ -63,7 +63,7 @@ function searchText(dish) {
   return [dish.name, dish.category, dish.taste, names(dish.ingredients), names(dish.seasonings), media.asArray(dish.tags).join(" ")].join(" ").toLowerCase()
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     dateKey: "",
     dateLabel: "",

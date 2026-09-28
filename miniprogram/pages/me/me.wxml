@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <view class="screen">
   <scroll-view class="screen-scroll" scroll-y enhanced show-scrollbar="{{false}}" refresher-enabled refresher-background="{{refresherWarm}}" refresher-default-style="{{refresherStyle}}" refresher-triggered="{{refreshing}}" bindrefresherrefresh="onRefresh">
     <!-- 头部：渐变背景 + 头像昵称 + 统计 -->
@@ -36,6 +37,7 @@
     </view>
 
     <view class="content me-content">
+      <view class="group"><view class="group-title">外观</view><view class="group-body"><theme-picker row /></view></view>
       <view class="group">
         <view class="group-title">AI 与口味</view>
         <view class="group-body">

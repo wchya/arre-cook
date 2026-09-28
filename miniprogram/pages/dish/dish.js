@@ -34,7 +34,7 @@ function stars(value) {
   return [1, 2, 3, 4, 5].map((n) => ({ n, on: n <= rounded }))
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     id: 0,
     loading: true,

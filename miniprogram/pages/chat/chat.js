@@ -62,7 +62,7 @@ function uid(prefix) {
   return `${prefix}-${Date.now()}-${seq}`
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     llmEnabled: true,
     statusText: "可以聊饮食、菜谱与记录",
