@@ -70,34 +70,7 @@ func parseDouyin(page []byte, in Input) (Metadata, error) {
 		if item == nil {
 			continue
 		}
-		video, _ := item["video"].(map[string]any)
-		author, _ := item["author"].(map[string]any)
-		duration := number(video["duration"])
-		if duration == 0 {
-			duration = number(item["duration"])
-		}
-		meta := Metadata{URL: in.URL, Platform: in.Platform, Title: stringValue(item["desc"]), Author: stringValue(author["nickname"]), Duration: (duration + 999) / 1000}
-		meta.Cover = firstURL(video["cover"])
-		meta.Media = firstURL(video["play_addr"])
-		if meta.Media == "" {
-			meta.Media = firstURL(video["playAddr"])
-		}
-		// Do not use music.play_url: background music is not the video's speech.
-		for _, parent := range []map[string]any{video, item} {
-			for _, key := range []string{"subtitle_infos", "caption_info", "caption_infos"} {
-				if entries, ok := parent[key].([]any); ok {
-					for _, entry := range entries {
-						m, _ := entry.(map[string]any)
-						for _, field := range []string{"url", "Url", "subtitle_url"} {
-							if value := stringValue(m[field]); value != "" && meta.Subtitle == "" {
-								meta.Subtitle = value
-							}
-						}
-					}
-				}
-			}
-		}
-		return meta, nil
+		return douyinMetadata(item, in), nil
 	}
 	return Metadata{}, problem("transcript_required", "抖音暂未开放此视频内容，可能需要登录或验证；可粘贴字幕继续提炼")
 }

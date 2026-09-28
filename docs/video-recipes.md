@@ -18,6 +18,34 @@ Web 和原生微信小程序的菜谱编辑页提供「从视频提炼」。粘�
 
 提炼使用现有服务端文本模型配置（CPA 或 `LLM_*`），不启用模型时明确提示手动填写。B 站先读取 `/x/v2/dm/view` 的目标分 P 字幕，正常响应但无可用字幕时才回退播放器字幕入口；优先人工中文，再选中文 AI 字幕。平台拒绝或限流时停止，不改用另一个入口绕过限制。
 
+### 抖音游客凭据
+
+抖音匿名分享页可能返回 HTTP 200 的验证页面，页面中没有视频数据。可以配置运维提供的游客凭据，通过工作台 / yt-dlp 已验证的 `/aweme/v1/web/aweme/detail/?aweme_id=…` 获取目标视频。服务器直接使用现有 Go 网络读取器，不安装浏览器、yt-dlp 或完整工作台。未设置 `VIDEO_DOUYIN_COOKIE_FILE` 时保留匿名页面读取；设置后若凭据缺失、格式无效或过期，会明确停止并提示更新。
+
+在运维自己的电脑上运行以下命令（Python 3.10+，已安装 Chrome 或 Edge）：
+
+```sh
+python3 -m venv .venv-douyin
+.venv-douyin/bin/python -m pip install -r scripts/requirements-douyin.txt
+.venv-douyin/bin/python scripts/douyin-guest-cookies.py --output secrets/video/douyin-guest.json
+```
+
+Windows 将 Python 命令改为 `.venv-douyin\Scripts\python.exe`；需要时用 `--browser` 指定浏览器可执行文件。工具使用全新的独立浏览器目录，阻止媒体加载，不访问日常浏览器账号；取得游客凭据后关闭并清理浏览器目录。检测到登录态或交互验证码就停止，失败不覆盖原有凭据。不要在窗口登录，也不要使用账号 Cookie 导出文件替代本工具生成的 JSON。
+
+将生成的 JSON 通过运维安全通道放到服务器项目目录的 `secrets/video/douyin-guest.json`。这只是小型凭据文件，不是视频文件。镜像中的应用 UID / GID 为 `1000:1000`，服务器上设置：
+
+```sh
+sudo chown 1000:1000 secrets/video secrets/video/douyin-guest.json
+sudo chmod 700 secrets/video
+sudo chmod 600 secrets/video/douyin-guest.json
+```
+
+在服务器 `.env` 设置 `VIDEO_DOUYIN_COOKIE_FILE=/run/video-secrets/douyin-guest.json`，按正常流程发布并重建容器。Compose 将整个 `secrets/video` 目录只读挂载到 `/run/video-secrets`；目录和凭据均不进入 Git 或构建上下文。后续更新时在同目录准备好权限和属主正确的新文件，再原子替换旧文件；读取器每次请求重新读取凭据，无需重启，相关缓存按凭据摘要隔离。不要直接截断正在使用的文件，也不要替换挂载目录本身。非 Compose 部署配置应用可读的绝对文件路径，仍要求文件权限 `600`。
+
+凭据只发给固定的抖音详情接口，不发给短链、分享页、媒体 CDN、字幕、B 站或 ASR；接口跳转也停止。平台返回验证页、空详情响应或 403 / 412 / 429 时进入冷却，不自动重试、启动浏览器或轮换凭据。凭据失效由运维在本机重新生成；更新凭据不会清除平台冷却和累计请求预算。
+
+获得元数据后仍优先字幕，无字幕时优先可识别的独立音轨，否则从允许的播放地址中选择已知体积最小的媒体源，并优先使用直接 CDN 地址。保留 10 分钟 / 20 MiB 上限；已知最小资源超限时在下载和 ASR 前拒绝，实际读取仍有字节限制。没有独立音轨的视频仍需临时读取含音轨的视频并做现有本地识别，因此这项修复不能消除所有媒体带宽和 ASR 开销，也不新增用户下载后上传的入口。
+
 ### 本地语音转写
 
 部署镜像包含 FFmpeg、Python 3.12、`sherpa-onnx` 与 NumPy，不包含工作台或另一个监听端口。使用固定版本的 SenseVoiceSmall int8 和 Silero VAD；模型文件合计约 229 MiB，不在每次请求时下载。
@@ -58,7 +86,7 @@ python3 backend/video_asr/download_models.py --destination models/video-asr
 | 网页 / 元数据 / 字幕响应 | 2 MiB / 1 MiB / 512 KiB，超限拒绝，不截断后继续生成 |
 | 网络 | 白名单平台域名和路径、HTTPS、最多 3 次跳转；每次连接拦截私网、环回、CGNAT、链路本地、测试网、组播、保留与 IPv6 转换地址 |
 | 平台请求 | B 站、抖音各自全站间隔至少 2 秒，每小时最多 60 次、UTC 日最多 200 次；ASR 也有独立的同等预算 |
-| 平台冷却 | HTTP 403 / 412 / 429、B 站风控错误触发至少 15 分钟冷却；`Retry-After` 最多采纳 24 小时 |
+| 平台冷却 | HTTP 403 / 412 / 429、B 站风控错误、抖音验证页或空详情响应触发至少 15 分钟冷却；`Retry-After` 最多采纳 24 小时 |
 | 抓取缓存 | 预览、保存元信息和提炼共用；最多 128 条 / 20 MiB，有效期 10 分钟，读取失败缓存 30 秒 |
 | 字幕缓存 | 仅公开内容，最多 64 条 / 2 MiB，有效期 10 分钟；手动字幕及账号额度错误不进入共享缓存 |
 | AI 额度 / 并发 | 与站内助手共用个人每日 20 次、全站默认 200 次和个人 1 / 全站 4 个请求位置；管理员原配置仍生效 |
@@ -72,7 +100,7 @@ GLM-5.3 / GLM-5.3-Flash 的结构化生成和审核显式使用 `reasoning_effor
 
 CPA 应通过智谱原生 Chat Completions 兼容入口转发这些请求；Anthropic 协议转换可能丢失 GLM 的推理强度，导致预算用完仍没有 JSON。可在 CPA 内配置独立前缀（如 `cook/glm-5.3`），并通过应用服务端的 `LLM_CPA_MODEL` 选择。该覆盖仅调整模型，仍使用挂载配置中的 CPA 地址和密钥；没有配置覆盖时沿用原模型。不得把上游订阅密钥下发给客户端。
 
-平台间隔、日 / 小时预算和冷却存于 `video_platform_budgets`，跨重启、部署、实例生效；同进程相同资源的并发请求合并。数据库失效时停止抓取。公网抓取不用环境代理、登录 Cookie 或用户凭据；每次实际拨号检查解析后的 IP，防止 DNS 重绑定。登录 JWT、来源检查、认证前 IP 限流、每账号提炼 12 次/分钟、预览 30 次/分钟共同保护入口。PAT 和 Agent 会话不可调用。
+平台间隔、日 / 小时预算和冷却存于 `video_platform_budgets`，跨重启、部署、实例生效；同进程相同资源的并发请求合并。数据库失效时停止抓取。公网抓取不用环境代理、登录 Cookie 或用户账号凭据；可选的抖音游客凭据仅用于上述固定详情接口。每次实际拨号检查解析后的 IP，防止 DNS 重绑定。登录 JWT、来源检查、认证前 IP 限流、每账号提炼 12 次/分钟、预览 30 次/分钟共同保护入口。PAT 和 Agent 会话不可调用。
 
 本地子进程不继承数据库、JWT、SMTP、CPA 凭据。Landlock 仅开放当前任务目录、只读模型及运行库；seccomp 拦截联网、进程窥探以及旧内核未覆盖的截断和权限修改操作。FFmpeg 的格式、协议、解码时间、CPU、地址空间和输出大小均受限。取消或异常退出时回收整个进程组。Compose 保留默认 seccomp，移除 capabilities、禁止提权并限制进程数量。扩容前需增加跨实例计算任务准入，不能直接把本地 ASR 并发叠加到资源紧张的服务器。
 
@@ -92,6 +120,10 @@ CPA 应通过智谱原生 Chat Completions 兼容入口转发这些请求；Anth
 ## 验证
 
 后端回归位于 `internal/video/video_test.go`、`internal/services/video_budget_test.go`、`internal/assistant/video_recipe_test.go`、`internal/routes/video_recipe_test.go`；客户端回归位于 `scripts/tests/video-recipe.test.cjs` 和既有草稿、私房菜可见性测试。覆盖 SSRF、跳转、字节上限、持久预算与冷却、分 P、抖音目标匹配、缓存 / 取消、ASR multipart、审核 / 截断 / 注入、无隐式写入、双端 UTF-8 分块和草稿保护。
+
+抖音补充回归位于 `internal/video/douyin_detail_test.go` 和 `scripts/tests/douyin-guest-cookies.test.py`，覆盖游客凭据作用域、替换后的缓存、最小媒体、验证响应、登录态拒绝和私密内容拦截。默认不访问抖音；可在 `backend` 目录设置 `ARRE_DOUYIN_TEST_COOKIE_FILE` 为本机凭据绝对路径，运行 `go test ./internal/video -run '^TestDouyinLiveMetadata$' -count=1 -v`，显式验证元数据，不下载视频、不调用 ASR。
+
+2026-09-28 本机实测：用户短链 `https://v.douyin.com/Z163A0D1xSs/` 对应 `7673525775051948287` 的花椒烤鸡腿视频。新 Go 详情读取测试通过，接口时长向上取整为 52 秒，选出 4,550,389 字节（约 4.34 MiB）的媒体源。本次平台返回的源没有独立音频或字幕，验证未下载媒体、未执行该视频的 ASR，也未在生产部署或验证抖音完整提炼；不能把元数据成功视为完整文稿已提取。
 
 上线前运行 Go 测试 / vet、Web lint / build、客户端测试，并检查移动端布局。Python 边界测试为 `python3 -m unittest discover -s backend/video_asr`；Linux 镜像内的 `test_sandbox.py` 验证配置读写、截断、联网及 shell 执行被拒绝。可在镜像内为编译后的 Go 测试设置 `ARRE_VIDEO_ASR_TEST_MEDIA`，运行 `TestLocalASRNativeIntegration`，覆盖真实转写、取消、静音、损坏媒体、实际超长音轨及临时文件清理。
 

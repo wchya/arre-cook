@@ -12,6 +12,9 @@ backend/video_asr/.venv
 *.tar.gz
 .env
 env.bak
+secrets
+scripts/__pycache__
+.venv-douyin
 docs/private.*.key
 README*.md
 CHANGELOG.md

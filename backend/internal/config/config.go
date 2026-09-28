@@ -75,6 +75,9 @@ type Config struct {
 	VideoASRModelDir string
 	VideoASRWorkDir  string
 
+	// Optional guest-only Douyin credentials generated on an operator's desktop.
+	VideoDouyinCookieFile string
+
 	// 嵌入式智能体会话令牌有效期（父页通过 postMessage 交给 iframe 内的智能体）
 	AgentSessionTTL time.Duration
 	// 每个智能体令牌每分钟最多请求数
@@ -147,6 +150,8 @@ func Load() {
 		AgentSessionTTL:  getEnvDuration("AGENT_SESSION_TTL", 2*time.Hour),
 		AgentRateLimit:   getEnvInt("AGENT_RATE_LIMIT", 120),
 		PublicURL:        strings.TrimRight(getEnv("PUBLIC_URL", ""), "/"),
+
+		VideoDouyinCookieFile: strings.TrimSpace(getEnv("VIDEO_DOUYIN_COOKIE_FILE", "")),
 	}
 	if C.DBDriver == "mysql" && C.DBDSN == "" {
 		C.DBDSN = mysqlDSNFromEnv()

@@ -1,0 +1,2 @@
+# Operator workstation only; not installed in the application image.
+websockets==16.1.1

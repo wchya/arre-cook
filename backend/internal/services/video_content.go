@@ -9,7 +9,9 @@ import (
 
 // Preview, saving video metadata and importing content share the same reader,
 // bounded caches, in-flight requests and persistent platform budgets.
-var publicVideoReader = video.NewReader(video.NewClient(videoBudgetGate{}))
+var publicVideoReader = video.NewReader(video.NewClient(videoBudgetGate{}), video.ReaderOptions{
+	DouyinCookieFile: func() string { return config.C.VideoDouyinCookieFile },
+})
 
 var localVideoASR = sync.OnceValue(func() *video.LocalASR {
 	return video.NewLocalASR(video.LocalASROptions{

@@ -18,8 +18,10 @@ it does not install or run a separate web application.
   <https://github.com/k2-fsa/sherpa-onnx>. The installed wheel includes its license.
 - **NumPy**: NumPy Developers, BSD-3-Clause; bundled numerical libraries have
   additional notices included in the installed wheel.
-- **video-transcript-workbench**: splexuan, MIT. Its Bilibili subtitle discovery
-  and SenseVoice runtime informed this integration. See the retained
+- **video-transcript-workbench**: splexuan, MIT. Its Bilibili subtitle discovery,
+  SenseVoice runtime, and Douyin guest-credential / metadata / smallest-media
+  workflow informed this integration. The server uses its existing guarded Go
+  HTTP reader, without installing the workbench, yt-dlp, or a browser. See the retained
   [MIT notice](video-transcript-workbench-MIT.txt) and source:
   <https://github.com/splexuan/video-transcript-workbench>.
 - **FFmpeg / libseccomp**: Debian-packaged binaries and libraries; their package

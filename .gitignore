@@ -1,6 +1,9 @@
 # 环境变量与本地数据
 .env
 env.bak
+secrets/
+scripts/__pycache__/
+.venv-douyin/
 *.bak
 docs/private.*.key
 

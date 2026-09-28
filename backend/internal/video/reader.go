@@ -14,17 +14,18 @@ const MaxTranscriptRunes = 8000
 const MaxMediaBytes = 20 << 20
 
 type Metadata struct {
-	URL      string `json:"url"`
-	Platform string `json:"platform"`
-	Title    string `json:"title"`
-	Cover    string `json:"cover"`
-	Author   string `json:"author"`
-	Duration int    `json:"duration"`
-	AID      int64  `json:"-"`
-	CID      int64  `json:"-"`
-	BVID     string `json:"-"`
-	Subtitle string `json:"-"`
-	Media    string `json:"-"`
+	URL        string `json:"url"`
+	Platform   string `json:"platform"`
+	Title      string `json:"title"`
+	Cover      string `json:"cover"`
+	Author     string `json:"author"`
+	Duration   int    `json:"duration"`
+	AID        int64  `json:"-"`
+	CID        int64  `json:"-"`
+	BVID       string `json:"-"`
+	Subtitle   string `json:"-"`
+	Media      string `json:"-"`
+	MediaBytes int64  `json:"-"`
 }
 
 type Source struct {
@@ -35,21 +36,35 @@ type Source struct {
 }
 
 type Reader struct {
-	client      *Client
-	transcripts *cache
+	client           *Client
+	transcripts      *cache
+	douyinCookieFile func() string
 }
 
-func NewReader(client *Client) *Reader {
+type ReaderOptions struct {
+	// Only a server-configured file produced by the local guest-cookie helper.
+	DouyinCookieFile func() string
+}
+
+func NewReader(client *Client, options ...ReaderOptions) *Reader {
 	transcripts := newCache(64, 2<<20)
 	transcripts.cacheErrors = false // Includes per-request AI-quota failures.
-	return &Reader{client: client, transcripts: transcripts}
+	r := &Reader{client: client, transcripts: transcripts}
+	if len(options) > 0 {
+		r.douyinCookieFile = options[0].DouyinCookieFile
+	}
+	return r
 }
 
-func (r *Reader) resolve(ctx context.Context, in Input) (Input, []byte, error) {
+func (r *Reader) resolve(ctx context.Context, in Input, credential douyinCredential) (Input, []byte, error) {
 	if !in.Short {
 		return in, nil, nil
 	}
-	res, err := r.client.get(ctx, in.Platform, "page", in.URL, 2<<20)
+	kind := "page"
+	if in.Platform == "douyin" && credential.header != "" {
+		kind = "resolve"
+	}
+	res, err := r.client.get(ctx, in.Platform, kind, in.URL, 2<<20)
 	if err != nil {
 		return Input{}, nil, err
 	}
@@ -65,16 +80,23 @@ func (r *Reader) Preview(ctx context.Context, raw string) (Metadata, error) {
 	if err != nil {
 		return Metadata{}, err
 	}
-	in, page, err := r.resolve(ctx, in)
+	credential, err := r.douyinCredential(in)
 	if err != nil {
 		return Metadata{}, err
 	}
-	return r.metadata(ctx, in, page)
+	in, page, err := r.resolve(ctx, in, credential)
+	if err != nil {
+		return Metadata{}, err
+	}
+	return r.metadata(ctx, in, page, credential)
 }
 
-func (r *Reader) metadata(ctx context.Context, in Input, page []byte) (Metadata, error) {
+func (r *Reader) metadata(ctx context.Context, in Input, page []byte, credential douyinCredential) (Metadata, error) {
 	if in.Platform == "bilibili" {
 		return r.biliMetadata(ctx, in)
+	}
+	if credential.header != "" {
+		return r.douyinDetail(ctx, in, credential)
 	}
 	if len(page) == 0 {
 		// Public share pages contain the target video's JSON on supported versions.
@@ -88,7 +110,11 @@ func (r *Reader) metadata(ctx context.Context, in Input, page []byte) (Metadata,
 		}
 		page = res.Body
 	}
-	return parseDouyin(page, in)
+	meta, err := parseDouyin(page, in)
+	if err != nil && isDouyinChallenge(page) {
+		return Metadata{}, r.client.douyinChallenge(ctx)
+	}
+	return meta, err
 }
 
 func (r *Reader) Transcript(ctx context.Context, raw, manual string, asr ASRSettings, status func(string), beforeAI func() error) (Source, error) {
@@ -100,15 +126,19 @@ func (r *Reader) Transcript(ctx context.Context, raw, manual string, asr ASRSett
 		text, err := ValidateTranscript(manual)
 		return Source{URL: in.URL, Platform: in.Platform, Method: "manual", Text: text}, err
 	}
+	credential, err := r.douyinCredential(in)
+	if err != nil {
+		return Source{}, err
+	}
 	status("正在读取公开视频内容…")
-	in, page, err := r.resolve(ctx, in)
+	in, page, err := r.resolve(ctx, in, credential)
 	if err != nil {
 		return Source{}, err
 	}
 	// No manual text enters this shared public-content cache.
-	key := in.URL + ":" + asr.cacheKey()
+	key := in.URL + ":" + asr.cacheKey() + ":" + credential.key
 	res, err := r.transcripts.get(ctx, key, func() (response, error) {
-		meta, err := r.metadata(ctx, in, page)
+		meta, err := r.metadata(ctx, in, page, credential)
 		if err != nil {
 			return response{}, err
 		}
@@ -149,6 +179,9 @@ func (r *Reader) Transcript(ctx context.Context, raw, manual string, asr ASRSett
 			}
 			if media == "" {
 				return response{}, problem("transcript_required", "平台未提供可读取的字幕或音频，可粘贴字幕继续提炼")
+			}
+			if meta.MediaBytes > MaxMediaBytes {
+				return response{}, problem("too_large", "可读取的最小视频资源仍超过 20 MiB，请选择更短的视频或粘贴文稿")
 			}
 			status("正在读取视频音频…")
 			res, err := r.client.get(ctx, in.Platform, "media", secureResource(media), MaxMediaBytes)

@@ -129,6 +129,8 @@ v0.10.0 增加持久的每日额度与并发租约表，启动时自动迁移。
 
 视频提炼使用 `video_platform_budgets` 表保存平台读取预算，不迁移或重写菜谱数据。发布前须备份数据库并保留当前镜像。默认 `VIDEO_ASR_PROVIDER=remote` 且没有完整远端配置时只尝试字幕，提供粘贴文稿入口；不要将 CPA 文本模型密钥填作转写密钥。
 
+抖音可选配置 `VIDEO_DOUYIN_COOKIE_FILE=/run/video-secrets/douyin-guest.json`。凭据由运维电脑上的 `scripts/douyin-guest-cookies.py` 使用独立游客浏览器生成，放入服务器 `secrets/video/douyin-guest.json`，文件属主 `1000:1000`、权限 `600`；Compose 只读挂载整个目录。服务器不安装浏览器或 yt-dlp。配置环境变量后重建容器，之后同目录原子替换凭据无需重启；凭据过期需运维刷新，冷却和请求预算不重置。完整步骤与资源边界见 [抖音游客凭据](video-recipes.md#抖音游客凭据)。该链路目前仅本机元数据验收通过，生产仍需少量验证，不能据此宣称所有抖音视频均可转写。
+
 本地免费文字提取使用 `VIDEO_ASR_PROVIDER=local`，在现有应用容器内按需启动 SenseVoice 子进程，不部署其他服务。发布前运行 `python3 backend/video_asr/download_models.py --destination models/video-asr`，确认三个模型文件的大小和 SHA-256 符合锁定清单。网络不通时可从可联网机器传入已验证文件。模型目录只读挂载，不放入 Git；工作目录是 64 MiB tmpfs。Linux amd64 / arm64 的宿主需要支持 Landlock 和默认容器 seccomp，不能通过关闭沙箱让转写启用。
 
 本地模式启动任务至少需要 768 MiB 可用内存，单进程同时只运行一个转写任务，RSS 超过 512 MiB 则终止。当前小内存服务器不应直接增大并发或复制 ASR 实例。首次状态请求会校验依赖、模型和沙箱；发布后检查 `/api/assistant/video-recipe/status` 的 `asr_enabled=true`，再少量验证真实视频。配置与验收项见 [视频做法提炼](video-recipes.md)。回滚仅切换应用镜像和配置，保留模型文件与原数据库；本轮没有新增菜谱迁移。

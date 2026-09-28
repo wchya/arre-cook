@@ -92,7 +92,8 @@ func ValidatePublicURL(u *url.URL) error {
 	return nil
 }
 
-// No environment proxy, cookies, automatic redirects or insecure TLS settings.
+// No environment proxy, cookie jar, automatic redirects or insecure TLS settings.
+// The Douyin reader may explicitly attach scoped guest credentials to its detail API.
 func PublicHTTPClient(timeout time.Duration) *http.Client {
 	dialer := &net.Dialer{Timeout: 4 * time.Second, Control: GuardPublicAddr}
 	return &http.Client{
@@ -120,7 +121,7 @@ func allowedURL(platform, kind string, u *url.URL) bool {
 		return false
 	}
 	host := strings.ToLower(u.Hostname())
-	if kind == "page" {
+	if kind == "page" || (platform == "douyin" && kind == "resolve") {
 		in, err := Parse(u.String())
 		return err == nil && in.Platform == platform
 	}
@@ -134,8 +135,14 @@ func allowedURL(platform, kind string, u *url.URL) bool {
 			return domain(host, "bilivideo.com", "bilivideo.cn", "bilivideo.net")
 		}
 	}
-	if platform == "douyin" && (kind == "subtitle" || kind == "media") {
-		return domain(host, "douyinvod.com", "bytevod.com", "ibytedtos.com", "bytetos.com", "douyinstatic.com") || (kind == "media" && host == "aweme.snssdk.com" && u.Path == "/aweme/v1/play/")
+	if platform == "douyin" {
+		if kind == "api" {
+			q, err := url.ParseQuery(u.RawQuery)
+			return err == nil && host == "www.douyin.com" && u.Path == douyinDetailPath && u.RawPath == "" && u.Fragment == "" && len(q) == 1 && len(q["aweme_id"]) == 1 && videoID.MatchString(q.Get("aweme_id"))
+		}
+		if kind == "subtitle" || kind == "media" {
+			return domain(host, "douyinvod.com", "bytevod.com", "ibytedtos.com", "bytetos.com", "douyinstatic.com") || (kind == "media" && (domain(host, "365yg.com") || ((host == "aweme.snssdk.com" || host == "api-play.amemv.com" || host == "api.amemv.com") && u.Path == "/aweme/v1/play/" && u.RawPath == "")))
+		}
 	}
 	return false
 }
@@ -167,6 +174,12 @@ func (c *Client) get(ctx context.Context, platform, kind, raw string, limit int6
 }
 
 func (c *Client) fetch(ctx context.Context, platform, kind, raw string, limit int64) (response, error) {
+	return c.fetchWithDouyinCredential(ctx, platform, kind, raw, limit, "")
+}
+
+// The credential is scoped to one fixed API request. It is never attached to
+// share pages, CDN requests, ASR requests, or redirects (including same-host ones).
+func (c *Client) fetchWithDouyinCredential(ctx context.Context, platform, kind, raw string, limit int64, credential string) (response, error) {
 	if c.gate == nil {
 		return response{}, errors.New("missing platform budget")
 	}
@@ -187,6 +200,12 @@ func (c *Client) fetch(ctx context.Context, platform, kind, raw string, limit in
 		if platform == "bilibili" {
 			req.Header.Set("Referer", "https://www.bilibili.com/")
 		}
+		if credential != "" {
+			if platform != "douyin" || kind != "api" || !allowedURL("douyin", "api", u) {
+				return response{}, problem("unsafe_url", "抖音凭据不能用于此资源地址")
+			}
+			req.Header.Set("Cookie", credential)
+		}
 		res, err := c.http.Do(req)
 		if err != nil {
 			return response{}, err
@@ -197,9 +216,22 @@ func (c *Client) fetch(ctx context.Context, platform, kind, raw string, limit in
 		}
 		if res.StatusCode >= 300 && res.StatusCode < 400 {
 			res.Body.Close()
+			if credential != "" {
+				return response{}, c.douyinChallenge(ctx)
+			}
 			next, err := res.Location()
 			if err != nil {
 				return response{}, err
+			}
+			if platform == "douyin" && kind == "resolve" {
+				if !allowedURL(platform, kind, next) {
+					return response{}, problem("unsafe_url", "视频资源地址不受支持，请使用公开视频链接")
+				}
+				if target, err := Parse(next.String()); err == nil && !target.Short {
+					// A validated video ID is sufficient for the credentialed API.
+					// Do not fetch another HTML challenge page just to rediscover it.
+					return response{URL: target.URL}, nil
+				}
 			}
 			raw = next.String()
 			continue
