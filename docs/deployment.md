@@ -133,9 +133,10 @@ v0.10.0 增加持久的每日额度与并发租约表，启动时自动迁移。
 CPA_CONFIG_PATH=/home/ubuntu/ai-agent-scaffold-lite/docs/dev-ops/config/llm-override.json
 LLM_CPA_CONFIG_PATH=/run/cpa/provider-config
 LLM_CPA_BASE_URL=http://host.docker.internal:8317/v1
+LLM_CPA_MODEL=cook/glm-5.3
 ```
 
-线上 DSH 文件当前指向 `http://172.22.0.1:8317`、`v1/chat/completions` 和 `glm-5.3`；应用读取其中的密钥和模型，并用 `LLM_CPA_BASE_URL` 将容器内地址映射到宿主机 CPA 端口。Hermes 的配置用于交叉确认同一 CPA 地址和模型，生产应用当前以 DSH JSON 覆盖文件作为唯一来源。只有未配置 CPA 文件或 CPA 配置缺失时，才回退到管理员设置或 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。未配置任何模型时，站内助手仍使用本地推荐引擎。
+线上 DSH 文件当前指向 `http://172.22.0.1:8317`、`v1/chat/completions` 和 `glm-5.3`；应用读取其中的 CPA 密钥，并用 `LLM_CPA_BASE_URL` 将容器内地址映射到宿主机 CPA 端口。`LLM_CPA_MODEL` 可覆盖该文件中的模型，未设置时仍使用文件中的模型。生产食谱应用使用 CPA 内独立别名 `cook/glm-5.3`，通过智谱订阅的原生 Chat Completions 入口转发，使 `reasoning_effort=low` 正确生效；上游订阅密钥仍只保存在 CPA。该别名通过 CPA 管理接口持久配置，保留既有模型路由。只有未配置 CPA 文件或 CPA 配置缺失时，才回退到管理员设置或 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。未配置任何模型时，站内助手仍使用本地推荐引擎。
 
 每位用户在「我的 → AI 连接」创建自己的访问令牌。外部 Agent 和 MCP 客户端必须使用该用户的令牌；不要配置旧的全站 `AGENT_TOKEN`。发给第三方的令牌可以修改名称/权限/有效期、撤销或轮换，并在调用记录中查看。`/api/agent/*` 与 `/mcp` 拒绝长期站内登录 JWT，只接受 `nm_` 个人令牌或短期 Agent session；Hermes、DSH 必须分别配置各自用户创建的令牌，不能共用。
 

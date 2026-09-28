@@ -86,6 +86,41 @@ func TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult(t *testing.T) {
 	}
 }
 
+func TestVideoRecipeNormalizesMultilineAmountsWithoutChangingEvidence(t *testing.T) {
+	const evidence = "桂皮一点点\n不要超过一克"
+	for _, group := range []string{"ingredients", "seasonings"} {
+		t.Run(group, func(t *testing.T) {
+			var generated VideoRecipe
+			if err := json.Unmarshal([]byte(recipeJSON), &generated); err != nil {
+				t.Fatal(err)
+			}
+			item := VideoIngredient{Name: "桂皮", Amount: " 一点点\r\n\t不要超过一克 ", Evidence: evidence}
+			if group == "ingredients" {
+				generated.Ingredients = append(generated.Ingredients, item)
+			} else {
+				generated.Seasonings = append(generated.Seasonings, item)
+			}
+			raw, _ := json.Marshal(generated)
+			var recipe VideoRecipe
+			if err := decodeVideoRecipe(string(raw), recipeTranscript+evidence, &recipe); err != nil {
+				t.Fatal(err)
+			}
+			items := recipe.Ingredients
+			if group == "seasonings" {
+				items = recipe.Seasonings
+			}
+			got := items[len(items)-1]
+			if got.Amount != "一点点 不要超过一克" || got.Evidence != evidence {
+				t.Fatalf("quantity or source was changed: %+v", got)
+			}
+		})
+	}
+	invalid := strings.Replace(recipeJSON, `"amount":"半勺"`, `"amount":"两\n公斤"`, 1)
+	if err := decodeVideoRecipe(invalid, recipeTranscript, &VideoRecipe{}); err == nil {
+		t.Fatal("normalizing whitespace accepted an unsupported quantity")
+	}
+}
+
 func TestVideoRecipeBoundsReasoningForGenerationAndSourceReview(t *testing.T) {
 	var calls, outputReviews atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
