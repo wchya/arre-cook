@@ -64,6 +64,11 @@ python3 backend/video_asr/download_models.py --destination models/video-asr
 | 本地 ASR 解码 / 分段 | 仅解码本地文件，校验实际音轨不超过 600 秒；识别片段硬性不超过 6 秒，串行处理，ASR 2 线程 / VAD 1 线程 |
 | 超时 | 整体 90 秒，本地 ASR 最长 50 秒、远端 ASR 最长 40 秒；模型输入 / 输出审核各最多 20 秒 |
 | 审核推理预算 | 普通审核最多 512 token，逐项核对视频字幕与菜谱时最多 1536 token；只接受完整的 `ALLOW` / `BLOCK`，不自动重试 |
+| 菜谱生成预算 | 最多 4096 token，正文最多 16 KiB；截断结果不会填入或自动重试 |
+
+GLM-5.3 / GLM-5.3-Flash 的结构化生成和审核显式使用 `reasoning_effort=low`。这些模型默认最高推理强度且不能关闭思考，可能在返回 JSON 前耗尽额度；其他模型不附加该参数。仍要求完整结果、逐项字幕依据和审核通过，整体 90 秒与审核 20 秒的期限保持不变。模型约束见 [智谱官方文档](https://docs.bigmodel.cn/cn/guide/models/text/glm-5.3)。
+
+CPA 应通过智谱原生 Chat Completions 兼容入口转发这些请求；Anthropic 协议转换可能丢失 GLM 的推理强度，导致预算用完仍没有 JSON。可在 CPA 内配置独立前缀（如 `cook/glm-5.3`），并通过应用服务端的 `LLM_CPA_MODEL` 选择。该覆盖仅调整模型，仍使用挂载配置中的 CPA 地址和密钥；没有配置覆盖时沿用原模型。不得把上游订阅密钥下发给客户端。
 
 平台间隔、日 / 小时预算和冷却存于 `video_platform_budgets`，跨重启、部署、实例生效；同进程相同资源的并发请求合并。数据库失效时停止抓取。公网抓取不用环境代理、登录 Cookie 或用户凭据；每次实际拨号检查解析后的 IP，防止 DNS 重绑定。登录 JWT、来源检查、认证前 IP 限流、每账号提炼 12 次/分钟、预览 30 次/分钟共同保护入口。PAT 和 Agent 会话不可调用。
 

@@ -1,12 +1,49 @@
 package llm
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"ninimenu/internal/config"
 )
+
+func TestStructuredReasoningOnlyAddsSupportedProviderOption(t *testing.T) {
+	for _, row := range []struct {
+		model, effort string
+	}{
+		{"glm-5.3", "low"}, {"glm-5.3-flash", "low"}, {"cook/glm-5.3", "low"},
+		{"deepseek-chat", ""}, {"glm-4.7", ""}, {"custom-model", ""},
+	} {
+		t.Run(row.model, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
+				}
+				value, present := body["reasoning_effort"]
+				if row.effort == "" && present || row.effort != "" && value != row.effort {
+					t.Errorf("unexpected reasoning option for %s: %v", row.model, value)
+				}
+				if _, exists := body["thinking"]; exists {
+					t.Error("must not request disabling required thinking")
+				}
+				fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"ALLOW\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+			}))
+			defer server.Close()
+			settings := Settings{BaseURL: server.URL, APIKey: "fixture", Model: row.model}
+			result, err := Stream(context.Background(), settings, Request{ReasoningEffort: settings.StructuredReasoningEffort()}, nil)
+			if err != nil || result.Content != "ALLOW" || result.FinishReason != "stop" {
+				t.Fatalf("unexpected response: %v", err)
+			}
+		})
+	}
+}
 
 func TestResolveCPAReadsDSHOverride(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
@@ -26,6 +63,11 @@ func TestResolveCPAReadsDSHOverride(t *testing.T) {
 	}
 	if got.APIKey != "cpa-test-key" || got.BaseURL != "http://172.22.0.1:8317/v1" || got.Model != "glm-5.3" {
 		t.Fatalf("unexpected CPA settings: %+v", got)
+	}
+	config.C.CPAModel = "cook/glm-5.3"
+	got, ok = resolveCPA()
+	if !ok || got.Model != "cook/glm-5.3" || got.BaseURL != "http://172.22.0.1:8317/v1" || got.APIKey != "cpa-test-key" {
+		t.Fatal("server model override changed credentials or was ignored")
 	}
 }
 

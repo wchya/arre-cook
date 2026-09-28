@@ -79,11 +79,14 @@ func TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult(t *testing.T) {
 			if scenario == "input_block" && calls.Load() != 1 {
 				t.Fatal("blocked input reached generator")
 			}
+			if (scenario == "truncated" || scenario == "tool_call") && calls.Load() != 2 {
+				t.Fatal("incomplete generation was retried or reached output review")
+			}
 		})
 	}
 }
 
-func TestVideoRecipeSupportsReasoningBeforeSourceReviewVerdict(t *testing.T) {
+func TestVideoRecipeBoundsReasoningForGenerationAndSourceReview(t *testing.T) {
 	var calls, outputReviews atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -95,7 +98,16 @@ func TestVideoRecipeSupportsReasoningBeforeSourceReviewVerdict(t *testing.T) {
 		if len(request.Tools) != 0 {
 			t.Error("video extraction enabled tools")
 		}
+		// This provider otherwise spends its entire budget reasoning, without
+		// returning any JSON or verdict, as GLM-5.3 does at its default effort.
+		if request.ReasoningEffort != "low" {
+			fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\ndata: [DONE]\n\n")
+			return
+		}
 		if request.Messages[0].Content == videoRecipePrompt {
+			if request.MaxTokens <= 3000 || request.MaxTokens > 4096 {
+				t.Error("recipe generation budget must fit source evidence and remain bounded")
+			}
 			respondText(w, recipeJSON)
 			return
 		}
@@ -122,7 +134,7 @@ func TestVideoRecipeSupportsReasoningBeforeSourceReviewVerdict(t *testing.T) {
 		respondText(w, "ALLOW")
 	}))
 	defer server.Close()
-	result, err := ExtractVideoRecipe(context.Background(), llm.Settings{BaseURL: server.URL, APIKey: "fixture", Model: "fixture"}, video.Source{Method: "manual", Text: recipeTranscript}, func(string) {})
+	result, err := ExtractVideoRecipe(context.Background(), llm.Settings{BaseURL: server.URL, APIKey: "fixture", Model: "glm-5.3"}, video.Source{Method: "manual", Text: recipeTranscript}, func(string) {})
 	if err != nil || result.Recipe.Name != "番茄炒蛋" || calls.Load() != 3 || outputReviews.Load() != 1 {
 		t.Fatalf("source review did not complete: error=%v calls=%d reviews=%d", err, calls.Load(), outputReviews.Load())
 	}

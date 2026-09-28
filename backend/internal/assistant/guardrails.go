@@ -127,6 +127,7 @@ func reviewContent(ctx context.Context, settings llm.Settings, stage, text strin
 		// Reasoning providers may charge internal reasoning to this budget even
 		// when the visible verdict is one word. A 32-token cap truncates verdicts.
 		MaxTokens: maxTokens, Temperature: 0,
+		ReasoningEffort: settings.StructuredReasoningEffort(),
 	}, nil)
 	if err != nil {
 		reason := "upstream"
@@ -161,7 +162,7 @@ func reviewContent(ctx context.Context, settings llm.Settings, stage, text strin
 // credentials or raw upstream errors, including unexpected finish_reason values.
 func logReviewFailure(stage, reason string, maxTokens int, result *llm.Result) {
 	switch stage {
-	case "input", "tool", "output", "video-output":
+	case "input", "tool", "output", "video-output", "video-extract":
 	default:
 		stage = "other"
 	}

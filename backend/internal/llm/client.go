@@ -29,6 +29,19 @@ type Settings struct {
 
 func (s Settings) Enabled() bool { return s.APIKey != "" && s.BaseURL != "" && s.Model != "" }
 
+// GLM-5.3 defaults to maximum reasoning and cannot disable thinking. Structured
+// extraction and strict verdicts need its documented low effort to meet deadlines.
+func (s Settings) StructuredReasoningEffort() string {
+	model := strings.ToLower(strings.TrimSpace(s.Model))
+	model = model[strings.LastIndex(model, "/")+1:]
+	switch model {
+	case "glm-5.3", "glm-5.3-flash":
+		return "low"
+	default:
+		return ""
+	}
+}
+
 // Resolve 优先读取 CPA 配置；未挂载 CPA 配置时再使用管理后台或环境变量。
 func Resolve() Settings {
 	if settings, ok := resolveCPA(); ok {
@@ -76,6 +89,9 @@ func resolveCPA() (Settings, bool) {
 		return Settings{}, false
 	}
 	if settings, ok := parseCPAOverride(b, baseURL); ok {
+		if model := strings.TrimSpace(config.C.CPAModel); model != "" {
+			settings.Model = model
+		}
 		return settings, true
 	}
 	var raw cpaConfig
@@ -179,13 +195,14 @@ type Message struct {
 }
 
 type Request struct {
-	Model       string           `json:"model"`
-	Messages    []Message        `json:"messages"`
-	Tools       []map[string]any `json:"tools,omitempty"`
-	ToolChoice  string           `json:"tool_choice,omitempty"`
-	Stream      bool             `json:"stream"`
-	Temperature float64          `json:"temperature"`
-	MaxTokens   int              `json:"max_tokens,omitempty"`
+	Model           string           `json:"model"`
+	Messages        []Message        `json:"messages"`
+	Tools           []map[string]any `json:"tools,omitempty"`
+	ToolChoice      string           `json:"tool_choice,omitempty"`
+	Stream          bool             `json:"stream"`
+	Temperature     float64          `json:"temperature"`
+	MaxTokens       int              `json:"max_tokens,omitempty"`
+	ReasoningEffort string           `json:"reasoning_effort,omitempty"`
 }
 
 // Result 一轮流式输出聚合后的结果。
