@@ -33,7 +33,7 @@ func main() {
 	if opts.target == "" {
 		log.Fatal("-target-dsn or MYSQL_DSN is required")
 	}
-	if opts.batch < 1 {
+	if opts.batch < 1 || opts.batch > 1000 {
 		opts.batch = 500
 	}
 
@@ -46,20 +46,7 @@ func main() {
 		log.Fatalf("open MySQL: %v", err)
 	}
 
-	modelsToCopy := []any{
-		&models.User{}, &models.EmailCode{}, &models.UserPreference{}, &models.UserSetting{},
-		&models.AgentToken{}, &models.AgentAuditLog{}, &models.AgentSuggestion{},
-		&models.Notification{}, &models.ChatSession{}, &models.ChatMessage{},
-		&models.AssistantUsage{}, &models.AssistantLease{},
-		&models.VideoPlatformBudget{},
-		&models.Family{}, &models.FamilyMember{}, &models.FamilyInvitation{},
-		&models.FamilyPlanItem{}, &models.FamilyShoppingItem{}, &models.FoodJournalEntry{},
-		&models.Dish{}, &models.MealRecord{}, &models.Favorite{}, &models.Quote{},
-		&models.Achievement{}, &models.UserAchievement{}, &models.AchievementEvent{},
-		&models.BlindBox{}, &models.Holiday{}, &models.Setting{}, &models.DayRating{},
-		&models.ShoppingCheck{}, &models.HomeInventory{}, &models.ShoppingItemCategory{},
-		&models.BehaviorEvent{},
-	}
+	modelsToCopy := models.SchemaModels()
 	if err := target.AutoMigrate(modelsToCopy...); err != nil {
 		log.Fatalf("migrate MySQL schema: %v", err)
 	}
@@ -81,34 +68,66 @@ func copyModel(source, target *gorm.DB, prototype any, opts options) error {
 		return nil
 	}
 
-	sliceType := reflect.SliceOf(reflect.TypeOf(prototype))
-	rows := reflect.New(sliceType).Interface()
-	// Include soft-deleted dishes and any other historical rows. The live app
-	// still hides them through GORM's normal scope, but dropping them during a
-	// database cutover would break old meal/favorite references.
-	if err := source.Unscoped().Find(rows).Error; err != nil {
-		return err
-	}
-	values := reflect.ValueOf(rows).Elem()
-	if values.Len() == 0 {
-		return nil
+	if opts.batch < 1 || opts.batch > 1000 {
+		return fmt.Errorf("batch size must be 1-1000")
 	}
 	if opts.truncate {
-		if err := target.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(reflect.New(reflect.TypeOf(prototype).Elem()).Interface()).Error; err != nil {
+		if err := target.Unscoped().Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(prototype).Error; err != nil {
 			return err
 		}
 	}
-	for start := 0; start < values.Len(); start += opts.batch {
-		end := start + opts.batch
-		if end > values.Len() {
-			end = values.Len()
+	// Stream rows rather than keyset helpers: several tables have composite or
+	// string primary keys, which GORM FindInBatches cannot advance correctly.
+	cursor, err := source.Unscoped().Model(prototype).Rows()
+	if err != nil {
+		return err
+	}
+	defer cursor.Close()
+	sliceType := reflect.SliceOf(reflect.TypeOf(prototype))
+	batch := reflect.MakeSlice(sliceType, 0, opts.batch)
+	count := int64(0)
+	flush := func() error {
+		if batch.Len() == 0 {
+			return nil
 		}
-		batch := reflect.MakeSlice(sliceType, end-start, end-start)
-		reflect.Copy(batch, values.Slice(start, end))
 		if err := target.Create(batch.Interface()).Error; err != nil {
-			return fmt.Errorf("insert %s rows %d-%d: %w", stmt.Schema.Table, start, end, err)
+			return fmt.Errorf("insert %s after %d rows: %w", stmt.Schema.Table, count, err)
+		}
+		count += int64(batch.Len())
+		batch = reflect.MakeSlice(sliceType, 0, opts.batch)
+		return nil
+	}
+	for cursor.Next() {
+		row := reflect.New(reflect.TypeOf(prototype).Elem())
+		if err := source.ScanRows(cursor, row.Interface()); err != nil {
+			return err
+		}
+		batch = reflect.Append(batch, row)
+		if batch.Len() == opts.batch {
+			if err := flush(); err != nil {
+				return err
+			}
 		}
 	}
-	log.Printf("%s: %d rows", stmt.Schema.Table, values.Len())
+	if err := cursor.Err(); err != nil {
+		return err
+	}
+	if err := cursor.Close(); err != nil {
+		return err
+	}
+	if err := flush(); err != nil {
+		return err
+	}
+	var sourceCount, targetCount int64
+	if err := source.Unscoped().Model(prototype).Count(&sourceCount).Error; err != nil {
+		return err
+	}
+	if err := target.Unscoped().Model(prototype).Count(&targetCount).Error; err != nil {
+		return err
+	}
+	if sourceCount != count || targetCount != sourceCount {
+		return fmt.Errorf("row count mismatch in %s: source=%d copied=%d target=%d", stmt.Schema.Table, sourceCount, count, targetCount)
+	}
+	log.Printf("%s: %d rows", stmt.Schema.Table, count)
 	return nil
 }

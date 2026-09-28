@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"ninimenu/internal/auth"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
+	"ninimenu/internal/resourcebudget"
 	"ninimenu/internal/routes"
 	"ninimenu/internal/services"
 	"ninimenu/internal/storage"
@@ -31,6 +33,9 @@ func main() {
 	if err := database.Init(); err != nil {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}
+	if os.Getenv("DB_MIGRATE_ONLY") == "true" {
+		return
+	}
 	if err := services.AnnounceDeploymentWithNotes(config.C.AppVersion, config.C.ReleaseNotes); err != nil {
 		log.Printf("发布版本更新站内信失败: %v", err)
 	}
@@ -43,7 +48,11 @@ func main() {
 	}
 	routes.Setup(r)
 
+	requestCtx, cancelRequests := context.WithCancel(context.Background())
+	defer cancelRequests()
+	services.StartAchievementWorkers(requestCtx)
 	srv := &http.Server{
+		BaseContext:       func(net.Listener) context.Context { return requestCtx },
 		Addr:              ":" + config.C.Port,
 		Handler:           r,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -67,11 +76,16 @@ func main() {
 
 	<-ctx.Done()
 	log.Println("正在关闭服务…")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("优雅关闭超时: %v", err)
 	}
+	cancelRequests()
+	_ = srv.Close()
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer drainCancel()
+	_ = resourcebudget.Drain(drainCtx)
 	if sqlDB, err := database.DB.DB(); err == nil {
 		_ = sqlDB.Close()
 	}
@@ -90,13 +104,19 @@ func housekeeping(ctx context.Context) {
 	defer ticker.Stop()
 	run := func() {
 		now := time.Now()
-		services.PurgeExpiredCodes()
-		database.DB.Where("expires_at < ?", now.Add(-time.Hour)).Delete(&models.AssistantLease{})
-		database.DB.Where("usage_date < ?", now.AddDate(0, 0, -180).Format("2006-01-02")).Delete(&models.AssistantUsage{})
-		database.DB.Model(&models.AgentSuggestion{}).
+		services.PurgeExpiredCodes(database.DB.WithContext(ctx))
+		cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 30*time.Second)
+		if err := database.CleanupUploads(cleanupCtx, database.DB.WithContext(cleanupCtx)); err != nil {
+			log.Printf("[uploads] cleanup deferred: %v", err)
+		}
+		cleanupCancel()
+		database.DB.WithContext(ctx).Where("expires_at < ?", now).Delete(&models.RequestWindow{})
+		database.DB.WithContext(ctx).Where("expires_at < ?", now.Add(-time.Hour)).Delete(&models.AssistantLease{})
+		database.DB.WithContext(ctx).Where("usage_date < ?", now.AddDate(0, 0, -180).Format("2006-01-02")).Delete(&models.AssistantUsage{})
+		database.DB.WithContext(ctx).Model(&models.AgentSuggestion{}).
 			Where("status = ? AND expires_at IS NOT NULL AND expires_at < ?", "pending", now).
 			Update("status", "expired")
-		database.DB.Where("created_at < ?", now.AddDate(0, 0, -180)).Delete(&models.AgentAuditLog{})
+		database.DB.WithContext(ctx).Where("created_at < ?", now.AddDate(0, 0, -180)).Delete(&models.AgentAuditLog{})
 		// 每晚固定整点给清单里还有没买食材的用户发一条买菜提醒（当天已发过的会跳过）
 		if now.Hour() == services.ShoppingReminderHour() {
 			services.SendShoppingReminders(now)

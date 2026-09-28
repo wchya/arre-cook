@@ -1,0 +1,31 @@
+=== RUN   TestCRCloneBypassesQuota
+    cr_audit_test.go:29: normal creation blocked; clone succeeded; private recipe count=501
+--- PASS: TestCRCloneBypassesQuota (0.46s)
+=== RUN   TestCRSettingsAdmissionAndMenuAmplification
+    cr_audit_test.go:37: 2 MiB unknown field accepted; lunch count stored=10000; first day contains 59 recipes
+--- PASS: TestCRSettingsAdmissionAndMenuAmplification (0.22s)
+=== RUN   TestCRFailedSecurityUpdatesReportSuccess
+    cr_audit_test.go:49: password change and logout-all returned HTTP 200; password/version unchanged; original token still works
+--- PASS: TestCRFailedSecurityUpdatesReportSuccess (0.78s)
+=== RUN   TestCRMenuCacheSurvivesDishEdit
+    cr_audit_test.go:61: dish update returned HTTP 200, cached menu still contains old name and ingredients
+--- PASS: TestCRMenuCacheSurvivesDishEdit (0.01s)
+=== RUN   TestCRShoppingFailureLeavesMealCommitted
+    cr_audit_test.go:75: CreateMealRecord returned nil error, meal committed, shopping row absent
+--- PASS: TestCRShoppingFailureLeavesMealCommitted (0.01s)
+=== RUN   TestCRCanceledRequestStillReadsDatabase
+    cr_audit_test.go:83: request context canceled before entering router; database-backed UserAuth still completed and returned HTTP 200
+--- PASS: TestCRCanceledRequestStillReadsDatabase (0.00s)
+=== RUN   TestCRTransferFamilyCanRaceWithLeave
+    cr_audit_test.go:101: member left between transfer validation and UPDATE; transfer succeeded; neither original nor new owner can manage the family
+--- PASS: TestCRTransferFamilyCanRaceWithLeave (0.01s)
+=== RUN   TestCRPasswordWriteCanRestoreRevokedGeneration
+    cr_audit_test.go:121: delayed password write rolled token version 3 back to 2; token rejected before write was accepted afterwards
+--- PASS: TestCRPasswordWriteCanRestoreRevokedGeneration (0.71s)
+=== RUN   TestCRSuggestionAcceptSwallowsMealFailure
+    cr_audit_test.go:133: suggestion marked accepted and returned nil error even though all meal writes failed
+--- PASS: TestCRSuggestionAcceptSwallowsMealFailure (0.01s)
+PASS
+ok  	ninimenu/internal/routes	7.975s
+PASS: tab A displays user 1; after real storage event its mutation uses user 2 token
+PASS: ordinary browser URL fragment replaces existing user 1 session with supplied user 2 token

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"gorm.io/gorm"
 	"math"
 	"math/rand"
 	"ninimenu/internal/config"
@@ -19,7 +20,9 @@ type TomorrowPickOptions struct {
 }
 
 // PickTomorrowDishes 明日菜单：按偏好档位（快手/清淡/辣/收藏/均衡）过滤排序，用户的过敏原/忌口始终生效。
-func PickTomorrowDishes(uid uint, opts TomorrowPickOptions) ([]models.Dish, error) {
+func PickTomorrowDishes(uid uint, opts TomorrowPickOptions, dbs ...*gorm.DB) ([]models.Dish, error) {
+	requestDB := database.Handle(dbs...)
+
 	count := opts.Count
 	if count < 1 {
 		count = 1
@@ -39,13 +42,13 @@ func PickTomorrowDishes(uid uint, opts TomorrowPickOptions) ([]models.Dish, erro
 	}
 
 	var all []models.Dish
-	query := database.DB.Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true)
+	query := requestDB.Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true)
 	if mealType != "" {
 		query = query.Where("meal_type IN ?", []string{mealType, "all", ""})
 	}
 	query.Find(&all)
 
-	prefs := GetPreferences(uid)
+	prefs := GetPreferences(uid, requestDB)
 	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
 	dishes := make([]models.Dish, 0, len(all))
 	for _, d := range all {
@@ -56,7 +59,7 @@ func PickTomorrowDishes(uid uint, opts TomorrowPickOptions) ([]models.Dish, erro
 	if len(dishes) == 0 {
 		return nil, nil
 	}
-	MarkFavorites(uid, dishes)
+	MarkFavorites(uid, dishes, requestDB)
 
 	excluded := make(map[uint]bool, len(opts.ExcludeIDs))
 	for _, id := range opts.ExcludeIDs {
@@ -65,7 +68,7 @@ func PickTomorrowDishes(uid uint, opts TomorrowPickOptions) ([]models.Dish, erro
 		}
 	}
 
-	recent := recentDishIDMap(uid, UserRepeatDays(uid))
+	recent := recentDishIDMap(uid, UserRepeatDays(uid, requestDB), requestDB)
 	pool := filterTomorrowPool(dishes, profile, excluded, recent, true)
 	if len(pool) == 0 {
 		pool = filterTomorrowPool(dishes, profile, excluded, recent, false)
@@ -195,13 +198,15 @@ func tomorrowDishScore(d models.Dish, profile string) int {
 	return score
 }
 
-func recentDishIDMap(uid uint, days int) map[uint]bool {
+func recentDishIDMap(uid uint, days int, dbs ...*gorm.DB) map[uint]bool {
+	requestDB := database.Handle(dbs...)
+
 	if days <= 0 {
 		return map[uint]bool{}
 	}
 	since := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
 	var recentIDs []uint
-	database.DB.Model(&models.MealRecord{}).Scopes(database.OwnedBy(uid)).
+	requestDB.Model(&models.MealRecord{}).Scopes(database.OwnedBy(uid)).
 		Where("meal_date >= ?", since).
 		Pluck("dish_id", &recentIDs)
 
@@ -237,16 +242,18 @@ func maxInt(a, b int) int {
 	return b
 }
 
-func GetRandomQuote(scene string) string {
+func GetRandomQuote(scene string, dbs ...*gorm.DB) string {
+	requestDB := database.Handle(dbs...)
+
 	var quotes []models.Quote
-	query := database.DB.Where("enabled = ?", true)
+	query := requestDB.Where("enabled = ?", true)
 	if scene != "" {
 		query = query.Where("scene = ?", scene)
 	}
 	query.Find(&quotes)
 
 	if len(quotes) == 0 {
-		database.DB.Where("enabled = ?", true).Find(&quotes)
+		requestDB.Where("enabled = ?", true).Find(&quotes)
 	}
 
 	if len(quotes) == 0 {

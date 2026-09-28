@@ -48,18 +48,21 @@ func HashPassword(pw string) (string, error) {
 }
 
 func VerifyPassword(encoded, pw string) bool {
+	if len(pw) > 128 {
+		return false
+	}
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 4 || parts[0] != hashPrefix {
 		return false
 	}
 	iter, err := strconv.Atoi(parts[1])
-	if err != nil || iter < 1 {
+	if err != nil || iter < 1 || iter > 1_000_000 {
 		return false
 	}
 	enc := base64.RawStdEncoding
 	salt, err1 := enc.DecodeString(parts[2])
 	want, err2 := enc.DecodeString(parts[3])
-	if err1 != nil || err2 != nil {
+	if err1 != nil || err2 != nil || len(salt) != pbkdf2SaltLen || len(want) != pbkdf2KeyLen {
 		return false
 	}
 	got, err := pbkdf2.Key(sha512.New, pw, salt, iter, len(want))

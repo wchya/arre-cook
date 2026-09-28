@@ -22,10 +22,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoggedIn: false,
   user: null,
 
-  // 启动：先吃掉小程序带来的令牌，再用令牌换当前用户
+  // 启动：清除旧桥接片段，用当前标签页会话读取用户
   bootstrap: async () => {
-    const fromURL = consumeTokenFromURL()
-    if (fromURL) setToken(fromURL)
+    consumeTokenFromURL()
     const startedWith = getToken()
     if (!startedWith) {
       set({ status: "anonymous", isLoggedIn: false, user: null })
@@ -55,7 +54,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ status: "authenticated", isLoggedIn: true, user })
   },
 
-  setUser: (user) => set({ user }),
+  setUser: (user) => set((state) => state.user?.id === user.id ? { user } : {}),
 
   refresh: async () => {
     const startedWith = getToken()
@@ -84,6 +83,11 @@ export const useIsAdmin = () => useAuthStore((s) => s.user?.role === "admin")
 export const useIsLoggedIn = () => useAuthStore((s) => s.isLoggedIn)
 
 if (typeof window !== "undefined") {
+  window.addEventListener("auth-storage-change", () => {
+    // Clear identity synchronously before any bootstrap request can complete.
+    useAuthStore.setState({ status: "unknown", isLoggedIn: false, user: null })
+    void useAuthStore.getState().bootstrap()
+  })
   window.addEventListener("auth-expired", () => {
     if (useAuthStore.getState().status === "authenticated") {
       void useAuthStore.getState().logout({ expired: true })

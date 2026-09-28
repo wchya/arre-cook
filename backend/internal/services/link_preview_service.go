@@ -67,11 +67,15 @@ func FetchLinkPreviewContext(ctx context.Context, raw string) (*LinkPreview, err
 }
 
 // BuildVideoMeta 供保存菜谱时填充 video_meta（JSON）；空链接返回空串。
-func BuildVideoMeta(rawURL string) string {
+func BuildVideoMeta(rawURL string, contexts ...context.Context) string {
 	if strings.TrimSpace(rawURL) == "" {
 		return ""
 	}
-	preview, err := FetchLinkPreview(rawURL)
+	ctx := context.Background()
+	if len(contexts) > 0 && contexts[0] != nil {
+		ctx = contexts[0]
+	}
+	preview, err := FetchLinkPreviewContext(ctx, rawURL)
 	if err != nil || preview == nil {
 		return ""
 	}

@@ -1,0 +1,19 @@
+2026/09/28 14:36:02 已创建初始管理员账号：admin（密码取自 ADMIN_PASSWORD，请登录后尽快修改）
+2026/09/28 14:36:02 多用户迁移完成：历史数据已归属到管理员账号 #1
+=== RUN   TestAuditMySQL
+=== RUN   TestAuditMySQL/quota_with_preexisting_repeatable_read_snapshot
+=== RUN   TestAuditMySQL/tombstone_overrides_old_snapshot
+=== RUN   TestAuditMySQL/transfer_and_leave_preserve_an_owner
+=== RUN   TestAuditMySQL/shared_windows_and_deployment_idempotency
+2026/09/28 14:36:03 已发布版本更新站内信：mysql-one-version（22 位用户）
+=== RUN   TestAuditMySQL/canceled_query_releases_client_pool
+=== RUN   TestAuditMySQL/identical_setting_upserts
+--- PASS: TestAuditMySQL (0.48s)
+    --- PASS: TestAuditMySQL/quota_with_preexisting_repeatable_read_snapshot (0.05s)
+    --- PASS: TestAuditMySQL/tombstone_overrides_old_snapshot (0.02s)
+    --- PASS: TestAuditMySQL/transfer_and_leave_preserve_an_owner (0.05s)
+    --- PASS: TestAuditMySQL/shared_windows_and_deployment_idempotency (0.01s)
+    --- PASS: TestAuditMySQL/canceled_query_releases_client_pool (0.10s)
+    --- PASS: TestAuditMySQL/identical_setting_upserts (0.00s)
+PASS
+ok  	ninimenu/internal/services	5.658s

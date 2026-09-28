@@ -181,7 +181,7 @@
   </view>
 </sheet>
 
-<sheet show="{{repeatOpen}}" title="推荐去重天数" subtitle="这几天内吃过的菜，推荐时会先避开" bind:close="closeRepeat">
+<sheet show="{{repeatOpen}}" title="推荐去重天数" subtitle="这几天内吃过的菜，推荐时会先避开" solid="{{true}}" bind:closed="onRepeatClosed" bind:close="closeRepeat">
   <view class="sheet-body">
     <view class="grid-4">
       <view wx:for="{{repeatOptions}}" wx:key="*this" class="repeat {{(item === '0' && !repeatDays) || repeatDays === item ? 'is-active' : ''}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseRepeat">{{item === '0' ? '默认' : item + ' 天'}}</view>

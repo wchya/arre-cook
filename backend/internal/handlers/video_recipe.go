@@ -27,7 +27,7 @@ func GetVideoRecipeStatus(c *gin.Context) {
 		utils.InternalError(c, "暂时无法读取提炼次数，请稍后重试")
 		return
 	}
-	utils.Success(c, gin.H{"enabled": llm.Resolve().Enabled(), "asr_enabled": services.VideoASRSettings().Enabled(), "max_duration_seconds": video.MaxDuration, "max_transcript_chars": video.MaxTranscriptRunes, "quota": quota})
+	utils.Success(c, gin.H{"enabled": llm.Resolve(database.DB.WithContext(c.Request.Context())).Enabled(), "asr_enabled": services.VideoASRSettings().Enabled(), "max_duration_seconds": video.MaxDuration, "max_transcript_chars": video.MaxTranscriptRunes, "quota": quota})
 }
 
 func ExtractVideoRecipe(c *gin.Context) {
@@ -56,14 +56,14 @@ func ExtractVideoRecipe(c *gin.Context) {
 			return
 		}
 	}
-	settings := llm.Resolve()
+	settings := llm.Resolve(database.DB.WithContext(c.Request.Context()))
 	if !settings.Enabled() {
 		utils.Error(c, http.StatusServiceUnavailable, 50300, "视频提炼尚未启用，请先在管理后台配置 AI 模型")
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), services.AssistantRequestTimeout)
 	defer cancel()
-	db := database.DB.WithContext(ctx)
+	db := database.DB.WithContext(c.Request.Context()).WithContext(ctx)
 	quota, err := services.GetAssistantQuota(db, uid(c), time.Now())
 	if err != nil {
 		utils.InternalError(c, "暂时无法读取提炼次数，请稍后重试")

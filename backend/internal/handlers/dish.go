@@ -19,7 +19,7 @@ import (
 // 菜品可见性：公共菜谱、本人私房菜，以及当前家庭明确共享的菜谱。
 
 func dishScope(c *gin.Context) *gorm.DB {
-	q := database.DB.Model(&models.Dish{})
+	q := database.DB.WithContext(c.Request.Context()).Model(&models.Dish{})
 	if c.Query("scope") == "mine" {
 		return q.Scopes(database.AuthoredDishes(uid(c)))
 	}
@@ -30,7 +30,7 @@ func dishScope(c *gin.Context) *gorm.DB {
 	case "public":
 		q = q.Where("owner_id = 0 AND family_id = 0")
 	case "family":
-		family, err := services.FamilyForUser(uid(c))
+		family, err := services.FamilyForUser(uid(c), database.DB.WithContext(c.Request.Context()))
 		if err != nil || family == nil {
 			q = q.Where("1 = 0")
 		} else {
@@ -42,7 +42,7 @@ func dishScope(c *gin.Context) *gorm.DB {
 
 func canEditDish(c *gin.Context, d *models.Dish) bool {
 	if d.FamilyID != 0 {
-		family, err := services.FamilyForUser(uid(c))
+		family, err := services.FamilyForUser(uid(c), database.DB.WithContext(c.Request.Context()))
 		return err == nil && family != nil && family.ID == d.FamilyID &&
 			(d.OwnerID == uid(c) || family.OwnerID == uid(c))
 	}
@@ -54,7 +54,7 @@ func canEditDish(c *gin.Context, d *models.Dish) bool {
 
 func findEditableDish(c *gin.Context) (*models.Dish, bool) {
 	var dish models.Dish
-	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).Where("id = ?", c.Param("id")).First(&dish).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.VisibleDishes(uid(c))).Where("id = ?", c.Param("id")).First(&dish).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.NotFound(c, "菜品不存在")
 		} else {
@@ -93,7 +93,7 @@ func GetDishes(c *gin.Context) {
 		query = query.Where("difficulty = ?", difficulty)
 	}
 	if queryBool(c.Query("favorite")) {
-		query = query.Where("id IN (?)", database.DB.Model(&models.Favorite{}).Select("dish_id").Where("user_id = ?", uid(c)))
+		query = query.Where("id IN (?)", database.DB.WithContext(c.Request.Context()).Model(&models.Favorite{}).Select("dish_id").Where("user_id = ?", uid(c)))
 	}
 
 	sort := c.DefaultQuery("sort", "created_at")
@@ -118,26 +118,35 @@ func GetDishes(c *gin.Context) {
 
 	var dishes []models.Dish
 	if isRandom {
-		if err := query.Find(&dishes).Error; err != nil {
-			utils.InternalError(c, "菜谱加载失败，请稍后重试")
+		var ids []uint
+		if err := query.Pluck("id", &ids).Error; err != nil {
+			utils.InternalError(c, "菜谱加载失败")
 			return
 		}
-		rand.Shuffle(len(dishes), func(i, j int) { dishes[i], dishes[j] = dishes[j], dishes[i] })
-		if len(dishes) > pageSize {
-			dishes = dishes[:pageSize]
+		rand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
+		if len(ids) > pageSize {
+			ids = ids[:pageSize]
 		}
+		if len(ids) > 0 {
+			if err := database.DB.WithContext(c.Request.Context()).Scopes(database.VisibleDishes(uid(c))).Where("id IN ?", ids).Find(&dishes).Error; err != nil {
+				utils.InternalError(c, "菜谱加载失败")
+				return
+			}
+			rand.Shuffle(len(dishes), func(i, j int) { dishes[i], dishes[j] = dishes[j], dishes[i] })
+		}
+
 	} else {
 		if err := query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&dishes).Error; err != nil {
 			utils.InternalError(c, "菜谱加载失败，请稍后重试")
 			return
 		}
 	}
-	services.MarkFavorites(uid(c), dishes)
+	services.MarkFavorites(uid(c), dishes, database.DB.WithContext(c.Request.Context()))
 	utils.SuccessPaginated(c, dishes, total, page, pageSize)
 }
 
 func GetDish(c *gin.Context) {
-	dish, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	dish, err := services.FindVisibleDish(uid(c), c.Param("id"), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.NotFound(c, "菜品不存在")
@@ -146,8 +155,8 @@ func GetDish(c *gin.Context) {
 		}
 		return
 	}
-	services.MarkFavorite(uid(c), &dish)
-	access := services.DishAccessFor(uid(c), isAdmin(c), &dish)
+	services.MarkFavorite(uid(c), &dish, database.DB.WithContext(c.Request.Context()))
+	access := services.DishAccessFor(uid(c), isAdmin(c), &dish, database.DB.WithContext(c.Request.Context()))
 	dish.Access = &access
 	utils.Success(c, dish)
 }
@@ -225,7 +234,7 @@ func CreateDish(c *gin.Context) {
 	if req.Public && isAdmin(c) {
 		dish.OwnerID = 0
 	} else if req.Family {
-		family, err := services.RequireFamily(uid(c))
+		family, err := services.RequireFamily(uid(c), database.DB.WithContext(c.Request.Context()))
 		if err != nil {
 			utils.BadRequest(c, "请先创建或加入家庭")
 			return
@@ -233,23 +242,13 @@ func CreateDish(c *gin.Context) {
 		dish.FamilyID = family.ID
 	}
 	req.apply(&dish)
-	if dish.OwnerID != 0 {
-		var n int64
-		q := database.DB.Model(&models.Dish{})
-		if dish.FamilyID != 0 {
-			q = q.Where("family_id = ?", dish.FamilyID)
+	dish.VideoMeta = services.BuildVideoMeta(dish.VideoURL, c.Request.Context())
+	if err := services.InsertDish(database.DB.WithContext(c.Request.Context()), &dish); err != nil {
+		if errors.Is(err, services.ErrDishQuota) {
+			utils.BadRequest(c, err.Error())
 		} else {
-			q = q.Where("owner_id = ? AND family_id = 0", dish.OwnerID)
+			utils.InternalError(c, "创建菜品失败")
 		}
-		q.Count(&n)
-		if n >= 500 {
-			utils.BadRequest(c, "菜谱已达 500 道上限")
-			return
-		}
-	}
-	dish.VideoMeta = services.BuildVideoMeta(dish.VideoURL)
-	if err := database.DB.Create(&dish).Error; err != nil {
-		utils.InternalError(c, "创建菜品失败")
 		return
 	}
 	services.QueueAutoAchievementSync(uid(c))
@@ -273,34 +272,34 @@ func UpdateDish(c *gin.Context) {
 	oldVideoURL := dish.VideoURL
 	req.apply(dish)
 	if dish.VideoURL != oldVideoURL {
-		dish.VideoMeta = services.BuildVideoMeta(dish.VideoURL)
+		dish.VideoMeta = services.BuildVideoMeta(dish.VideoURL, c.Request.Context())
 	}
-	if err := database.DB.Save(dish).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Save(dish).Error; err != nil {
 		utils.InternalError(c, "更新菜品失败")
 		return
 	}
 	services.QueueAutoAchievementSync(uid(c))
-	services.MarkFavorite(uid(c), dish)
+	services.MarkFavorite(uid(c), dish, database.DB.WithContext(c.Request.Context()))
 	utils.Success(c, dish)
 }
 
 func DeleteDish(c *gin.Context) {
 	var dish models.Dish
-	if err := database.DB.Scopes(database.VisibleDishes(uid(c))).Where("id = ?", c.Param("id")).First(&dish).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.VisibleDishes(uid(c))).Where("id = ?", c.Param("id")).First(&dish).Error; err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
-	access := services.DishAccessFor(uid(c), isAdmin(c), &dish)
+	access := services.DishAccessFor(uid(c), isAdmin(c), &dish, database.DB.WithContext(c.Request.Context()))
 	switch access.DeleteMode {
 	case services.DeleteModeDirect:
-		if err := services.DeleteDishCascade(&dish, uid(c)); err != nil {
+		if err := services.DeleteDishCascade(&dish, uid(c), database.DB.WithContext(c.Request.Context())); err != nil {
 			utils.InternalError(c, "删除菜品失败")
 			return
 		}
 		services.QueueAutoAchievementSync(uid(c))
 		utils.Success(c, gin.H{"deleted": true, "pending": false})
 	case services.DeleteModeRequest:
-		view, err := services.RequestDishDeletion(uid(c), &dish)
+		view, err := services.RequestDishDeletion(uid(c), &dish, database.DB.WithContext(c.Request.Context()))
 		if err != nil {
 			utils.BadRequest(c, err.Error())
 			return
@@ -317,14 +316,17 @@ func ToggleDish(c *gin.Context) {
 		return
 	}
 	dish.Enabled = !dish.Enabled
-	database.DB.Model(dish).Update("enabled", dish.Enabled)
+	if err := database.DB.WithContext(c.Request.Context()).Model(dish).Update("enabled", dish.Enabled).Error; err != nil {
+		utils.InternalError(c, "更新失败")
+		return
+	}
 	services.QueueAutoAchievementSync(uid(c))
 	utils.Success(c, dish)
 }
 
 // CloneDish 复制一道菜：普通用户得到一份可自由修改的私房菜；管理员可带 ?public=1 复制为公共菜谱。
 func CloneDish(c *gin.Context) {
-	src, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	src, err := services.FindVisibleDish(uid(c), c.Param("id"), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
@@ -341,8 +343,12 @@ func CloneDish(c *gin.Context) {
 	} else if src.OwnerID == uid(c) {
 		newDish.Name = src.Name + " (副本)"
 	}
-	if err := database.DB.Create(&newDish).Error; err != nil {
-		utils.InternalError(c, "复制菜品失败")
+	if err := services.InsertDish(database.DB.WithContext(c.Request.Context()), &newDish); err != nil {
+		if errors.Is(err, services.ErrDishQuota) {
+			utils.BadRequest(c, err.Error())
+		} else {
+			utils.InternalError(c, "复制菜品失败")
+		}
 		return
 	}
 	services.QueueAutoAchievementSync(uid(c))
@@ -373,7 +379,7 @@ func GetDishCategoryCounts(c *gin.Context) {
 	for _, category := range counts {
 		total += category.Count
 	}
-	if err := database.DB.Model(&models.Dish{}).Scopes(database.AuthoredDishes(uid(c))).Count(&mine).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Scopes(database.AuthoredDishes(uid(c))).Count(&mine).Error; err != nil {
 		utils.InternalError(c, "分类统计加载失败")
 		return
 	}
@@ -383,8 +389,8 @@ func GetDishCategoryCounts(c *gin.Context) {
 
 // editableIDs 批量操作只作用于调用者有权编辑的菜品。
 func editableIDs(c *gin.Context, ids []uint) []uint {
-	q := database.DB.Model(&models.Dish{}).Where("id IN ?", ids)
-	family, err := services.FamilyForUser(uid(c))
+	q := database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Where("id IN ?", ids)
+	family, err := services.FamilyForUser(uid(c), database.DB.WithContext(c.Request.Context()))
 	familyClause := "1 = 0"
 	args := []any{}
 	if err == nil && family != nil {
@@ -413,12 +419,12 @@ type BatchToggleRequest struct {
 
 func BatchToggleDishes(c *gin.Context) {
 	var req BatchToggleRequest
-	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 || len(req.IDs) > 500 {
 		utils.BadRequest(c, "请选择菜品")
 		return
 	}
 	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
-		database.DB.Model(&models.Dish{}).Where("id IN ?", ids).Update("enabled", req.Enabled)
+		database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Where("id IN ?", ids).Update("enabled", req.Enabled)
 	}
 	utils.SuccessMsg(c, "批量操作成功")
 }
@@ -429,21 +435,21 @@ type BatchDeleteRequest struct {
 
 func BatchDeleteDishes(c *gin.Context) {
 	var req BatchDeleteRequest
-	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 || len(req.IDs) > 500 {
 		utils.BadRequest(c, "请选择菜品")
 		return
 	}
 	var dishes []models.Dish
-	database.DB.Scopes(database.VisibleDishes(uid(c))).Where("id IN ?", req.IDs).Find(&dishes)
+	database.DB.WithContext(c.Request.Context()).Scopes(database.VisibleDishes(uid(c))).Where("id IN ?", req.IDs).Find(&dishes)
 	deleted, requested := 0, 0
 	for i := range dishes {
-		switch services.DishAccessFor(uid(c), isAdmin(c), &dishes[i]).DeleteMode {
+		switch services.DishAccessFor(uid(c), isAdmin(c), &dishes[i], database.DB.WithContext(c.Request.Context())).DeleteMode {
 		case services.DeleteModeDirect:
-			if err := services.DeleteDishCascade(&dishes[i], uid(c)); err == nil {
+			if err := services.DeleteDishCascade(&dishes[i], uid(c), database.DB.WithContext(c.Request.Context())); err == nil {
 				deleted++
 			}
 		case services.DeleteModeRequest:
-			if _, err := services.RequestDishDeletion(uid(c), &dishes[i]); err == nil {
+			if _, err := services.RequestDishDeletion(uid(c), &dishes[i], database.DB.WithContext(c.Request.Context())); err == nil {
 				requested++
 			}
 		}
@@ -461,12 +467,12 @@ type BatchCategoryRequest struct {
 
 func BatchUpdateCategory(c *gin.Context) {
 	var req BatchCategoryRequest
-	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 || len(req.IDs) > 500 {
 		utils.BadRequest(c, "请选择菜品并指定分类")
 		return
 	}
 	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
-		database.DB.Model(&models.Dish{}).Where("id IN ?", ids).Update("category", req.Category)
+		database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Where("id IN ?", ids).Update("category", req.Category)
 	}
 	utils.SuccessMsg(c, "批量修改分类成功")
 }
@@ -504,7 +510,7 @@ type DishRecordsResponse struct {
 
 // GetDishRecords 当前用户吃这道菜的历史。
 func GetDishRecords(c *gin.Context) {
-	dish, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	dish, err := services.FindVisibleDish(uid(c), c.Param("id"), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
@@ -512,7 +518,7 @@ func GetDishRecords(c *gin.Context) {
 	own := database.OwnedBy(uid(c))
 
 	var records []models.MealRecord
-	database.DB.Scopes(own).Where("dish_id = ?", dish.ID).Order("meal_date DESC, created_at DESC").Find(&records)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Where("dish_id = ?", dish.ID).Order("meal_date DESC, created_at DESC").Find(&records)
 	if len(records) == 0 {
 		utils.Success(c, DishRecordsResponse{Records: []DishRecordWithDay{}, Stats: DishRecordsStats{}})
 		return
@@ -524,7 +530,7 @@ func GetDishRecords(c *gin.Context) {
 	}
 	dayRatingMap := make(map[string]models.DayRating)
 	var dayRatings []models.DayRating
-	database.DB.Scopes(own).Where("meal_date IN ?", dates).Find(&dayRatings)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Where("meal_date IN ?", dates).Find(&dayRatings)
 	for _, dr := range dayRatings {
 		dayRatingMap[dr.MealDate] = dr
 	}

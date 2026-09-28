@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"ninimenu/internal/config"
@@ -43,14 +44,16 @@ func (s Settings) StructuredReasoningEffort() string {
 }
 
 // Resolve 优先读取 CPA 配置；未挂载 CPA 配置时再使用管理后台或环境变量。
-func Resolve() Settings {
+func Resolve(dbs ...*gorm.DB) Settings {
+	requestDB := database.Handle(dbs...)
+
 	if settings, ok := resolveCPA(); ok {
 		return settings
 	}
 	return Settings{
-		BaseURL: strings.TrimRight(database.GetSetting("llm_base_url", config.C.LLMBaseURL), "/"),
-		APIKey:  database.GetSetting("llm_api_key", config.C.LLMAPIKey),
-		Model:   database.GetSetting("llm_model", config.C.LLMModel),
+		BaseURL: strings.TrimRight(database.GetSetting("llm_base_url", config.C.LLMBaseURL, requestDB), "/"),
+		APIKey:  database.GetSetting("llm_api_key", config.C.LLMAPIKey, requestDB),
+		Model:   database.GetSetting("llm_model", config.C.LLMModel, requestDB),
 	}
 }
 

@@ -122,7 +122,7 @@ func OwnedBy(key string, uid uint) bool {
 	return strings.HasPrefix(rel, fmt.Sprintf("u/%d/", uid))
 }
 
-// Delete 删除上传文件：本地存在就删本地，否则删对象存储。
+// Delete removes both copies when an object exists locally and in S3.
 func Delete(ctx context.Context, key string) error {
 	local := filepath.Join(config.C.UploadDir, filepath.FromSlash(key))
 	if root, err := filepath.Abs(config.C.UploadDir); err == nil {
@@ -132,8 +132,8 @@ func Delete(ctx context.Context, key string) error {
 			}
 		}
 	}
-	if _, err := os.Stat(local); err == nil {
-		return os.Remove(local)
+	if err := os.Remove(local); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	if c := s3Client(); c != nil {
 		return c.Delete(ctx, key)
@@ -142,6 +142,8 @@ func Delete(ctx context.Context, key string) error {
 }
 
 // ServeUploads GET /uploads/*：先找本地文件（种子图片、历史上传），找不到再回源对象存储。
+var originSlots = make(chan struct{}, 8)
+
 func ServeUploads(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, "/uploads/")
 	clean := strings.TrimLeft(path.Clean("/"+key), "/")
@@ -161,6 +163,14 @@ func ServeUploads(w http.ResponseWriter, r *http.Request) {
 	c := s3Client()
 	if c == nil {
 		http.NotFound(w, r)
+		return
+	}
+	select {
+	case originSlots <- struct{}{}:
+		defer func() { <-originSlots }()
+	default:
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, "image service busy", http.StatusTooManyRequests)
 		return
 	}
 	extra := http.Header{}

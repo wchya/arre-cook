@@ -1,0 +1,5 @@
+concurrent migration exits: [0, 0]
+users / dishes / ledger marker:
+1
+100
+done

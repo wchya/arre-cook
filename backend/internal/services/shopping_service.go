@@ -18,15 +18,15 @@ import (
 // 自动展开的条目（FamilyShoppingCheck）加上成员手动添加的条目（FamilyShoppingItem）。两份分开展示、分开勾选。
 
 const (
-	shoppingReminderKey   = "shopping_reminder"    // 用户设置：买菜提醒开关，"0" 关闭
-	shoppingRemindedKey   = "shopping_reminded_on" // 用户设置：最近一次每晚提醒的日期
-	shoppingPushCountKey  = "shopping_push_count"  // 用户设置：当天智能体推送次数，形如 2026-09-26:3
-	shoppingPushDailyMax  = 10
-	shoppingCoalesceTTL   = 2 * time.Hour
-	shoppingPreviewNames  = 6
-	personalShoppingLink  = "/plan?tab=shopping"
-	familyShoppingLink    = "/plan?tab=family-shopping"
-	defaultReminderHour   = 20
+	shoppingReminderKey  = "shopping_reminder"    // 用户设置：买菜提醒开关，"0" 关闭
+	shoppingRemindedKey  = "shopping_reminded_on" // 用户设置：最近一次每晚提醒的日期
+	shoppingPushCountKey = "shopping_push_count"  // 用户设置：当天智能体推送次数，形如 2026-09-26:3
+	shoppingPushDailyMax = 10
+	shoppingCoalesceTTL  = 2 * time.Hour
+	shoppingPreviewNames = 6
+	personalShoppingLink = "/plan?tab=shopping"
+	familyShoppingLink   = "/plan?tab=family-shopping"
+	defaultReminderHour  = 20
 )
 
 type ShoppingMeal struct {
@@ -63,43 +63,51 @@ func ShoppingDates() []string {
 	return []string{now.Format("2006-01-02"), now.AddDate(0, 0, 1).Format("2006-01-02")}
 }
 
-func ShoppingReminderEnabled(uid uint) bool {
-	return database.GetUserSetting(uid, shoppingReminderKey, "1") != "0"
+func ShoppingReminderEnabled(uid uint, dbs ...*gorm.DB) bool {
+	requestDB := database.Handle(dbs...)
+
+	return database.GetUserSetting(uid, shoppingReminderKey, "1", requestDB) != "0"
 }
 
 // ShoppingReminderHour 每晚提醒的整点（服务器本地时区），站点设置 shopping_reminder_hour 可改，默认 20 点。
-func ShoppingReminderHour() int {
-	if h, err := strconv.Atoi(database.GetSetting("shopping_reminder_hour", "")); err == nil && h >= 0 && h <= 23 {
+func ShoppingReminderHour(dbs ...*gorm.DB) int {
+	requestDB := database.Handle(dbs...)
+
+	if h, err := strconv.Atoi(database.GetSetting("shopping_reminder_hour", "", requestDB)); err == nil && h >= 0 && h <= 23 {
 		return h
 	}
 	return defaultReminderHour
 }
 
 // ShoppingOverview 个人与家庭两份买菜清单（今明两天），并附各自来自哪几餐。
-func ShoppingOverview(uid uint) ShoppingOverviewView {
+func ShoppingOverview(uid uint, dbs ...*gorm.DB) ShoppingOverviewView {
+	requestDB := database.Handle(dbs...)
+
 	dates := ShoppingDates()
 	view := ShoppingOverviewView{
 		Dates:           dates,
-		Personal:        PersonalShoppingView{Meals: personalShoppingMeals(uid, dates), Categories: BuildShoppingList(uid, dates)},
-		ReminderEnabled: ShoppingReminderEnabled(uid),
+		Personal:        PersonalShoppingView{Meals: personalShoppingMeals(uid, dates, requestDB), Categories: BuildShoppingList(uid, dates, requestDB)},
+		ReminderEnabled: ShoppingReminderEnabled(uid, requestDB),
 	}
-	if family, err := FamilyForUser(uid); err == nil && family != nil {
+	if family, err := FamilyForUser(uid, requestDB); err == nil && family != nil {
 		manual := []models.FamilyShoppingItem{}
-		database.DB.Where("family_id = ?", family.ID).Order("checked ASC, created_at DESC").Find(&manual)
+		requestDB.Where("family_id = ?", family.ID).Order("checked ASC, created_at DESC").Find(&manual)
 		view.Family = &FamilyShoppingView{
 			FamilyID:   family.ID,
 			FamilyName: family.Name,
-			Meals:      familyShoppingMeals(family.ID, dates),
-			Categories: BuildFamilyShoppingList(family.ID, dates),
+			Meals:      familyShoppingMeals(family.ID, dates, requestDB),
+			Categories: BuildFamilyShoppingList(family.ID, dates, requestDB),
 			Manual:     manual,
 		}
 	}
 	return view
 }
 
-func personalShoppingMeals(uid uint, dates []string) []ShoppingMeal {
+func personalShoppingMeals(uid uint, dates []string, dbs ...*gorm.DB) []ShoppingMeal {
+	requestDB := database.Handle(dbs...)
+
 	meals := []ShoppingMeal{}
-	database.DB.Model(&models.ShoppingCheck{}).Scopes(database.OwnedBy(uid)).
+	requestDB.Model(&models.ShoppingCheck{}).Scopes(database.OwnedBy(uid)).
 		Select("meal_date, meal_type, dish_id, dish_name").
 		Where("meal_date IN ?", dates).
 		Group("meal_date, meal_type, dish_id, dish_name").
@@ -108,10 +116,12 @@ func personalShoppingMeals(uid uint, dates []string) []ShoppingMeal {
 	return meals
 }
 
-func familyShoppingMeals(familyID uint, dates []string) []ShoppingMeal {
+func familyShoppingMeals(familyID uint, dates []string, dbs ...*gorm.DB) []ShoppingMeal {
+	requestDB := database.Handle(dbs...)
+
 	meals := []ShoppingMeal{}
 	var items []models.FamilyPlanItem
-	database.DB.Where("family_id = ? AND meal_date IN ?", familyID, dates).Find(&items)
+	requestDB.Where("family_id = ? AND meal_date IN ?", familyID, dates).Find(&items)
 	if len(items) == 0 {
 		return meals
 	}
@@ -122,12 +132,12 @@ func familyShoppingMeals(familyID uint, dates []string) []ShoppingMeal {
 		userIDs = append(userIDs, it.AddedBy)
 	}
 	var dishes []models.Dish
-	database.DB.Select("id", "name").Where("id IN ?", dishIDs).Find(&dishes)
+	requestDB.Select("id", "name").Where("id IN ?", dishIDs).Find(&dishes)
 	dishNames := make(map[uint]string, len(dishes))
 	for _, d := range dishes {
 		dishNames[d.ID] = d.Name
 	}
-	users := userDisplayNames(userIDs)
+	users := userDisplayNames(userIDs, requestDB)
 	for _, it := range items {
 		if name, ok := dishNames[it.DishID]; ok {
 			meals = append(meals, ShoppingMeal{MealDate: it.MealDate, MealType: it.MealType, DishID: it.DishID, DishName: name, AddedByName: users[it.AddedBy]})
@@ -157,22 +167,26 @@ func sortShoppingMeals(meals []ShoppingMeal) {
 }
 
 // BuildFamilyShoppingList 家庭菜单自动生成的清单（按分类合并同名食材）；家庭清单不区分家中库存。
-func BuildFamilyShoppingList(familyID uint, dates []string) []ShoppingCategory {
+func BuildFamilyShoppingList(familyID uint, dates []string, dbs ...*gorm.DB) []ShoppingCategory {
+	requestDB := database.Handle(dbs...)
+
 	if len(dates) == 0 {
 		return []ShoppingCategory{}
 	}
 	var checks []models.FamilyShoppingCheck
-	database.DB.Where("family_id = ? AND meal_date IN ?", familyID, dates).Find(&checks)
+	requestDB.Where("family_id = ? AND meal_date IN ?", familyID, dates).Find(&checks)
 	rows := make([]shoppingRow, 0, len(checks))
 	for _, ch := range checks {
 		rows = append(rows, shoppingRow{name: ch.ItemName, amount: ch.ItemAmount, checked: ch.Checked})
 	}
-	return groupShoppingRows(rows, nil)
+	return groupShoppingRows(rows, nil, requestDB)
 }
 
 // ToggleFamilyShoppingCheck 勾选 / 取消家庭自动清单里的某样食材（今明两天内同名条目一起变）。
-func ToggleFamilyShoppingCheck(uid uint, itemName string, checked bool) error {
-	family, err := RequireFamily(uid)
+func ToggleFamilyShoppingCheck(uid uint, itemName string, checked bool, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
+	family, err := RequireFamily(uid, requestDB)
 	if err != nil {
 		return err
 	}
@@ -180,7 +194,7 @@ func ToggleFamilyShoppingCheck(uid uint, itemName string, checked bool) error {
 	if itemName == "" {
 		return errors.New("请指定食材")
 	}
-	return database.DB.Model(&models.FamilyShoppingCheck{}).
+	return requestDB.Model(&models.FamilyShoppingCheck{}).
 		Where("family_id = ? AND item_name = ? AND meal_date IN ?", family.ID, itemName, ShoppingDates()).
 		Update("checked", checked).Error
 }
@@ -206,33 +220,39 @@ func dishShoppingEntries(dish models.Dish) []nameAmount {
 
 // syncFamilyPlanShopping 家庭菜单格变化时整格替换自动买菜条目；dish 为 nil 表示清空该格。
 // 同一道菜重复设置时保留原条目（和勾选状态）。返回该格当前的条目数。
-func syncFamilyPlanShopping(familyID uint, date, mealType string, dish *models.Dish) int {
+func syncFamilyPlanShopping(tx *gorm.DB, familyID uint, date, mealType string, dish *models.Dish) (int, error) {
 	slot := func() *gorm.DB {
-		return database.DB.Where("family_id = ? AND meal_date = ? AND meal_type = ?", familyID, date, mealType)
+		return tx.Where("family_id = ? AND meal_date = ? AND meal_type = ?", familyID, date, mealType)
 	}
+	var existing []models.FamilyShoppingCheck
+	if err := slot().Find(&existing).Error; err != nil {
+		return 0, err
+	}
+	checked := map[string]bool{}
 	if dish != nil {
-		var existing []models.FamilyShoppingCheck
-		slot().Find(&existing)
-		if len(existing) > 0 && existing[0].DishID == dish.ID {
-			return len(existing)
+		for _, e := range existing {
+			if e.DishID == dish.ID {
+				checked[e.ItemName] = e.Checked
+			}
 		}
 	}
-	slot().Delete(&models.FamilyShoppingCheck{})
+	if err := slot().Delete(&models.FamilyShoppingCheck{}).Error; err != nil {
+		return 0, err
+	}
 	if dish == nil {
-		return 0
+		return 0, nil
 	}
 	entries := dishShoppingEntries(*dish)
 	rows := make([]models.FamilyShoppingCheck, 0, len(entries))
 	for _, e := range entries {
-		rows = append(rows, models.FamilyShoppingCheck{
-			FamilyID: familyID, MealDate: date, MealType: mealType,
-			DishID: dish.ID, DishName: dish.Name, ItemName: e.Name, ItemAmount: e.Amount,
-		})
+		rows = append(rows, models.FamilyShoppingCheck{FamilyID: familyID, MealDate: date, MealType: mealType, DishID: dish.ID, DishName: dish.Name, ItemName: e.Name, ItemAmount: e.Amount, Checked: checked[e.Name]})
 	}
 	if len(rows) > 0 {
-		database.DB.Create(&rows)
+		if err := tx.Create(&rows).Error; err != nil {
+			return 0, err
+		}
 	}
-	return len(rows)
+	return len(rows), nil
 }
 
 // shoppingWorthReminding 只为还来得及买菜的餐发提醒：明天及以后，或今天下午 4 点前定下的晚餐。
@@ -245,45 +265,51 @@ func shoppingWorthReminding(date, mealType string, now time.Time) bool {
 }
 
 // notifyMealShopping 个人确认一餐后，把新增的食材合并进一条“买菜清单已更新”站内信。
-func notifyMealShopping(uid uint, dish models.Dish, mealType, date string, entries []nameAmount) {
-	if len(entries) == 0 || !ShoppingReminderEnabled(uid) || !shoppingWorthReminding(date, mealType, time.Now()) {
+func notifyMealShopping(uid uint, dish models.Dish, mealType, date string, entries []nameAmount, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
+	if len(entries) == 0 || !ShoppingReminderEnabled(uid, requestDB) || !shoppingWorthReminding(date, mealType, time.Now()) {
 		return
 	}
 	line := fmt.Sprintf("%s%s「%s」要买：%s", mealDateLabel(date), mealTypeLabel(mealType), dish.Name, previewEntryNames(entries, shoppingPreviewNames))
-	_ = UpsertRecentNotification(uid, "shopping", "买菜清单已更新", line, personalShoppingLink, shoppingCoalesceTTL)
+	_ = UpsertRecentNotification(uid, "shopping", "买菜清单已更新", line, personalShoppingLink, shoppingCoalesceTTL, requestDB)
 }
 
 // notifyFamilyPlanShopping 家庭菜单定下一餐后通知其他成员，家庭清单已自动同步。
-func notifyFamilyPlanShopping(familyID, actor uint, date, mealType string, dish models.Dish, items int) {
+func notifyFamilyPlanShopping(familyID, actor uint, date, mealType string, dish models.Dish, items int, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	if !shoppingWorthReminding(date, mealType, time.Now()) {
 		return
 	}
-	line := fmt.Sprintf("%s 把%s%s定为「%s」", userDisplayName(actor), mealDateLabel(date), mealTypeLabel(mealType), dish.Name)
+	line := fmt.Sprintf("%s 把%s%s定为「%s」", userDisplayName(actor, requestDB), mealDateLabel(date), mealTypeLabel(mealType), dish.Name)
 	if items > 0 {
 		line += fmt.Sprintf("，%d 样食材已加入家庭清单", items)
 	}
-	for _, uid := range familyMemberUserIDs(familyID) {
-		if uid != actor && ShoppingReminderEnabled(uid) {
-			_ = UpsertRecentNotification(uid, "shopping", "家庭菜单已更新", line, familyShoppingLink, shoppingCoalesceTTL)
+	for _, uid := range familyMemberUserIDs(familyID, requestDB) {
+		if uid != actor && ShoppingReminderEnabled(uid, requestDB) {
+			_ = UpsertRecentNotification(uid, "shopping", "家庭菜单已更新", line, familyShoppingLink, shoppingCoalesceTTL, requestDB)
 		}
 	}
 }
 
 // SendShoppingReminders 每晚提醒一次：明天的个人或家庭清单里还有没买的食材，就给相关用户发一条站内信。
 // 同一用户同一天只发一次，关闭了买菜提醒的用户跳过。返回发送条数。
-func SendShoppingReminders(now time.Time) int {
+func SendShoppingReminders(now time.Time, dbs ...*gorm.DB) int {
+	requestDB := database.Handle(dbs...)
+
 	today := now.Format("2006-01-02")
 	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
 
 	personal := map[uint][]string{}
 	var checks []models.ShoppingCheck
-	database.DB.Where("meal_date = ? AND checked = ?", tomorrow, false).Find(&checks)
+	requestDB.Where("meal_date = ? AND checked = ?", tomorrow, false).Find(&checks)
 	for _, ch := range checks {
 		personal[ch.UserID] = appendUniqueName(personal[ch.UserID], ch.ItemName)
 	}
 	familyItems := map[uint][]string{}
 	var familyChecks []models.FamilyShoppingCheck
-	database.DB.Where("meal_date = ? AND checked = ?", tomorrow, false).Find(&familyChecks)
+	requestDB.Where("meal_date = ? AND checked = ?", tomorrow, false).Find(&familyChecks)
 	for _, ch := range familyChecks {
 		familyItems[ch.FamilyID] = appendUniqueName(familyItems[ch.FamilyID], ch.ItemName)
 	}
@@ -294,7 +320,7 @@ func SendShoppingReminders(now time.Time) int {
 			ids = append(ids, id)
 		}
 		var members []models.FamilyMember
-		database.DB.Where("family_id IN ?", ids).Find(&members)
+		requestDB.Where("family_id IN ?", ids).Find(&members)
 		for _, m := range members {
 			familyOf[m.UserID] = m.FamilyID
 		}
@@ -314,7 +340,7 @@ func SendShoppingReminders(now time.Time) int {
 
 	sent := 0
 	for _, uid := range recipients {
-		if uid == 0 || !ShoppingReminderEnabled(uid) || database.GetUserSetting(uid, shoppingRemindedKey, "") == today {
+		if uid == 0 || !ShoppingReminderEnabled(uid, requestDB) || database.GetUserSetting(uid, shoppingRemindedKey, "", requestDB) == today {
 			continue
 		}
 		parts := []string{}
@@ -331,8 +357,8 @@ func SendShoppingReminders(now time.Time) int {
 		if len(parts) == 0 {
 			continue
 		}
-		if _, err := CreateNotification(uid, "shopping", "明天要买的菜", strings.Join(parts, "；")+"。", link); err == nil {
-			_ = database.SetUserSetting(uid, shoppingRemindedKey, today)
+		if _, err := CreateNotification(uid, "shopping", "明天要买的菜", strings.Join(parts, "；")+"。", link, requestDB); err == nil {
+			_ = database.SetUserSetting(uid, shoppingRemindedKey, today, requestDB)
 			sent++
 		}
 	}
@@ -348,7 +374,9 @@ type ShoppingReminderResult struct {
 
 // PushShoppingReminder 智能体推送买菜提醒：audience=me 发给本人（个人 + 家庭清单），
 // audience=family 把家庭清单发给全体家庭成员。只统计未勾选的食材；每位用户每天最多推送 10 次。
-func PushShoppingReminder(uid uint, audience, rawDate, note, actor string) (*ShoppingReminderResult, error) {
+func PushShoppingReminder(uid uint, audience, rawDate, note, actor string, dbs ...*gorm.DB) (*ShoppingReminderResult, error) {
+	requestDB := database.Handle(dbs...)
+
 	if strings.TrimSpace(rawDate) == "" {
 		rawDate = "tomorrow"
 	}
@@ -363,13 +391,13 @@ func PushShoppingReminder(uid uint, audience, rawDate, note, actor string) (*Sho
 	}
 
 	var family *models.Family
-	if f, err := FamilyForUser(uid); err == nil {
+	if f, err := FamilyForUser(uid, requestDB); err == nil {
 		family = f
 	}
 	var personalNames, familyNames []string
 	if audience != "family" {
 		var checks []models.ShoppingCheck
-		database.DB.Scopes(database.OwnedBy(uid)).Where("meal_date = ? AND checked = ?", date, false).Find(&checks)
+		requestDB.Scopes(database.OwnedBy(uid)).Where("meal_date = ? AND checked = ?", date, false).Find(&checks)
 		for _, ch := range checks {
 			personalNames = appendUniqueName(personalNames, ch.ItemName)
 		}
@@ -378,12 +406,12 @@ func PushShoppingReminder(uid uint, audience, rawDate, note, actor string) (*Sho
 	}
 	if family != nil {
 		var checks []models.FamilyShoppingCheck
-		database.DB.Where("family_id = ? AND meal_date = ? AND checked = ?", family.ID, date, false).Find(&checks)
+		requestDB.Where("family_id = ? AND meal_date = ? AND checked = ?", family.ID, date, false).Find(&checks)
 		for _, ch := range checks {
 			familyNames = appendUniqueName(familyNames, ch.ItemName)
 		}
 		var manual []models.FamilyShoppingItem
-		database.DB.Where("family_id = ? AND checked = ?", family.ID, false).Find(&manual)
+		requestDB.Where("family_id = ? AND checked = ?", family.ID, false).Find(&manual)
 		for _, it := range manual {
 			familyNames = appendUniqueName(familyNames, it.Name)
 		}
@@ -393,7 +421,7 @@ func PushShoppingReminder(uid uint, audience, rawDate, note, actor string) (*Sho
 	if total == 0 {
 		return &ShoppingReminderResult{OK: true, Message: mealDateLabel(date) + "的清单里没有待买的食材，没有发送提醒"}, nil
 	}
-	if !allowShoppingPush(uid) {
+	if !allowShoppingPush(uid, requestDB) {
 		return nil, errors.New("今天的买菜提醒次数已达上限")
 	}
 
@@ -404,8 +432,8 @@ func PushShoppingReminder(uid uint, audience, rawDate, note, actor string) (*Sho
 	result := &ShoppingReminderResult{OK: true, Items: total}
 	if audience == "family" {
 		content := fmt.Sprintf("%s 提醒大家：%s家庭清单还差 %d 样：%s。%s", actor, mealDateLabel(date), len(familyNames), previewNames(familyNames, 10), suffix)
-		for _, member := range familyMemberUserIDs(family.ID) {
-			if _, err := CreateNotification(member, "shopping", "买菜提醒", content, familyShoppingLink); err == nil {
+		for _, member := range familyMemberUserIDs(family.ID, requestDB) {
+			if _, err := CreateNotification(member, "shopping", "买菜提醒", content, familyShoppingLink, requestDB); err == nil {
 				result.Sent++
 			}
 		}
@@ -422,7 +450,7 @@ func PushShoppingReminder(uid uint, audience, rawDate, note, actor string) (*Sho
 			}
 		}
 		content := fmt.Sprintf("%s 提醒你%s要买菜：%s。%s", actor, mealDateLabel(date), strings.Join(parts, "；"), suffix)
-		if _, err := CreateNotification(uid, "shopping", "买菜提醒", content, link); err == nil {
+		if _, err := CreateNotification(uid, "shopping", "买菜提醒", content, link, requestDB); err == nil {
 			result.Sent++
 		}
 	}
@@ -430,16 +458,18 @@ func PushShoppingReminder(uid uint, audience, rawDate, note, actor string) (*Sho
 	return result, nil
 }
 
-func allowShoppingPush(uid uint) bool {
+func allowShoppingPush(uid uint, dbs ...*gorm.DB) bool {
+	requestDB := database.Handle(dbs...)
+
 	today := Today()
 	count := 0
-	if raw := database.GetUserSetting(uid, shoppingPushCountKey, ""); strings.HasPrefix(raw, today+":") {
+	if raw := database.GetUserSetting(uid, shoppingPushCountKey, "", requestDB); strings.HasPrefix(raw, today+":") {
 		count, _ = strconv.Atoi(strings.TrimPrefix(raw, today+":"))
 	}
 	if count >= shoppingPushDailyMax {
 		return false
 	}
-	_ = database.SetUserSetting(uid, shoppingPushCountKey, fmt.Sprintf("%s:%d", today, count+1))
+	_ = database.SetUserSetting(uid, shoppingPushCountKey, fmt.Sprintf("%s:%d", today, count+1), requestDB)
 	return true
 }
 

@@ -1,0 +1,1503 @@
+{
+  "go": "1.25.14",
+  "mysql": "8.0.45, isolated Unix socket",
+  "go_test_summary": {
+    "pass": 273,
+    "skip": 3
+  },
+  "packages": [
+    {
+      "package": "ninimenu/cmd/imgtool",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/cmd/server",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/achievements",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/agent",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/config",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/cmd/dbmigrate",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/imaging",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/models",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/dishes",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/auth",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/mailer",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/resourcebudget",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/middleware",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/testutil",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/utils",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/storage",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "status": "pass"
+    }
+  ],
+  "tests": [
+    {
+      "package": "ninimenu/cmd/dbmigrate",
+      "test": "TestCopyEveryRegisteredModelIncludingSoftDeletedHistory",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/cmd/dbmigrate",
+      "test": "TestCopyModelReadsSeveralBatchesAndTruncatesEmptySource",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/imaging",
+      "test": "TestCompressRejectsOversizedHeaderBeforeDecoding",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/imaging",
+      "test": "TestWhiteBackgroundPreservesColors",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/imaging",
+      "test": "TestCompressJPEGKeepsEXIFOrientationAndSize",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStructuredReasoningOnlyAddsSupportedProviderOption/glm-5.3",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStructuredReasoningOnlyAddsSupportedProviderOption/glm-5.3-flash",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStructuredReasoningOnlyAddsSupportedProviderOption/cook/glm-5.3",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStructuredReasoningOnlyAddsSupportedProviderOption/deepseek-chat",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStructuredReasoningOnlyAddsSupportedProviderOption/glm-4.7",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStructuredReasoningOnlyAddsSupportedProviderOption/custom-model",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStructuredReasoningOnlyAddsSupportedProviderOption",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestResolveCPAReadsDSHOverride",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestResolveCPAReadsRawConfigAsFallback",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestCPAOverrideCanUseContainerBaseURL",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestResolveCPAFallsBackWhenConfigIsUnavailable",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStreamRejectsUnboundedToolIndexesAndArguments",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/llm",
+      "test": "TestStreamDoesNotFollowProviderRedirectsOrExposeRawErrors",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/dishes",
+      "test": "TestDefaultDishesAreComplete",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/dishes",
+      "test": "TestMenuIsSouthernAndSpicy",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/auth",
+      "test": "TestTokenRequiresExpiryAndRejectsFutureIssueTime",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/allow",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/block",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/reasoning_truncated",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/visible_verdict_truncated",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/invalid_verdict",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/missing_finish",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/untrusted_finish",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/unexpected_tools",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy/upstream_failure",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewDiagnosticsPreserveFailureClosureAndPrivacy",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestInputPolicyAndOrdinaryRecipeNames",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestWriteIntentRequiresAnAction",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewStrictResultsAndFailureClosure",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestReviewRejectsTruncatedVerdicts",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/exact_file_limit/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/fields_around_file/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/file_over_limit/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/fields_over_body_limit/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/missing_file/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/second_file/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/empty_first_file/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/wrong_field/chunked=false",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/exact_file_limit/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/fields_around_file/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/file_over_limit/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/fields_over_body_limit/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/missing_file/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/second_file/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/empty_first_file/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds/wrong_field/chunked=true",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageBounds",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestReadUploadImageRejectsTruncatedMultipart",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestUploadAdmissionDoesNotBufferQueuedBodies",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/handlers",
+      "test": "TestRecipeSaveNormalizesVideoShareTextWithoutChangingOtherRecipes",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/mailer",
+      "test": "TestSMTPGreetingStallRespectsCancellation",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/resourcebudget",
+      "test": "TestHeavyTasksShareOneReservation",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/middleware",
+      "test": "TestAIIngressOriginAndPayloadBounds",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/middleware",
+      "test": "TestAIIngressLimitsRandomTokensBeforeAuthentication",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/middleware",
+      "test": "TestAILocalDevelopmentOriginsDoNotLoosenProduction",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/approved",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/approved_cards",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/blocked_input",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/blocked_output",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/blocked_cards",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/injected_write",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/blocked_write",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites/metadata",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestGuardedConversationDoesNotStreamUnreviewedOutputOrExecuteInjectedWrites",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsFromRealCookingVideo",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsPreserveContiguousSourceIncludingQualifiers",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationDecoderRetainsMultilineQuantityQualifier",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationDecoderSupportsNumericSubtitleLines",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationDecoderRejectsForgedRangesAndUnsupportedQuantities",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsAllowExpandedEvidenceWithoutRaisingModelOutputLimit",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsDiscardUnsupportedOptionalTotalTime/null",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsDiscardUnsupportedOptionalTotalTime/{\"first\":0,\"last\":0}",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsDiscardUnsupportedOptionalTotalTime/{\"first\":1,\"last\":999}",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsDiscardUnsupportedOptionalTotalTime/{\"first\":3,\"last\":2}",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoCitationsDiscardUnsupportedOptionalTotalTime",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeLiveProvider",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeRejectsInventedEvidenceUnknownFieldsAndPartialJSON",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult/ok",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult/input_block",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult/output_block",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult/truncated",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult/tool_call",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeRequiresCompleteAndApprovedToolFreeResult",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeNormalizesMultilineAmountsWithoutChangingEvidence/ingredients",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeNormalizesMultilineAmountsWithoutChangingEvidence/seasonings",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeNormalizesMultilineAmountsWithoutChangingEvidence",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeBoundsReasoningForGenerationAndSourceReview",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoTimesRequireExplicitSourceDurations",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/summed_steps",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/single_step",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/step_total",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/invented_quote",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/explicit_total",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/wrong_value",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/half_hour",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/combined_units",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes/video_duration",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/assistant",
+      "test": "TestVideoRecipeDoesNotInferTotalFromIndividualStepTimes",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/storage",
+      "test": "TestUploadInventoryPaginatesAndIncludesLocalFiles",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/storage",
+      "test": "TestUploadInventoryRejectsStalledCursor",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/storage",
+      "test": "TestDeleteRemovesLocalAndRemoteCopies",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/storage",
+      "test": "TestSignV4MatchesAWSExample",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/storage",
+      "test": "TestPathStyleURL",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/storage",
+      "test": "TestURIEncode",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliSubtitlesPreferHumanChineseAndSkipLocked",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliPublicAISubtitlesDoNotRequireASROrPlayerEndpoint",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliEmptySubtitlesFallBackButPlatformBlocksStop/empty",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliEmptySubtitlesFallBackButPlatformBlocksStop/locked",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliEmptySubtitlesFallBackButPlatformBlocksStop/platform-code",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliEmptySubtitlesFallBackButPlatformBlocksStop/rate-limit",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliEmptySubtitlesFallBackButPlatformBlocksStop/broken-json",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestBilibiliEmptySubtitlesFallBackButPlatformBlocksStop",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinGuestDetailCacheRotationAndCredentialScope",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinGuestShortLinkSkipsHTMLAndNeverSendsCookie",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinCredentialedRedirectsAndChallengesStop/https://www.douyin.com/aweme/v1/web/aweme/detail/?aweme_id=333",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinCredentialedRedirectsAndChallengesStop/https://v.example.douyinvod.com/file.mp4",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinCredentialedRedirectsAndChallengesStop/https://evil.invalid/collect",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinCredentialedRedirectsAndChallengesStop",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinRejectsWrongVideoPrivateContentMalformedAndOversize",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinAnonymousChallengeAndCredentialedHTTPBlocks",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinMediaUsesSmallestSafeSourceAndNeverBackgroundMusic",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinCredentialValidationAndManualIndependence",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinCredentialFilePermissionsAndSize",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinAPIAndCDNAllowlist",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinLiveMetadata",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRNativeIntegration",
+      "status": "skip"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRIsolatedProcessResultAndCleanup",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRCancellationAndMalformedOutput/sleep",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRCancellationAndMalformedOutput/invalid",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAssistantRejectsExternalCredentialsAndModelOverrides",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRCancellationAndMalformedOutput/oversize",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRCancellationAndMalformedOutput/no_speech",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRCancellationAndMalformedOutput",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalASRAdmissionDoesNotConsumeQuotaOrPlatformBudget",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestLocalModelHashAndOutputBounds",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestSubtitlePreservesNumericCueText/srt",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestSubtitlePreservesNumericCueText/vtt",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestSubtitlePreservesNumericCueText",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestParseVideoLinksAndUnsafeInputs",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestPublicNetworkGuardCoversSpecialAndReboundAddresses",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestRedirectBodyLimitsCredentialsAndCooldown",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestCacheCoalescesAndCancellationDoesNotPoisonNextRequest",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestSubtitleContentAndCorrectBilibiliPart",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestDouyinOnlyUsesTheRequestedVideoAndNeverMusicOrDescription",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/video",
+      "test": "TestASRUsesServerConfigurationAndBoundedMultipart",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestMCPBatchMaximumAndSharedTokenBudget",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAssistantSitePauseAppliesBeforeSSE",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestPageAssistantQuotaSharedAcrossClientsAndSessionDeletion",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestFindAutoAchievementsMySQL",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestFindAutoAchievementsFiltersCandidates",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAssistantCardsRemainReadableByReleasedMiniPrograms",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAssistantQuotaInvalidRequestsAndAdminPermissions",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAssistantQuotaConcurrentPersistentAndDaily",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAssistantQuotaConfigurationAndStorageFailure",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAssistantSiteQuotaCannotBeBypassedWithMultipleAccounts",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestExhaustedUserCannotBurnSiteBudget",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAssistantLeasesAcrossConnectionsExpireAndReleaseSafely",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAchievementQueueBoundsAndCoalescesUsers",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestConcurrentDeploymentAndRollbackDoNotRepeatNotices",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestDishSearchPagesKeepDetailsAndSeasoningFilters",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestMenuChecksSeasoningAllergiesAfterRecipeChanges",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditAllRecipeInsertionsRespectQuota",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAuditMySQL/quota_with_preexisting_repeatable_read_snapshot",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAuditMySQL/tombstone_overrides_old_snapshot",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditBoundedMenuSettingsAndLegacyReads",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAuditMySQL/transfer_and_leave_preserve_an_owner",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAuditMySQL/shared_windows_and_deployment_idempotency",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAuditMySQL/canceled_query_releases_client_pool",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAuditMySQL/identical_setting_upserts",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAuditMySQL",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestEmailCodeLoginFlow",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestEmailCodeAttemptLimit",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAdminEmailGetsAdminRole",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestSendEmailCodeCooldownAndValidation",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestEmailDomainWhitelist",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestApplyPlatformSupportsBilibiliAndDouyinOnly/bilibili_bv",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestApplyPlatformSupportsBilibiliAndDouyinOnly/bilibili_short_link",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestApplyPlatformSupportsBilibiliAndDouyinOnly/douyin",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestApplyPlatformSupportsBilibiliAndDouyinOnly/lookalike_host",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestApplyPlatformSupportsBilibiliAndDouyinOnly/other_platform",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestApplyPlatformSupportsBilibiliAndDouyinOnly",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAnnounceDeploymentIsIdempotent",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAnnounceDeploymentWithNotesUsesReadableSummary",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestAnnounceDeploymentWithNotesFallsBackWhenEmpty",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestDisplayDeploymentVersion",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestWeekPlanPersistentCacheIsolationAndFavorites",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestWeekPlanCacheReadsLegacyStringAndCurrentArrayFields",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/same_unit_sums",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/different_units_stay_separate",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/different_unit_order_is_stable",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/text_amounts_dedupe",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/mixed_text_and_numeric",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/existing_plus_values_compact",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/no_unit_numeric_sums",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/decimal_values_sum",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts/empty_defaults_to_suitable_amount",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestCompactShoppingAmounts",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestSortShoppingItems",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestShoppingItemPriority",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestBuildShoppingCategoryExact",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/番茄",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/西红柿",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/西兰花",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/豆腐",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/青椒",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/小米辣",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/金针菇",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/土豆",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/玉米",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/猪肉末",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/鸡蛋",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/鸡翅",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/牛腩",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/虾仁",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/鱿鱼",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/花椒粉",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/豆瓣酱",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/辣椒粉",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/生抽",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/老抽",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/料酒",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/鸡精",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/玉米淀粉",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/番茄酱",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/蛋黄酱",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/面粉",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/糯米粉",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/粉丝",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/鸡蛋面",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/可乐",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/紫菜",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/黄瓜段",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/五花肉片",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem/黑胡椒碎",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestClassifyShoppingItem",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestVideoBudgetAtomicSharedPersistentAndIndependentOfUsers",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/services",
+      "test": "TestVideoCooldownSurvivesCanceledRequestAndRestart",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditFailedSecurityUpdatesDoNotReportSuccess",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditPasswordCannotRestoreRevokedGeneration",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditMenuResolvesCurrentContentAndVisibility",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditMealAndShoppingRollbackTogether",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditMealDeletionRollback",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditCanceledRequestDoesNotReadAuthenticatedUser",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditTransferAndLeavePreserveAdministrator",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditSuggestionFailureDoesNotConsumePendingState",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAuditSuggestionRetryAndFamilyPlanRollback",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestFamilyInvitationAndIsolation",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestHealthJournalReportAndAgentScope",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAgentPrivateRecipeManagement",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestPersonalRecipeCountMatchesCollectionAfterFamilySharing",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestMineEntryIncludesOwnedFamilyRecipesWithoutExposingOtherRecipes",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestMultiUserIsolationAndAgentScopes",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAssistantFallbackStreamsAndIsolatesSessions",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAssistantWithoutModelDoesNotWriteJournal",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestPreferencesDriveRecommendations",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestOpenAPIAndHealth",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestAgentCredentialsAndNotificationIsolation",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestPathIDsCannotBecomeSQLExpressions",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestMalformedRecipeReplacementPreservesSavedContent",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestMineCategoryCountsExcludePublicAndOtherUsers",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestUploadRejectsLargePixelsAndPreservesOriginalBackup",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestVideoRecipeEndpointReturnsDraftWithoutSavingOrTouchingOtherUsers",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/routes",
+      "test": "TestVideoRecipeRejectsUnsafeIngressBeforeModelOrQuota",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestInitMigratesLegacyDataAndScopesMealUniquenessByUser",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestSQLLogsNeverExpandParametersOrDriverValues",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestDissolvedFamilyReleasesOnlyItsImageReferences",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestSettingsRepeatedWritesAndUserIsolation",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestUploadQuotaCountsPendingReservations",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestUploadReferencesProtectCopiesStepPhotosAndMapUpdates",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestAbandonedUploadCleanupDeletesOriginalAndBackup",
+      "status": "pass"
+    },
+    {
+      "package": "ninimenu/internal/database",
+      "test": "TestSharedWindowUsesDatabaseAcrossHandles",
+      "status": "pass"
+    }
+  ],
+  "client_tests": {
+    "pass": 46
+  },
+  "python_tests": {
+    "pass": 8,
+    "skip": 1
+  },
+  "frontend_lint": "passed",
+  "frontend_build": "passed",
+  "go_vet": "passed",
+  "compose_config": "passed, dummy environment",
+  "production_deployed": false,
+  "linux_amd64_build": "passed, CGO_ENABLED=0, Go 1.25.14",
+  "linux_binary_vulnerabilities": {
+    "reachable": 0,
+    "imported": 0,
+    "required_modules_without_reachable_symbols": 18
+  },
+  "isolated_mysql_shutdown": "completed"
+}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"gorm.io/gorm"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"ninimenu/internal/services"
@@ -44,7 +45,7 @@ func getEffectiveDishEmoji(dish models.Dish) string {
 
 func GetRecords(c *gin.Context) {
 	page, pageSize := pageParams(c, 20)
-	query := database.DB.Model(&models.MealRecord{}).Scopes(database.OwnedBy(uid(c)))
+	query := database.DB.WithContext(c.Request.Context()).Model(&models.MealRecord{}).Scopes(database.OwnedBy(uid(c)))
 
 	if mealType := c.Query("meal_type"); mealType != "" {
 		query = query.Where("meal_type = ?", mealType)
@@ -79,7 +80,7 @@ func GetRecords(c *gin.Context) {
 	dishInfoMap := make(map[uint]models.Dish)
 	if len(ids) > 0 {
 		var dishes []models.Dish
-		database.DB.Unscoped().Scopes(database.VisibleDishes(uid(c))).Where("id IN ?", ids).Find(&dishes)
+		database.DB.WithContext(c.Request.Context()).Unscoped().Scopes(database.VisibleDishes(uid(c))).Where("id IN ?", ids).Find(&dishes)
 		for _, d := range dishes {
 			dishInfoMap[d.ID] = d
 		}
@@ -131,7 +132,7 @@ func CreateRecord(c *gin.Context) {
 		utils.BadRequest(c, "请填写完整信息")
 		return
 	}
-	record, err := services.CreateMealRecord(uid(c), req.input(), "app", "")
+	record, err := services.CreateMealRecord(uid(c), req.input(), "app", "", database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		recordError(c, err)
 		return
@@ -150,7 +151,7 @@ func BatchCreateRecords(c *gin.Context) {
 	created := make([]models.MealRecord, 0, len(req.Records))
 	skipped := 0
 	for _, r := range req.Records {
-		record, err := services.CreateMealRecord(uid(c), r.input(), "app", "")
+		record, err := services.CreateMealRecord(uid(c), r.input(), "app", "", database.DB.WithContext(c.Request.Context()))
 		if err != nil {
 			skipped++
 			continue
@@ -171,7 +172,7 @@ func UpdateRecord(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-	record, err := services.UpdateMealRecord(uid(c), c.Param("id"), services.MealPatch{Rating: &req.Rating, Remark: &req.Remark, Mood: &req.Mood, Photo: &req.Photo})
+	record, err := services.UpdateMealRecord(uid(c), c.Param("id"), services.MealPatch{Rating: &req.Rating, Remark: &req.Remark, Mood: &req.Mood, Photo: &req.Photo}, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		recordError(c, err)
 		return
@@ -180,7 +181,7 @@ func UpdateRecord(c *gin.Context) {
 }
 
 func DeleteRecord(c *gin.Context) {
-	if _, err := services.DeleteMealRecord(uid(c), c.Param("id")); err != nil {
+	if _, err := services.DeleteMealRecord(uid(c), c.Param("id"), database.DB.WithContext(c.Request.Context())); err != nil {
 		recordError(c, err)
 		return
 	}
@@ -189,7 +190,7 @@ func DeleteRecord(c *gin.Context) {
 
 // GetStats 个人统计。
 func GetStats(c *gin.Context) {
-	utils.Success(c, services.BuildUserStats(uid(c)))
+	utils.Success(c, services.BuildUserStats(uid(c), database.DB.WithContext(c.Request.Context())))
 }
 
 func GetDayRating(c *gin.Context) {
@@ -199,7 +200,7 @@ func GetDayRating(c *gin.Context) {
 		return
 	}
 	var rating models.DayRating
-	if err := database.DB.Scopes(database.OwnedBy(uid(c))).Where("meal_date = ?", date).First(&rating).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("meal_date = ?", date).First(&rating).Error; err != nil {
 		utils.Success(c, nil)
 		return
 	}
@@ -213,14 +214,16 @@ func GetDayRatings(c *gin.Context) {
 		return
 	}
 	var ratings []models.DayRating
-	database.DB.Scopes(database.OwnedBy(uid(c))).Where("meal_date >= ? AND meal_date <= ?", dateFrom, dateTo).
+	database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("meal_date >= ? AND meal_date <= ?", dateFrom, dateTo).
 		Order("meal_date ASC").Find(&ratings)
 	utils.Success(c, ratings)
 }
 
-func findOrNewDayRating(u uint, date string) models.DayRating {
+func findOrNewDayRating(u uint, date string, dbs ...*gorm.DB) models.DayRating {
+	requestDB := database.Handle(dbs...)
+
 	var rating models.DayRating
-	if err := database.DB.Scopes(database.OwnedBy(u)).Where("meal_date = ?", date).First(&rating).Error; err != nil {
+	if err := requestDB.Scopes(database.OwnedBy(u)).Where("meal_date = ?", date).First(&rating).Error; err != nil {
 		return models.DayRating{UserID: u, MealDate: date, Photos: "[]"}
 	}
 	if rating.Photos == "" {
@@ -238,9 +241,9 @@ func CreateOrUpdateHomeMood(c *gin.Context) {
 		utils.BadRequest(c, "请选择心情")
 		return
 	}
-	rating := findOrNewDayRating(uid(c), req.MealDate)
+	rating := findOrNewDayRating(uid(c), req.MealDate, database.DB.WithContext(c.Request.Context()))
 	rating.HomeMood = req.HomeMood
-	if err := database.DB.Save(&rating).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Save(&rating).Error; err != nil {
 		utils.InternalError(c, "保存心情失败")
 		return
 	}
@@ -271,13 +274,13 @@ func CreateOrUpdateDayRating(c *gin.Context) {
 			return
 		}
 	}
-	rating := findOrNewDayRating(uid(c), req.MealDate)
+	rating := findOrNewDayRating(uid(c), req.MealDate, database.DB.WithContext(c.Request.Context()))
 	if req.Mood != "" {
 		rating.Mood = req.Mood
 	}
 	rating.Remark = req.Remark
 	rating.Photos = photos
-	if err := database.DB.Save(&rating).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Save(&rating).Error; err != nil {
 		utils.InternalError(c, "保存评价失败")
 		return
 	}
@@ -308,7 +311,7 @@ type PhotoWallRecord struct {
 func GetPhotoWall(c *gin.Context) {
 	own := database.OwnedBy(uid(c))
 	var ratings []models.DayRating
-	database.DB.Scopes(own).Where("photos IS NOT NULL AND photos != '' AND photos != '[]'").
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Where("photos IS NOT NULL AND photos != '' AND photos != '[]'").
 		Order("meal_date DESC").Find(&ratings)
 
 	dates := make([]string, 0, len(ratings))
@@ -318,7 +321,7 @@ func GetPhotoWall(c *gin.Context) {
 	recordsByDate := make(map[string][]PhotoWallRecord)
 	if len(dates) > 0 {
 		var records []models.MealRecord
-		database.DB.Scopes(own).Where("meal_date IN ?", dates).Order("meal_type ASC, created_at ASC").Find(&records)
+		database.DB.WithContext(c.Request.Context()).Scopes(own).Where("meal_date IN ?", dates).Order("meal_type ASC, created_at ASC").Find(&records)
 		for _, rec := range records {
 			recordsByDate[rec.MealDate] = append(recordsByDate[rec.MealDate], PhotoWallRecord{
 				DishID: rec.DishID, DishName: rec.DishName, MealType: rec.MealType, Mood: rec.Mood, Remark: rec.Remark,

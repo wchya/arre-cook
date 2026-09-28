@@ -1,0 +1,138 @@
+=== Symbol Results ===
+
+Vulnerability #1: GO-2026-6222
+    Excessive memory allocation during VP8L decoding in golang.org/x/image
+  More info: https://pkg.go.dev/vuln/GO-2026-6222
+  Module: golang.org/x/image
+    Found in: golang.org/x/image@v0.41.0
+    Fixed in: golang.org/x/image@v0.45.0
+    Example traces found:
+      #1: internal/imaging/compress.go:24:35: imaging.CompressJPEG calls image.DecodeConfig, which eventually calls vp8l.Decode
+
+Vulnerability #2: GO-2026-6218
+    Avoid quadratic complexity in resolvePath in net/url
+  More info: https://pkg.go.dev/vuln/GO-2026-6218
+  Standard library
+    Found in: net/url@go1.26.5
+    Fixed in: net/url@go1.26.6
+    Example traces found:
+      #1: internal/llm/client.go:263:28: llm.Stream calls http.Client.Do, which eventually calls url.URL.Parse
+
+Vulnerability #3: GO-2026-6090
+    Limit handshake messages we are willing to accept post-handshake in
+    crypto/tls
+  More info: https://pkg.go.dev/vuln/GO-2026-6090
+  Standard library
+    Found in: crypto/tls@go1.26.5
+    Fixed in: crypto/tls@go1.26.6
+    Example traces found:
+      #1: internal/database/database.go:39:22: database.Init calls gorm.Open, which eventually calls tls.Conn.Handshake
+      #2: cmd/server/main.go:63:31: server.main calls http.Server.ListenAndServe, which eventually calls tls.Conn.HandshakeContext
+      #3: internal/config/config.go:223:19: config.loadDotEnv calls bufio.Scanner.Scan, which eventually calls tls.Conn.Read
+      #4: cmd/server/main.go:38:14: server.main calls gin.New, which eventually calls tls.Conn.Write
+      #5: internal/mailer/mailer.go:34:34: mailer.Send calls tls.DialWithDialer
+      #6: internal/llm/client.go:263:28: llm.Stream calls http.Client.Do, which eventually calls tls.Dialer.DialContext
+
+Vulnerability #4: GO-2026-6089
+    Apply ReadHeaderTimeout when doing unencrypted HTTP/2 check in net/http
+  More info: https://pkg.go.dev/vuln/GO-2026-6089
+  Standard library
+    Found in: net/http@go1.26.5
+    Fixed in: net/http@go1.26.6
+    Example traces found:
+      #1: cmd/server/main.go:63:31: server.main calls http.Server.ListenAndServe
+
+Vulnerability #5: GO-2026-5972
+    Enforce maximum recursion depth in encoding/asn1
+  More info: https://pkg.go.dev/vuln/GO-2026-5972
+  Standard library
+    Found in: encoding/asn1@go1.26.5
+    Fixed in: encoding/asn1@go1.26.6
+    Example traces found:
+      #1: internal/database/database.go:39:22: database.Init calls gorm.Open, which eventually calls asn1.Unmarshal
+
+Vulnerability #6: GO-2026-5970
+    Infinite loop on invalid input in golang.org/x/text
+  More info: https://pkg.go.dev/vuln/GO-2026-5970
+  Module: golang.org/x/text
+    Found in: golang.org/x/text@v0.37.0
+    Fixed in: golang.org/x/text@v0.39.0
+    Example traces found:
+      #1: internal/services/achievement_service.go:14:2: services.init calls gorm.init, which eventually calls norm.Form.Properties
+
+Vulnerability #7: GO-2026-5676
+    HTTP/3 QPACK Trailer Expansion Memory Exhaustion in
+    github.com/quic-go/quic-go
+  More info: https://pkg.go.dev/vuln/GO-2026-5676
+  Module: github.com/quic-go/quic-go
+    Found in: github.com/quic-go/quic-go@v0.59.0
+    Fixed in: github.com/quic-go/quic-go@v0.59.1
+    Example traces found:
+      #1: cmd/server/main.go:63:31: server.main calls http.Server.ListenAndServe, which eventually calls http3.ConfigureTLSConfig
+      #2: cmd/server/main.go:63:31: server.main calls http.Server.ListenAndServe, which eventually calls http3.Error.Error
+      #3: internal/config/config.go:223:19: config.loadDotEnv calls bufio.Scanner.Scan, which eventually calls http3.countingByteReader.Read
+      #4: cmd/server/main.go:63:31: server.main calls http.Server.ListenAndServe, which eventually calls http3.qpackError.Error
+
+Vulnerability #8: GO-2026-5066
+    Panic decoding image with out-of-bounds strip offset in x/image/tiff in
+    golang.org/x/image
+  More info: https://pkg.go.dev/vuln/GO-2026-5066
+  Module: golang.org/x/image
+    Found in: golang.org/x/image@v0.41.0
+    Fixed in: golang.org/x/image@v0.43.0
+    Example traces found:
+      #1: internal/imaging/compress.go:31:28: imaging.CompressJPEG calls imaging.Decode, which eventually calls tiff.Decode
+
+Vulnerability #9: GO-2026-5062
+    Lack of limit on tile sizes in x/image/tiff in golang.org/x/image
+  More info: https://pkg.go.dev/vuln/GO-2026-5062
+  Module: golang.org/x/image
+    Found in: golang.org/x/image@v0.41.0
+    Fixed in: golang.org/x/image@v0.43.0
+    Example traces found:
+      #1: internal/imaging/compress.go:31:28: imaging.CompressJPEG calls imaging.Decode, which eventually calls tiff.Decode
+
+Vulnerability #10: GO-2026-5061
+    Panic on VP8 alpha channel size mismatch in x/image/webp in
+    golang.org/x/image
+  More info: https://pkg.go.dev/vuln/GO-2026-5061
+  Module: golang.org/x/image
+    Found in: golang.org/x/image@v0.41.0
+    Fixed in: golang.org/x/image@v0.43.0
+    Example traces found:
+      #1: internal/imaging/compress.go:31:28: imaging.CompressJPEG calls imaging.Decode, which eventually calls webp.Decode
+      #2: internal/imaging/compress.go:24:35: imaging.CompressJPEG calls image.DecodeConfig, which calls webp.DecodeConfig
+      #3: internal/imaging/compress.go:11:2: imaging.init calls webp.init
+
+Vulnerability #11: GO-2026-5026
+    Invoking failure to reject ASCII-only Punycode-encoded labels in
+    golang.org/x/net/idna
+  More info: https://pkg.go.dev/vuln/GO-2026-5026
+  Module: golang.org/x/net
+    Found in: golang.org/x/net@v0.51.0
+    Fixed in: golang.org/x/net@v0.55.0
+
+  Standard library
+    Found in: net/http@go1.26.5
+    Fixed in: net/http@go1.26.6
+    Example traces found:
+      #1: internal/llm/client.go:263:28: llm.Stream calls http.Client.Do
+      #2: internal/services/auth_service.go:264:29: services.code2Session calls http.Client.Get
+
+Vulnerability #12: GO-2026-4961
+    Panic when decoding large WEBP image on 32-bit platforms in
+    golang.org/x/image
+  More info: https://pkg.go.dev/vuln/GO-2026-4961
+  Module: golang.org/x/image
+    Found in: golang.org/x/image@v0.41.0
+    Fixed in: golang.org/x/image@v0.42.0
+    Example traces found:
+      #1: internal/imaging/compress.go:31:28: imaging.CompressJPEG calls imaging.Decode, which eventually calls webp.Decode
+      #2: internal/imaging/compress.go:24:35: imaging.CompressJPEG calls image.DecodeConfig, which calls webp.DecodeConfig
+
+Your code is affected by 12 vulnerabilities from 3 modules and the Go standard library.
+This scan also found 9 vulnerabilities in packages you import and 18
+vulnerabilities in modules you require, but your code doesn't appear to call
+these vulnerabilities.
+Use '-show verbose' for more details.
+exit status 3

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"ninimenu/internal/auth"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type userView struct {
@@ -64,7 +66,7 @@ func GetAuthOptions(c *gin.Context) {
 		"email_dev":     config.C.EmailCodeDevEcho,
 		"email_domains": config.C.EmailDomains,
 		"wechat":        config.C.WechatEnabled(),
-		"register_open": services.RegistrationOpen(),
+		"register_open": services.RegistrationOpen(database.DB.WithContext(c.Request.Context())),
 	})
 }
 
@@ -77,7 +79,7 @@ func SendEmailCode(c *gin.Context) {
 		utils.BadRequest(c, "请输入邮箱")
 		return
 	}
-	wait, err := services.SendEmailCode(req.Email, "login", c.ClientIP())
+	wait, err := services.SendEmailCode(req.Email, "login", c.ClientIP(), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		c.JSON(400, gin.H{"code": 40001, "message": err.Error(), "data": gin.H{"cooldown": wait}})
 		return
@@ -96,7 +98,7 @@ func EmailLogin(c *gin.Context) {
 		utils.BadRequest(c, "请输入邮箱和验证码")
 		return
 	}
-	u, created, err := services.LoginWithEmailCode(req.Email, req.Code, req.WechatCode)
+	u, created, err := services.LoginWithEmailCode(req.Email, req.Code, req.WechatCode, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.Error(c, 400, 40002, err.Error())
 		return
@@ -119,7 +121,7 @@ func PasswordLogin(c *gin.Context) {
 	if account == "" {
 		account = req.Username
 	}
-	u, err := services.LoginWithPassword(account, req.Password)
+	u, err := services.LoginWithPassword(account, req.Password, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.Unauthorized(c, err.Error())
 		return
@@ -136,7 +138,7 @@ func WechatLogin(c *gin.Context) {
 		utils.BadRequest(c, "缺少 code")
 		return
 	}
-	u, needBind, err := services.LoginWithWechat(req.Code)
+	u, needBind, err := services.LoginWithWechat(req.Code, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.Error(c, 400, 40003, err.Error())
 		return
@@ -184,7 +186,7 @@ func UpdateMe(c *gin.Context) {
 		u.Avatar = a
 	}
 	if len(updates) > 0 {
-		database.DB.Model(&models.User{}).Where("id = ?", u.ID).Updates(updates)
+		database.DB.WithContext(c.Request.Context()).Model(&models.User{}).Where("id = ?", u.ID).Updates(updates)
 	}
 	utils.Success(c, toUserView(u))
 }
@@ -213,16 +215,32 @@ func ChangePassword(c *gin.Context) {
 		utils.InternalError(c, "设置密码失败")
 		return
 	}
+	// Compare the credentials observed by authentication. A concurrent password
+	// change, revocation or disable must never be overwritten by this request.
+	result := database.DB.WithContext(c.Request.Context()).Model(&models.User{}).
+		Where("id = ? AND token_version = ? AND password_hash = ? AND disabled = ?", u.ID, u.TokenVersion, u.PasswordHash, false).
+		Updates(map[string]any{"password_hash": hash, "token_version": gorm.Expr("token_version + 1")})
+	if result.Error != nil {
+		utils.InternalError(c, "设置密码失败，请稍后重试")
+		return
+	}
+	if result.RowsAffected != 1 {
+		utils.Error(c, 409, 40900, "账号状态已变化，请重新登录后操作")
+		return
+	}
 	u.PasswordHash = hash
 	u.TokenVersion++
-	database.DB.Model(&models.User{}).Where("id = ?", u.ID).Updates(map[string]any{"password_hash": hash, "token_version": u.TokenVersion})
 	issueLogin(c, u, nil)
 }
 
 // LogoutAll POST /api/me/logout-all —— 让所有设备上的登录态失效（智能体令牌不受影响，需单独撤销）。
 func LogoutAll(c *gin.Context) {
 	u := auth.CurrentUser(c)
-	database.DB.Model(&models.User{}).Where("id = ?", u.ID).UpdateColumn("token_version", gorm.Expr("token_version + 1"))
+	result := database.DB.WithContext(c.Request.Context()).Model(&models.User{}).Where("id = ?", u.ID).UpdateColumn("token_version", gorm.Expr("token_version + 1"))
+	if result.Error != nil || result.RowsAffected != 1 {
+		utils.InternalError(c, "退出失败，请稍后重试")
+		return
+	}
 	utils.SuccessMsg(c, "已退出所有设备")
 }
 
@@ -248,13 +266,13 @@ func DeleteMe(c *gin.Context) {
 	}
 	if u.IsAdmin() {
 		var admins int64
-		database.DB.Model(&models.User{}).Where("role = ? AND disabled = ?", models.RoleAdmin, false).Count(&admins)
+		database.DB.WithContext(c.Request.Context()).Model(&models.User{}).Where("role = ? AND disabled = ?", models.RoleAdmin, false).Count(&admins)
 		if admins <= 1 {
 			utils.BadRequest(c, "你是唯一的管理员，不能注销")
 			return
 		}
 	}
-	family, err := services.FamilyForUser(u.ID)
+	family, err := services.FamilyForUser(u.ID, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.InternalError(c, "注销失败，请稍后再试")
 		return
@@ -263,7 +281,28 @@ func DeleteMe(c *gin.Context) {
 		utils.BadRequest(c, "请先转让或解散家庭，再注销账号")
 		return
 	}
-	err = database.DB.Transaction(func(tx *gorm.DB) error {
+	err = database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		if family != nil {
+			locked, err := services.LockFamilyForUser(tx, u.ID, false)
+			if err != nil {
+				return err
+			}
+			if locked.OwnerID == u.ID {
+				return services.ErrFamilyOwnerOnly
+			}
+			family = locked
+		}
+		if err := tx.Model(&models.User{}).Where("id = ?", u.ID).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
+			return err
+		}
+		var current models.FamilyMember
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", u.ID).First(&current).Error; err == nil {
+			if family == nil || current.FamilyID != family.ID {
+				return services.ErrFamilyConflict
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 		if family != nil {
 			if err := tx.Where("family_id = ? AND user_id = ?", family.ID, u.ID).Delete(&models.FamilyMember{}).Error; err != nil {
 				return err
@@ -278,7 +317,11 @@ func DeleteMe(c *gin.Context) {
 				return err
 			}
 		}
-		if err := tx.Unscoped().Where("owner_id = ? AND family_id = 0", u.ID).Delete(&models.Dish{}).Error; err != nil {
+		if err := tx.Unscoped().Where("owner_id = ?", u.ID).
+			Where("family_id = 0 OR NOT EXISTS (SELECT 1 FROM families WHERE families.id = dishes.family_id)").Delete(&models.Dish{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.UploadAsset{}).Where("owner_id = ?", u.ID).Update("expires_at", time.Now()).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&models.User{}, u.ID).Error
@@ -287,7 +330,7 @@ func DeleteMe(c *gin.Context) {
 		utils.InternalError(c, "注销失败，请稍后再试")
 		return
 	}
-	services.InvalidateWeekPlan(u.ID)
+	services.InvalidateWeekPlan(u.ID, database.DB.WithContext(c.Request.Context()))
 	utils.SuccessMsg(c, "账号已注销")
 }
 
@@ -307,21 +350,21 @@ func ExportMe(c *gin.Context) {
 		journal       []models.FoodJournalEntry
 		notifications []models.Notification
 	)
-	database.DB.Scopes(own).Order("meal_date ASC").Find(&records)
-	database.DB.Scopes(own).Find(&favorites)
-	database.DB.Scopes(own).Order("meal_date ASC").Find(&ratings)
-	database.DB.Scopes(own).Order("created_at DESC").Limit(10000).Find(&events)
-	database.DB.Where("owner_id = ?", uid).Find(&dishes)
-	database.DB.Scopes(own).Find(&suggestions)
-	database.DB.Scopes(own).Find(&sessions)
-	database.DB.Scopes(own).Order("id ASC").Find(&messages)
-	database.DB.Scopes(own).Order("meal_date ASC").Find(&journal)
-	database.DB.Scopes(own).Order("created_at ASC").Find(&notifications)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("meal_date ASC").Find(&records)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&favorites)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("meal_date ASC").Find(&ratings)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("created_at DESC").Limit(10000).Find(&events)
+	database.DB.WithContext(c.Request.Context()).Where("owner_id = ?", uid).Find(&dishes)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&suggestions)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&sessions)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("id ASC").Find(&messages)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("meal_date ASC").Find(&journal)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("created_at ASC").Find(&notifications)
 	c.Header("Content-Disposition", `attachment; filename="ninimenu-export.json"`)
 	utils.Success(c, gin.H{
 		"exported_at":     time.Now().Format(time.RFC3339),
 		"user":            toUserView(auth.CurrentUser(c)),
-		"preferences":     services.GetPreferences(uid),
+		"preferences":     services.GetPreferences(uid, database.DB.WithContext(c.Request.Context())),
 		"meal_records":    records,
 		"favorites":       favorites,
 		"day_ratings":     ratings,
@@ -337,7 +380,7 @@ func ExportMe(c *gin.Context) {
 
 // GetPreferences / UpdatePreferences /api/me/preferences
 func GetPreferences(c *gin.Context) {
-	utils.Success(c, services.GetPreferences(auth.UID(c)))
+	utils.Success(c, services.GetPreferences(auth.UID(c), database.DB.WithContext(c.Request.Context())))
 }
 
 func UpdatePreferences(c *gin.Context) {
@@ -346,12 +389,12 @@ func UpdatePreferences(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-	prefs, err := services.SavePreferences(auth.UID(c), patch)
+	prefs, err := services.SavePreferences(auth.UID(c), patch, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.InternalError(c, "保存失败")
 		return
 	}
-	services.InvalidateWeekPlan(auth.UID(c))
+	services.InvalidateWeekPlan(auth.UID(c), database.DB.WithContext(c.Request.Context()))
 	utils.Success(c, prefs)
 }
 
@@ -359,7 +402,7 @@ func UpdatePreferences(c *gin.Context) {
 
 func AdminListUsers(c *gin.Context) {
 	page, pageSize := pageParams(c, 20)
-	q := database.DB.Model(&models.User{})
+	q := database.DB.WithContext(c.Request.Context()).Model(&models.User{})
 	if s := strings.TrimSpace(c.Query("search")); s != "" {
 		like := "%" + s + "%"
 		q = q.Where("email LIKE ? OR nickname LIKE ? OR username LIKE ?", like, like, like)
@@ -379,7 +422,7 @@ func AdminListUsers(c *gin.Context) {
 	}
 	var rows []countRow
 	if len(ids) > 0 {
-		database.DB.Model(&models.MealRecord{}).Select("user_id, count(*) as n").Where("user_id IN ?", ids).Group("user_id").Scan(&rows)
+		database.DB.WithContext(c.Request.Context()).Model(&models.MealRecord{}).Select("user_id, count(*) as n").Where("user_id IN ?", ids).Group("user_id").Scan(&rows)
 	}
 	counts := map[uint]int64{}
 	for _, r := range rows {
@@ -406,7 +449,7 @@ func AdminUpdateUser(c *gin.Context) {
 		return
 	}
 	var u models.User
-	if err := database.DB.Where("id = ?", c.Param("id")).First(&u).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Where("id = ?", c.Param("id")).First(&u).Error; err != nil {
 		utils.NotFound(c, "用户不存在")
 		return
 	}
@@ -425,12 +468,18 @@ func AdminUpdateUser(c *gin.Context) {
 	if req.Disabled != nil {
 		updates["disabled"] = *req.Disabled
 		if *req.Disabled {
-			updates["token_version"] = u.TokenVersion + 1
+			updates["token_version"] = gorm.Expr("token_version + 1")
 		}
 	}
 	if len(updates) > 0 {
-		database.DB.Model(&u).Updates(updates)
+		if err := database.DB.WithContext(c.Request.Context()).Model(&u).Updates(updates).Error; err != nil {
+			utils.InternalError(c, "保存失败")
+			return
+		}
 	}
-	database.DB.First(&u, u.ID)
+	if err := database.DB.WithContext(c.Request.Context()).First(&u, u.ID).Error; err != nil {
+		utils.InternalError(c, "读取账号失败")
+		return
+	}
 	utils.Success(c, toUserView(&u))
 }

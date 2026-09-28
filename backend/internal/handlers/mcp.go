@@ -93,7 +93,7 @@ func MCPPost(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, rpcResponse{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{Code: rpcInvalidRequest, Message: "每批最多 10 个 MCP 请求"}})
 			return
 		}
-		if !middleware.ReserveAgentRequests(principal(c), len(batch)-1) {
+		if !middleware.ReserveAgentRequests(principal(c), len(batch)-1, database.DB.WithContext(c.Request.Context())) {
 			c.Header("Retry-After", "60")
 			c.JSON(http.StatusTooManyRequests, rpcResponse{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{Code: -32029, Message: "请求过于频繁，请稍后再试"}})
 			return
@@ -171,7 +171,7 @@ func dispatchMCP(c *gin.Context, req rpcRequest) (any, *rpcError) {
 			},
 			"serverInfo": gin.H{
 				"name":    "ninimenu",
-				"title":   database.GetSetting("app_name", "arre食谱推荐小助手") + " 食谱助手",
+				"title":   database.GetSetting("app_name", "arre食谱推荐小助手", database.DB.WithContext(c.Request.Context())) + " 食谱助手",
 				"version": agentAPIVersion,
 			},
 			"instructions": mcpInstructions(p),

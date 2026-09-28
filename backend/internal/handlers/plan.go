@@ -11,16 +11,16 @@ import (
 )
 
 func GetWeekPlan(c *gin.Context) {
-	plan := services.GetCachedWeekPlan(uid(c))
+	plan := services.GetCachedWeekPlan(uid(c), database.DB.WithContext(c.Request.Context()))
 	if plan != nil && len(plan.Days) > 0 {
-		services.RecordUniqueAchievementEvent(uid(c), "week_plan", plan.Days[0].Date)
+		services.RecordUniqueAchievementEvent(uid(c), "week_plan", plan.Days[0].Date, database.DB.WithContext(c.Request.Context()))
 	}
 	utils.Success(c, plan)
 }
 
 func RegenerateWeekPlanHandler(c *gin.Context) {
-	plan := services.RegenerateWeekPlan(uid(c))
-	services.RecordAchievementEvent(uid(c), "week_plan", "")
+	plan := services.RegenerateWeekPlan(uid(c), database.DB.WithContext(c.Request.Context()))
+	services.RecordAchievementEvent(uid(c), "week_plan", "", database.DB.WithContext(c.Request.Context()))
 	utils.Success(c, plan)
 }
 
@@ -29,12 +29,12 @@ func shoppingDates() []string {
 }
 
 func GetShoppingList(c *gin.Context) {
-	utils.Success(c, services.BuildShoppingList(uid(c), shoppingDates()))
+	utils.Success(c, services.BuildShoppingList(uid(c), shoppingDates(), database.DB.WithContext(c.Request.Context())))
 }
 
 // GetShoppingOverview 个人 + 家庭两份买菜清单（今明两天），供买菜页分区展示。
 func GetShoppingOverview(c *gin.Context) {
-	utils.Success(c, services.ShoppingOverview(uid(c)))
+	utils.Success(c, services.ShoppingOverview(uid(c), database.DB.WithContext(c.Request.Context())))
 }
 
 type ToggleShoppingCheckRequest struct {
@@ -49,7 +49,7 @@ func ToggleShoppingCheckHandler(c *gin.Context) {
 		utils.BadRequest(c, "参数无效")
 		return
 	}
-	services.ToggleShoppingCheck(uid(c), req.ItemName, shoppingDates(), req.Checked)
+	services.ToggleShoppingCheck(uid(c), req.ItemName, shoppingDates(), req.Checked, database.DB.WithContext(c.Request.Context()))
 	if req.Checked {
 		services.QueueAutoAchievementSync(uid(c))
 	}
@@ -67,13 +67,13 @@ func ToggleHomeInventoryHandler(c *gin.Context) {
 		utils.BadRequest(c, "参数无效")
 		return
 	}
-	services.ToggleHomeInventory(uid(c), req.ItemName, req.InStock)
+	services.ToggleHomeInventory(uid(c), req.ItemName, req.InStock, database.DB.WithContext(c.Request.Context()))
 	services.QueueAutoAchievementSync(uid(c))
 	utils.SuccessMsg(c, "已更新")
 }
 
 func GetShoppingCategories(c *gin.Context) {
-	utils.Success(c, services.ListShoppingCategoryOverrides())
+	utils.Success(c, services.ListShoppingCategoryOverrides(database.DB.WithContext(c.Request.Context())))
 }
 
 type UpsertShoppingCategoryRequest struct {
@@ -87,7 +87,7 @@ func UpsertShoppingCategoryHandler(c *gin.Context) {
 		utils.BadRequest(c, "参数无效")
 		return
 	}
-	if !services.UpsertShoppingCategoryOverride(req.ItemName, req.Category) {
+	if !services.UpsertShoppingCategoryOverride(req.ItemName, req.Category, database.DB.WithContext(c.Request.Context())) {
 		utils.BadRequest(c, "分类无效")
 		return
 	}
@@ -95,12 +95,12 @@ func UpsertShoppingCategoryHandler(c *gin.Context) {
 }
 
 func DeleteShoppingCategoryHandler(c *gin.Context) {
-	services.DeleteShoppingCategoryOverride(c.Param("itemName"))
+	services.DeleteShoppingCategoryOverride(c.Param("itemName"), database.DB.WithContext(c.Request.Context()))
 	utils.SuccessMsg(c, "已删除")
 }
 
 func GetUpcomingHolidays(c *gin.Context) {
 	var holidays []models.Holiday
-	database.DB.Where("date >= ?", todayStr()).Order("date ASC").Limit(5).Find(&holidays)
+	database.DB.WithContext(c.Request.Context()).Where("date >= ?", todayStr()).Order("date ASC").Limit(5).Find(&holidays)
 	utils.Success(c, holidays)
 }

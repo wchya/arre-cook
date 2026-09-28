@@ -2,12 +2,14 @@ package middleware
 
 import (
 	"bytes"
+	"gorm.io/gorm"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"ninimenu/internal/auth"
 	"ninimenu/internal/config"
+	"ninimenu/internal/database"
 	"ninimenu/internal/utils"
 	"strings"
 	"time"
@@ -69,7 +71,7 @@ func AIIngress() gin.HandlerFunc {
 
 func VideoRateLimit(limit int) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !videoLimiter.Allow(c.FullPath()+":"+itoa(auth.UID(c)), limit) {
+		if !videoLimiter.Allow(c.FullPath()+":"+itoa(auth.UID(c)), limit) || !database.ReserveWindow(database.DB.WithContext(c.Request.Context()), c.FullPath()+":"+itoa(auth.UID(c)), time.Minute, limit, 1) {
 			c.Header("Retry-After", "60")
 			utils.Error(c, http.StatusTooManyRequests, 42900, "视频请求过于频繁，请稍后重试")
 			c.Abort()
@@ -107,11 +109,11 @@ func allowedAIOrigin(origin, requestHost string) bool {
 
 // ReserveAgentRequests counts REST, MCP batches, PATs and short-lived sessions
 // against the same user. Rotating or minting another token cannot add capacity.
-func ReserveAgentRequests(p *auth.Principal, units int) bool {
+func ReserveAgentRequests(p *auth.Principal, units int, dbs ...*gorm.DB) bool {
 	limit := config.C.AgentRateLimit
 	if limit <= 0 {
 		limit = 120
 	}
 	limit = min(limit, 600)
-	return agentLimiter.AllowN(agentLimitKey(p), limit, units)
+	return database.ReserveWindow(database.Handle(dbs...), agentLimitKey(p), time.Minute, limit, units)
 }

@@ -12,6 +12,7 @@ import (
 	"ninimenu/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const deploymentVersionSetting = "notifications_last_deployment_version"
@@ -48,7 +49,9 @@ func validateNotification(title, content string) error {
 }
 
 // CreateNotification 写入一条只属于 uid 的站内信。
-func CreateNotification(uid uint, kind, title, content, link string) (*models.Notification, error) {
+func CreateNotification(uid uint, kind, title, content, link string, dbs ...*gorm.DB) (*models.Notification, error) {
+	requestDB := database.Handle(dbs...)
+
 	if uid == 0 {
 		return nil, errors.New("缺少通知接收人")
 	}
@@ -62,7 +65,7 @@ func CreateNotification(uid uint, kind, title, content, link string) (*models.No
 		return nil, err
 	}
 	n := &models.Notification{UserID: uid, Type: NormalizeNotificationType(kind), Title: title, Content: content, Link: link}
-	if err := database.DB.Create(n).Error; err != nil {
+	if err := requestDB.Create(n).Error; err != nil {
 		return nil, err
 	}
 	return n, nil
@@ -70,17 +73,19 @@ func CreateNotification(uid uint, kind, title, content, link string) (*models.No
 
 // UpsertRecentNotification 合并短时间内的同类提醒：同一用户、同类型、同标题、同链接、仍未读且在 window 内
 // 创建的站内信追加一条内容（用“；”分隔）并置顶，否则新建一条。避免连续确认几餐时刷屏。
-func UpsertRecentNotification(uid uint, kind, title, line, link string, window time.Duration) error {
+func UpsertRecentNotification(uid uint, kind, title, line, link string, window time.Duration, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
 	line = strings.TrimSpace(line)
 	if uid == 0 || line == "" {
 		return nil
 	}
 	var n models.Notification
-	err := database.DB.Scopes(database.OwnedBy(uid)).
+	err := requestDB.Scopes(database.OwnedBy(uid)).
 		Where("type = ? AND title = ? AND link = ? AND read_at IS NULL AND created_at > ?", NormalizeNotificationType(kind), strings.TrimSpace(title), strings.TrimSpace(link), time.Now().Add(-window)).
 		Order("created_at DESC").First(&n).Error
 	if err != nil {
-		_, err = CreateNotification(uid, kind, title, line, link)
+		_, err = CreateNotification(uid, kind, title, line, link, requestDB)
 		return err
 	}
 	parts := strings.Split(n.Content, "；")
@@ -93,28 +98,30 @@ func UpsertRecentNotification(uid uint, kind, title, line, link string, window t
 	if len(parts) > coalescedNoticeMaxParts {
 		parts = parts[len(parts)-coalescedNoticeMaxParts:]
 	}
-	return database.DB.Model(&n).Updates(map[string]any{"content": strings.Join(parts, "；"), "created_at": time.Now()}).Error
+	return requestDB.Model(&n).Updates(map[string]any{"content": strings.Join(parts, "；"), "created_at": time.Now()}).Error
 }
 
 // PublishNotification 发布给指定用户；uid=0 表示向全部正常用户广播。
-func PublishNotification(uid uint, kind, title, content, link string) (int64, error) {
+func PublishNotification(uid uint, kind, title, content, link string, dbs ...*gorm.DB) (int64, error) {
+	requestDB := database.Handle(dbs...)
+
 	if err := validateNotification(strings.TrimSpace(title), strings.TrimSpace(content)); err != nil {
 		return 0, err
 	}
 	if uid != 0 {
-		if _, err := CreateNotification(uid, kind, title, content, link); err != nil {
+		if _, err := CreateNotification(uid, kind, title, content, link, requestDB); err != nil {
 			return 0, err
 		}
 		return 1, nil
 	}
 	var ids []uint
-	if err := database.DB.Model(&models.User{}).Where("disabled = ?", false).Pluck("id", &ids).Error; err != nil {
+	if err := requestDB.Model(&models.User{}).Where("disabled = ?", false).Pluck("id", &ids).Error; err != nil {
 		return 0, err
 	}
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
+	err := requestDB.Transaction(func(tx *gorm.DB) error {
 		rows := make([]models.Notification, 0, len(ids))
 		for _, id := range ids {
 			rows = append(rows, models.Notification{UserID: id, Type: NormalizeNotificationType(kind), Title: strings.TrimSpace(title), Content: strings.TrimSpace(content), Link: strings.TrimSpace(link)})
@@ -167,52 +174,68 @@ func deploymentNoticeContent(version, rawNotes string) string {
 // AnnounceDeployment publishes one system notice per build identifier. The version is
 // supplied by the container build (APP_VERSION); missing/placeholder values are ignored
 // so local development restarts do not spam every account.
-func AnnounceDeployment(version string) error {
-	return AnnounceDeploymentWithNotes(version, "")
+func AnnounceDeployment(version string, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
+	return AnnounceDeploymentWithNotes(version, "", requestDB)
 }
 
 // AnnounceDeploymentWithNotes publishes a deployment notice with an optional user-facing
 // summary. The marker remains keyed by version, so restarting the same container never
 // sends duplicate notices.
-func AnnounceDeploymentWithNotes(version, releaseNotes string) error {
+func AnnounceDeploymentWithNotes(version, releaseNotes string, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
 	version = strings.TrimSpace(version)
 	if version == "" || strings.EqualFold(version, "unknown") || strings.EqualFold(version, "dev") {
 		return nil
 	}
 
 	var sent int
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
+	err := requestDB.Transaction(func(tx *gorm.DB) error {
+		// A durable task key protects retries, rollbacks and simultaneous versions.
+		claim := models.TaskClaim{Key: "deployment:" + version}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&claim).Error; err != nil {
+			return err
+		}
+		var locked models.TaskClaim
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("`key` = ?", claim.Key).First(&locked).Error; err != nil {
+			return err
+		}
+		if locked.Done {
+			return nil
+		}
 		var marker models.Setting
 		markerErr := tx.Where("`key` = ?", deploymentVersionSetting).First(&marker).Error
 		if markerErr == nil && strings.TrimSpace(marker.Value) == version {
-			return nil
+			return tx.Model(&locked).Update("done", true).Error
 		}
 		if markerErr != nil && !errors.Is(markerErr, gorm.ErrRecordNotFound) {
 			return markerErr
 		}
 
-		var ids []uint
-		if err := tx.Model(&models.User{}).Where("disabled = ?", false).Pluck("id", &ids).Error; err != nil {
+		content := deploymentNoticeContent(version, releaseNotes)
+		var users []models.User
+		if err := tx.Model(&models.User{}).Select("id").Where("disabled = ?", false).FindInBatches(&users, 100, func(batch *gorm.DB, _ int) error {
+			rows := make([]models.Notification, 0, len(users))
+			for _, u := range users {
+				rows = append(rows, models.Notification{UserID: u.ID, Type: "system_update", Title: "arre食谱推荐小助手 已更新", Content: content, Link: "/notifications"})
+			}
+			if len(rows) > 0 {
+				if err := tx.Create(&rows).Error; err != nil {
+					return err
+				}
+				sent += len(rows)
+			}
+			return nil
+		}).Error; err != nil {
 			return err
 		}
-		content := deploymentNoticeContent(version, releaseNotes)
-		rows := make([]models.Notification, 0, len(ids))
-		for _, id := range ids {
-			rows = append(rows, models.Notification{
-				UserID: id, Type: "system_update", Title: "arre食谱推荐小助手 已更新",
-				Content: content, Link: "/notifications",
-			})
+		if err := tx.Model(&locked).Update("done", true).Error; err != nil {
+			return err
 		}
-		if len(rows) > 0 {
-			if err := tx.Create(&rows).Error; err != nil {
-				return err
-			}
-			sent = len(rows)
-		}
-		if markerErr == nil {
-			return tx.Model(&marker).Update("value", version).Error
-		}
-		return tx.Create(&models.Setting{Key: deploymentVersionSetting, Value: version}).Error
+
+		return tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "key"}}, DoUpdates: clause.AssignmentColumns([]string{"value"})}).Create(&models.Setting{Key: deploymentVersionSetting, Value: version}).Error
 	})
 	if err == nil && sent > 0 {
 		log.Printf("已发布版本更新站内信：%s（%d 位用户）", version, sent)
@@ -228,17 +251,19 @@ type NotificationPage struct {
 	PageSize int                   `json:"page_size"`
 }
 
-func ListNotifications(uid uint, unreadOnly bool, page, pageSize int) NotificationPage {
+func ListNotifications(uid uint, unreadOnly bool, page, pageSize int, dbs ...*gorm.DB) NotificationPage {
+	requestDB := database.Handle(dbs...)
+
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
-	q := database.DB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid))
+	q := requestDB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid))
 	var total, unread int64
 	q.Count(&total)
-	database.DB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("read_at IS NULL").Count(&unread)
+	requestDB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("read_at IS NULL").Count(&unread)
 	if unreadOnly {
 		q = q.Where("read_at IS NULL")
 	}
@@ -250,12 +275,14 @@ func ListNotifications(uid uint, unreadOnly bool, page, pageSize int) Notificati
 	return NotificationPage{Items: items, Total: total, Unread: unread, Page: page, PageSize: pageSize}
 }
 
-func MarkNotificationRead(uid uint, id any) error {
+func MarkNotificationRead(uid uint, id any, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
 	now := time.Now()
-	res := database.DB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("id = ?", id).Where("read_at IS NULL").Update("read_at", now)
+	res := requestDB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("id = ?", id).Where("read_at IS NULL").Update("read_at", now)
 	if res.RowsAffected == 0 {
 		var exists int64
-		database.DB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("id = ?", id).Count(&exists)
+		requestDB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("id = ?", id).Count(&exists)
 		if exists == 0 {
 			return gorm.ErrRecordNotFound
 		}
@@ -263,6 +290,8 @@ func MarkNotificationRead(uid uint, id any) error {
 	return nil
 }
 
-func MarkAllNotificationsRead(uid uint) error {
-	return database.DB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("read_at IS NULL").Update("read_at", time.Now()).Error
+func MarkAllNotificationsRead(uid uint, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
+	return requestDB.Model(&models.Notification{}).Scopes(database.OwnedBy(uid)).Where("read_at IS NULL").Update("read_at", time.Now()).Error
 }

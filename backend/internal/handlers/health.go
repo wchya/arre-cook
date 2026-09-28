@@ -1,6 +1,10 @@
 package handlers
 
 import (
+	"ninimenu/internal/database"
+)
+
+import (
 	"errors"
 	"net/http"
 	"ninimenu/internal/services"
@@ -11,7 +15,7 @@ import (
 )
 
 func GetFoodJournal(c *gin.Context) {
-	items, err := services.ListFoodJournal(uid(c), c.Query("from"), c.Query("to"))
+	items, err := services.ListFoodJournal(uid(c), c.Query("from"), c.Query("to"), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.BadRequest(c, err.Error())
 		return
@@ -25,7 +29,7 @@ func CreateFoodJournal(c *gin.Context) {
 		utils.BadRequest(c, "饮食记录格式无效")
 		return
 	}
-	entry, err := services.CreateFoodJournalEntry(uid(c), input)
+	entry, err := services.CreateFoodJournalEntry(uid(c), input, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.BadRequest(c, err.Error())
 		return
@@ -39,7 +43,7 @@ func DeleteFoodJournal(c *gin.Context) {
 		utils.BadRequest(c, "记录 ID 无效")
 		return
 	}
-	if err := services.DeleteFoodJournalEntry(uid(c), uint(id)); err != nil {
+	if err := services.DeleteFoodJournalEntry(uid(c), uint(id), database.DB.WithContext(c.Request.Context())); err != nil {
 		if errors.Is(err, services.ErrFoodEntryNotFound) {
 			utils.NotFound(c, err.Error())
 		} else {
@@ -56,7 +60,7 @@ func GetHealthReport(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, 40000, "只支持最近 7 天或 30 天")
 		return
 	}
-	report, err := services.BuildHealthReport(uid(c), period)
+	report, err := services.BuildHealthReport(uid(c), period, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.InternalError(c, "生成报告失败")
 		return

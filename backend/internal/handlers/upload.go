@@ -11,7 +11,9 @@ import (
 	"log"
 	"net/http"
 	"ninimenu/internal/config"
+	"ninimenu/internal/database"
 	imgproc "ninimenu/internal/imaging"
+	"ninimenu/internal/resourcebudget"
 	"ninimenu/internal/storage"
 	"ninimenu/internal/utils"
 	"os"
@@ -139,6 +141,13 @@ func UploadImage(c *gin.Context) {
 		return
 	}
 	defer func() { <-imageUploadSlot }()
+	release, err := resourcebudget.Acquire(c.Request.Context())
+	if err != nil {
+		c.Header("Retry-After", "5")
+		utils.Error(c, 429, 42900, "正在处理图片或视频，请稍后重试")
+		return
+	}
+	defer release()
 	data, err := readUploadImage(c.Writer, c.Request, config.C.MaxUploadSize)
 	if err != nil {
 		var bodyLimit *http.MaxBytesError
@@ -175,18 +184,41 @@ func UploadImage(c *gin.Context) {
 		log.Printf("[upload] 压缩失败，保存原图: %v", err)
 	}
 
+	key := storage.UserKey(uid(c), name, now)
+	backupKey := ""
+	size := int64(len(body))
 	if !storage.UsingS3() && config.C.BackupDir != "" {
-		backup := filepath.Join(config.C.BackupDir, fmt.Sprintf("u/%d", uid(c)), now.Format("2006/01/02"), baseName+ext)
-		if err := os.MkdirAll(filepath.Dir(backup), 0755); err == nil {
-			_ = os.WriteFile(backup, data, 0644)
+		backupKey = fmt.Sprintf("u/%d/%s/%s", uid(c), now.Format("2006/01/02"), baseName+ext)
+		size += int64(len(data))
+	}
+	db := database.DB.WithContext(c.Request.Context())
+	if err := database.ReserveUpload(db, uid(c), key, backupKey, size); err != nil {
+		if errors.Is(err, database.ErrUploadQuota) {
+			utils.Error(c, 429, 42900, err.Error())
+		} else {
+			utils.InternalError(c, "图片存储暂不可用")
+		}
+		return
+	}
+	if backupKey != "" {
+		backup := filepath.Join(config.C.BackupDir, filepath.FromSlash(backupKey))
+		if err := os.MkdirAll(filepath.Dir(backup), 0755); err != nil {
+			utils.InternalError(c, "图片保存失败")
+			return
+		}
+		if err := os.WriteFile(backup, data, 0644); err != nil {
+			utils.InternalError(c, "图片保存失败")
+			return
 		}
 	}
-
-	key := storage.UserKey(uid(c), name, now)
 	url, err := storage.Save(c.Request.Context(), key, body, contentType)
 	if err != nil {
 		log.Printf("[upload] 保存 %s 失败: %v", key, err)
 		utils.InternalError(c, "图片保存失败，请稍后再试")
+		return
+	}
+	if err := database.FinishUpload(db, key); err != nil {
+		utils.InternalError(c, "图片保存失败，请重试")
 		return
 	}
 	utils.Success(c, gin.H{"url": url, "filename": name, "size": len(body), "storage": storage.Backend()})
@@ -210,9 +242,13 @@ func DeleteImage(c *gin.Context) {
 		utils.Forbidden(c, "只能删除自己上传的图片")
 		return
 	}
-	if err := storage.Delete(c.Request.Context(), key); err != nil {
-		log.Printf("[upload] 删除 %s 失败: %v", key, err)
-		utils.InternalError(c, "删除失败")
+	if err := database.DeleteUpload(c.Request.Context(), database.DB.WithContext(c.Request.Context()), key); err != nil {
+		if errors.Is(err, database.ErrUploadReferenced) {
+			utils.Error(c, 409, 40900, err.Error())
+		} else {
+			log.Printf("[upload] 删除 %s 失败: %v", key, err)
+			utils.InternalError(c, "删除失败")
+		}
 		return
 	}
 	utils.SuccessMsg(c, "删除成功")

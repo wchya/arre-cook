@@ -81,7 +81,9 @@ func randomDigits(n int) (string, error) {
 
 // SendEmailCode 发送邮箱验证码：60 秒冷却、每邮箱每小时 6 次、每 IP 每小时 20 次。
 // 返回距离可再次发送的秒数（用于前端倒计时）。
-func SendEmailCode(rawEmail, purpose, ip string) (int, error) {
+func SendEmailCode(rawEmail, purpose, ip string, dbs ...*gorm.DB) (int, error) {
+	requestDB := database.Handle(dbs...)
+
 	email, err := NormalizeEmail(rawEmail)
 	if err != nil {
 		return 0, err
@@ -90,45 +92,56 @@ func SendEmailCode(rawEmail, purpose, ip string) (int, error) {
 		purpose = "login"
 	}
 	now := time.Now()
-
-	var last models.EmailCode
-	if err := database.DB.Where("email = ? AND purpose = ?", email, purpose).Order("created_at DESC").First(&last).Error; err == nil {
-		if wait := codeCooldown - now.Sub(last.CreatedAt); wait > 0 {
-			return int(wait.Seconds()) + 1, fmt.Errorf("发送太频繁，请 %d 秒后再试", int(wait.Seconds())+1)
-		}
-	}
-	hourAgo := now.Add(-time.Hour)
-	var n int64
-	database.DB.Model(&models.EmailCode{}).Where("email = ? AND created_at > ?", email, hourAgo).Count(&n)
-	if n >= codePerEmailHourly {
-		return 0, errors.New("该邮箱获取验证码次数过多，请稍后再试")
-	}
-	database.DB.Model(&models.EmailCode{}).Where("ip = ? AND created_at > ?", ip, hourAgo).Count(&n)
-	if n >= codePerIPHourly {
-		return 0, errors.New("请求过于频繁，请稍后再试")
-	}
-
 	code, err := randomDigits(6)
 	if err != nil {
 		return 0, err
 	}
-	rec := models.EmailCode{
-		Email: email, Purpose: purpose, CodeHash: hashCode(email, purpose, code),
-		IP: ip, ExpiresAt: now.Add(config.C.EmailCodeTTL),
-	}
-	if err := database.DB.Create(&rec).Error; err != nil {
-		return 0, err
+	rec := models.EmailCode{Email: email, Purpose: purpose, CodeHash: hashCode(email, purpose, code), IP: ip, ExpiresAt: now.Add(config.C.EmailCodeTTL)}
+	waitSeconds := 0
+	err = requestDB.Transaction(func(tx *gorm.DB) error {
+		// Lock only while reserving the rolling quotas, never during SMTP I/O.
+		if err := database.LockKey(tx, "email-code-reservation"); err != nil {
+			return err
+		}
+		var last models.EmailCode
+		e := tx.Where("email = ? AND purpose = ?", email, purpose).Order("created_at DESC").First(&last).Error
+		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
+			return e
+		}
+		if e == nil {
+			if wait := codeCooldown - now.Sub(last.CreatedAt); wait > 0 {
+				waitSeconds = int(wait.Seconds()) + 1
+				return errors.New("发送太频繁，请稍后再试")
+			}
+		}
+		var n int64
+		if err := tx.Model(&models.EmailCode{}).Where("email = ? AND created_at > ?", email, now.Add(-time.Hour)).Count(&n).Error; err != nil {
+			return err
+		}
+		if n >= codePerEmailHourly {
+			return errors.New("该邮箱获取验证码次数过多，请稍后再试")
+		}
+		if err := tx.Model(&models.EmailCode{}).Where("ip = ? AND created_at > ?", ip, now.Add(-time.Hour)).Count(&n).Error; err != nil {
+			return err
+		}
+		if n >= codePerIPHourly {
+			return errors.New("请求过于频繁，请稍后再试")
+		}
+		return tx.Create(&rec).Error
+	})
+	if err != nil {
+		return waitSeconds, err
 	}
 
-	appName := database.GetSetting("app_name", "arre食谱推荐小助手")
+	appName := database.GetSetting("app_name", "arre食谱推荐小助手", requestDB)
 	subject := fmt.Sprintf("【%s】登录验证码 %s", appName, code)
 	html := mailer.CodeEmailHTML(appName, code, int(config.C.EmailCodeTTL.Minutes()))
-	if err := mailer.Send(email, subject, html); err != nil {
+	if err := mailer.Send(email, subject, html, requestDB.Statement.Context); err != nil {
 		if errors.Is(err, mailer.ErrNotConfigured) && config.C.EmailCodeDevEcho {
 			log.Printf("[开发模式] 未配置 SMTP，%s 的验证码：%s", email, code)
 			return int(codeCooldown.Seconds()), nil
 		}
-		database.DB.Delete(&rec)
+		requestDB.Model(&rec).Update("expires_at", time.Now())
 		log.Printf("[mail] 发送验证码到 %s 失败: %v", email, err)
 		return 0, errors.New("验证码发送失败，请稍后再试")
 	}
@@ -136,7 +149,9 @@ func SendEmailCode(rawEmail, purpose, ip string) (int, error) {
 }
 
 // VerifyEmailCode 校验并消费验证码（一次性）。
-func VerifyEmailCode(rawEmail, purpose, code string) (string, error) {
+func VerifyEmailCode(rawEmail, purpose, code string, dbs ...*gorm.DB) (string, error) {
+	requestDB := database.Handle(dbs...)
+
 	email, err := NormalizeEmail(rawEmail)
 	if err != nil {
 		return "", err
@@ -146,7 +161,7 @@ func VerifyEmailCode(rawEmail, purpose, code string) (string, error) {
 	}
 	code = strings.TrimSpace(code)
 	var rec models.EmailCode
-	err = database.DB.Where("email = ? AND purpose = ? AND consumed_at IS NULL", email, purpose).
+	err = requestDB.Where("email = ? AND purpose = ? AND consumed_at IS NULL", email, purpose).
 		Order("created_at DESC").First(&rec).Error
 	if err != nil || time.Now().After(rec.ExpiresAt) {
 		return "", ErrCodeInvalid
@@ -155,14 +170,14 @@ func VerifyEmailCode(rawEmail, purpose, code string) (string, error) {
 		return "", ErrCodeTooMany
 	}
 	if rec.CodeHash != hashCode(email, purpose, code) {
-		database.DB.Model(&rec).UpdateColumn("attempts", gorm.Expr("attempts + 1"))
+		requestDB.Model(&rec).UpdateColumn("attempts", gorm.Expr("attempts + 1"))
 		if rec.Attempts+1 >= codeMaxAttempts {
 			return "", ErrCodeTooMany
 		}
 		return "", ErrCodeInvalid
 	}
 	now := time.Now()
-	res := database.DB.Model(&models.EmailCode{}).Where("id = ? AND consumed_at IS NULL", rec.ID).Update("consumed_at", now)
+	res := requestDB.Model(&models.EmailCode{}).Where("id = ? AND consumed_at IS NULL", rec.ID).Update("consumed_at", now)
 	if res.RowsAffected == 0 {
 		return "", ErrCodeInvalid
 	}
@@ -171,16 +186,18 @@ func VerifyEmailCode(rawEmail, purpose, code string) (string, error) {
 
 // LoginWithEmailCode 邮箱验证码登录：已注册直接登录，未注册自动创建账号。
 // wechatCode 非空时（小程序里用邮箱登录）顺带把微信 openid 绑定到该账号。
-func LoginWithEmailCode(rawEmail, code, wechatCode string) (*models.User, bool, error) {
-	email, err := VerifyEmailCode(rawEmail, "login", code)
+func LoginWithEmailCode(rawEmail, code, wechatCode string, dbs ...*gorm.DB) (*models.User, bool, error) {
+	requestDB := database.Handle(dbs...)
+
+	email, err := VerifyEmailCode(rawEmail, "login", code, requestDB)
 	if err != nil {
 		return nil, false, err
 	}
 	var u models.User
 	created := false
-	err = database.DB.Where("email = ?", email).First(&u).Error
+	err = requestDB.Where("email = ?", email).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if !RegistrationOpen() && email != config.C.AdminEmail {
+		if !RegistrationOpen(requestDB) && email != config.C.AdminEmail {
 			return nil, false, errors.New("暂未开放注册")
 		}
 		local, _, _ := strings.Cut(email, "@")
@@ -188,11 +205,11 @@ func LoginWithEmailCode(rawEmail, code, wechatCode string) (*models.User, bool, 
 		if config.C.AdminEmail != "" && email == config.C.AdminEmail {
 			u.Role = models.RoleAdmin
 		}
-		if err := database.DB.Create(&u).Error; err != nil {
+		if err := requestDB.Create(&u).Error; err != nil {
 			return nil, false, err
 		}
-		appName := database.GetSetting("app_name", "arre食谱推荐小助手")
-		_, _ = CreateNotification(u.ID, "system_update", "欢迎来到 "+appName, "你可以记录每天吃的菜、生成健康饮食报告，并在 AI 连接中为 Hermes、DSH 等 Agent 创建独立凭证。", "/")
+		appName := database.GetSetting("app_name", "arre食谱推荐小助手", requestDB)
+		_, _ = CreateNotification(u.ID, "system_update", "欢迎来到 "+appName, "你可以记录每天吃的菜、生成健康饮食报告，并在 AI 连接中为 Hermes、DSH 等 Agent 创建独立凭证。", "/", requestDB)
 		created = true
 	} else if err != nil {
 		return nil, false, err
@@ -202,18 +219,20 @@ func LoginWithEmailCode(rawEmail, code, wechatCode string) (*models.User, bool, 
 	}
 	if wechatCode != "" {
 		if openid, unionid, err := code2Session(wechatCode); err == nil {
-			bindWechat(&u, openid, unionid)
+			bindWechat(&u, openid, unionid, requestDB)
 		}
 	}
-	touchLogin(&u)
+	touchLogin(&u, requestDB)
 	return &u, created, nil
 }
 
 // LoginWithPassword 密码登录（账号可以是邮箱或用户名）。主要给管理员在邮件服务不可用时兜底。
-func LoginWithPassword(account, password string) (*models.User, error) {
+func LoginWithPassword(account, password string, dbs ...*gorm.DB) (*models.User, error) {
+	requestDB := database.Handle(dbs...)
+
 	account = strings.TrimSpace(account)
 	var u models.User
-	q := database.DB
+	q := requestDB
 	if strings.Contains(account, "@") {
 		q = q.Where("email = ?", strings.ToLower(account))
 	} else {
@@ -225,19 +244,23 @@ func LoginWithPassword(account, password string) (*models.User, error) {
 	if u.Disabled {
 		return nil, ErrAccountLocked
 	}
-	touchLogin(&u)
+	touchLogin(&u, requestDB)
 	return &u, nil
 }
 
 // RegistrationOpen 是否允许新邮箱自动注册（环境变量与后台开关同时为开）。
-func RegistrationOpen() bool {
-	return config.C.AllowRegister && database.GetSetting("allow_register", "1") != "0"
+func RegistrationOpen(dbs ...*gorm.DB) bool {
+	requestDB := database.Handle(dbs...)
+
+	return config.C.AllowRegister && database.GetSetting("allow_register", "1", requestDB) != "0"
 }
 
-func touchLogin(u *models.User) {
+func touchLogin(u *models.User, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	now := time.Now()
 	u.LastLoginAt = &now
-	database.DB.Model(&models.User{}).Where("id = ?", u.ID).Update("last_login_at", now)
+	requestDB.Model(&models.User{}).Where("id = ?", u.ID).Update("last_login_at", now)
 }
 
 // ---------------- 微信小程序 ----------------
@@ -276,39 +299,45 @@ func code2Session(code string) (openid, unionid string, err error) {
 	return r.OpenID, r.UnionID, nil
 }
 
-func bindWechat(u *models.User, openid, unionid string) {
+func bindWechat(u *models.User, openid, unionid string, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	if u.WechatOpenID != nil && *u.WechatOpenID == openid {
 		return
 	}
 	var other int64
-	database.DB.Model(&models.User{}).Where("wechat_open_id = ? AND id <> ?", openid, u.ID).Count(&other)
+	requestDB.Model(&models.User{}).Where("wechat_open_id = ? AND id <> ?", openid, u.ID).Count(&other)
 	if other > 0 {
 		return // 该微信已绑定其他账号，不抢绑
 	}
 	u.WechatOpenID = &openid
 	u.WechatUnionID = unionid
-	database.DB.Model(&models.User{}).Where("id = ?", u.ID).Updates(map[string]any{"wechat_open_id": openid, "wechat_union_id": unionid})
+	requestDB.Model(&models.User{}).Where("id = ?", u.ID).Updates(map[string]any{"wechat_open_id": openid, "wechat_union_id": unionid})
 }
 
 // LoginWithWechat 小程序 wx.login 的 code 换取 openid，已绑定则登录；未绑定返回 needBind=true，
 // 由小程序引导用户用邮箱验证码登录并顺带绑定（保证一个人只有一个账号、数据不分裂）。
-func LoginWithWechat(code string) (u *models.User, needBind bool, err error) {
+func LoginWithWechat(code string, dbs ...*gorm.DB) (u *models.User, needBind bool, err error) {
+	requestDB := database.Handle(dbs...)
+
 	openid, _, err := code2Session(code)
 	if err != nil {
 		return nil, false, err
 	}
 	var user models.User
-	if err := database.DB.Where("wechat_open_id = ?", openid).First(&user).Error; err != nil {
+	if err := requestDB.Where("wechat_open_id = ?", openid).First(&user).Error; err != nil {
 		return nil, true, nil
 	}
 	if user.Disabled {
 		return nil, false, ErrAccountLocked
 	}
-	touchLogin(&user)
+	touchLogin(&user, requestDB)
 	return &user, false, nil
 }
 
 // PurgeExpiredCodes 清理一天前的验证码记录。
-func PurgeExpiredCodes() {
-	database.DB.Where("created_at < ?", time.Now().Add(-24*time.Hour)).Delete(&models.EmailCode{})
+func PurgeExpiredCodes(dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
+	requestDB.Where("created_at < ?", time.Now().Add(-24*time.Hour)).Delete(&models.EmailCode{})
 }

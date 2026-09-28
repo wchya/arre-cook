@@ -2,6 +2,8 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
+	"gorm.io/gorm"
 	"math"
 	"math/rand"
 	"ninimenu/internal/database"
@@ -34,10 +36,12 @@ func getCurrentWeekKey() string {
 	return monday.Format("2006-01-02")
 }
 
-func getSettingInt(key string, defaultVal int) int {
+func getSettingInt(key string, defaultVal int, dbs ...*gorm.DB) int {
+	requestDB := database.Handle(dbs...)
+
 	var setting models.Setting
-	if err := database.DB.Where("`key` = ?", key).First(&setting).Error; err == nil {
-		if n, err := strconv.Atoi(setting.Value); err == nil && n > 0 {
+	if err := requestDB.Where("`key` = ?", key).First(&setting).Error; err == nil {
+		if n, err := strconv.Atoi(setting.Value); err == nil && n > 0 && validMenuSetting(key, n) {
 			return n
 		}
 	}
@@ -45,8 +49,10 @@ func getSettingInt(key string, defaultVal int) int {
 }
 
 // getUserSettingInt 用户设置优先，未设置时回落到 fallback（通常是站点设置）。
-func getUserSettingInt(uid uint, key string, fallback int) int {
-	if n, err := strconv.Atoi(database.GetUserSetting(uid, key, "")); err == nil && n > 0 {
+func getUserSettingInt(uid uint, key string, fallback int, dbs ...*gorm.DB) int {
+	requestDB := database.Handle(dbs...)
+
+	if n, err := strconv.Atoi(database.GetUserSetting(uid, key, "", requestDB)); err == nil && n > 0 && validMenuSetting(key, n) {
 		return n
 	}
 	return fallback
@@ -54,40 +60,72 @@ func getUserSettingInt(uid uint, key string, fallback int) int {
 
 // GetCachedWeekPlan 从持久缓存读取本周菜单，过期才重新生成。
 // 不在进程内重复保留每个用户的完整菜谱，避免内存随访问过的账号数增长。
-func GetCachedWeekPlan(uid uint) *WeekPlan {
+func GetCachedWeekPlan(uid uint, dbs ...*gorm.DB) *WeekPlan {
+	requestDB := database.Handle(dbs...)
+
 	weekKey := getCurrentWeekKey()
 
-	if raw := database.GetUserSetting(uid, "week_plan_cache", ""); raw != "" {
-		if plan, err := decodeCachedWeekPlan(raw); err == nil && len(plan.Days) > 0 && plan.Days[0].Date >= weekKey {
-			return withFavorites(uid, plan)
+	if raw := database.GetUserSetting(uid, "week_plan_cache", "", requestDB); raw != "" && len(raw) <= 128<<10 {
+		if plan, err := decodeCachedWeekPlan(raw); err == nil && len(plan.Days) > 0 && len(plan.Days) <= 7 && plan.Days[0].Date == weekKey && hydrateWeekPlan(uid, plan, requestDB) {
+			return withFavorites(uid, plan, requestDB)
 		}
 	}
 
-	return RegenerateWeekPlan(uid)
+	return RegenerateWeekPlan(uid, requestDB)
 }
 
-func RegenerateWeekPlan(uid uint) *WeekPlan {
-	plan, _ := GenerateWeekPlan(uid)
-	saveWeekPlanCache(uid, plan)
-	return withFavorites(uid, plan)
+func RegenerateWeekPlan(uid uint, dbs ...*gorm.DB) *WeekPlan {
+	requestDB := database.Handle(dbs...)
+
+	plan, _ := GenerateWeekPlan(uid, requestDB)
+	saveWeekPlanCache(uid, plan, requestDB)
+	return withFavorites(uid, plan, requestDB)
 }
 
 // InvalidateWeekPlan 菜品变更后让用户的周菜单下次重新生成。
-func InvalidateWeekPlan(uid uint) {
-	database.DB.Where("user_id = ? AND `key` = ?", uid, "week_plan_cache").Delete(&models.UserSetting{})
+func InvalidateWeekPlan(uid uint, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
+	requestDB.Where("user_id = ? AND `key` = ?", uid, "week_plan_cache").Delete(&models.UserSetting{})
 }
 
-func saveWeekPlanCache(uid uint, plan *WeekPlan) {
-	data, _ := json.Marshal(plan)
-	_ = database.SetUserSetting(uid, "week_plan_cache", string(data))
+func saveWeekPlanCache(uid uint, plan *WeekPlan, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
+	// Persist identities only. Every read resolves current visibility and content.
+	type dishID struct {
+		ID uint `json:"id"`
+	}
+	type cachedDay struct {
+		Date    string   `json:"date"`
+		DayName string   `json:"day_name"`
+		Lunch   []dishID `json:"lunch"`
+		Dinner  []dishID `json:"dinner"`
+	}
+	compact := struct {
+		Days []cachedDay `json:"days"`
+	}{Days: make([]cachedDay, len(plan.Days))}
+	for i, day := range plan.Days {
+		compact.Days[i] = cachedDay{Date: day.Date, DayName: day.DayName}
+		for _, d := range day.Lunch {
+			compact.Days[i].Lunch = append(compact.Days[i].Lunch, dishID{ID: d.ID})
+		}
+		for _, d := range day.Dinner {
+			compact.Days[i].Dinner = append(compact.Days[i].Dinner, dishID{ID: d.ID})
+		}
+	}
+	data, _ := json.Marshal(compact)
+	_ = database.SetUserSetting(uid, "week_plan_cache", string(data), requestDB)
 }
 
 // withFavorites 刷新请求独享菜单的收藏状态，不需要再复制整份菜谱。
-func withFavorites(uid uint, plan *WeekPlan) *WeekPlan {
+func withFavorites(uid uint, plan *WeekPlan, dbs ...*gorm.DB) *WeekPlan {
+	requestDB := database.Handle(dbs...)
+
 	if plan == nil {
 		return &WeekPlan{Days: []WeekDayPlan{}}
 	}
-	favs := FavoriteIDSet(uid)
+	favs := FavoriteIDSet(uid, requestDB)
 	for i := range plan.Days {
 		d := &plan.Days[i]
 		if d.Lunch == nil {
@@ -106,11 +144,13 @@ func withFavorites(uid uint, plan *WeekPlan) *WeekPlan {
 	return plan
 }
 
-func GenerateWeekPlan(uid uint) (*WeekPlan, error) {
-	prefs := GetPreferences(uid)
+func GenerateWeekPlan(uid uint, dbs ...*gorm.DB) (*WeekPlan, error) {
+	requestDB := database.Handle(dbs...)
+
+	prefs := GetPreferences(uid, requestDB)
 	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
 	var dishes []models.Dish
-	for _, d := range VisibleEnabledDishes(uid) {
+	for _, d := range menuCandidates(uid, nil, requestDB) {
 		if !containsAny(dishSearchText(d), blocked) {
 			dishes = append(dishes, d)
 		}
@@ -119,8 +159,8 @@ func GenerateWeekPlan(uid uint) (*WeekPlan, error) {
 		return &WeekPlan{Days: []WeekDayPlan{}}, nil
 	}
 
-	lunchCount := getUserSettingInt(uid, "lunch_dishes_per_day", getSettingInt("lunch_dishes_per_day", 1))
-	dinnerCount := getUserSettingInt(uid, "dinner_dishes_per_day", getSettingInt("dinner_dishes_per_day", 1))
+	lunchCount := getUserSettingInt(uid, "lunch_dishes_per_day", getSettingInt("lunch_dishes_per_day", 1, requestDB), requestDB)
+	dinnerCount := getUserSettingInt(uid, "dinner_dishes_per_day", getSettingInt("dinner_dishes_per_day", 1, requestDB), requestDB)
 
 	var lunchPool, dinnerPool []models.Dish
 	for _, d := range dishes {
@@ -172,27 +212,30 @@ func GenerateWeekPlan(uid uint) (*WeekPlan, error) {
 }
 
 func pickNDishes(pool []models.Dish, count int, globalUsed map[uint]bool, dayUsed map[uint]bool, r *rand.Rand) []models.Dish {
-	available := filterAvailableBoth(pool, globalUsed, dayUsed)
-	var picked []models.Dish
-
-	for len(picked) < count && len(available) > 0 {
-		d := available[weightedDishIndex(available, r)]
-		picked = append(picked, d)
-		globalUsed[d.ID] = true
-		dayUsed[d.ID] = true
-		available = filterAvailableBoth(pool, globalUsed, dayUsed)
+	count = min(max(count, 0), MaxDishesPerMeal)
+	type ranked struct {
+		dish  models.Dish
+		score float64
+		used  bool
 	}
-
-	if len(picked) < count {
-		available2 := filterAvailable(pool, dayUsed)
-		for len(picked) < count && len(available2) > 0 {
-			d := available2[weightedDishIndex(available2, r)]
-			picked = append(picked, d)
-			dayUsed[d.ID] = true
-			available2 = filterAvailable(pool, dayUsed)
+	candidates := make([]ranked, 0, len(pool))
+	for _, d := range pool {
+		if !dayUsed[d.ID] {
+			candidates = append(candidates, ranked{d, -math.Log(1-r.Float64()) / DishSourceWeight(d), globalUsed[d.ID]})
 		}
 	}
-
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].used != candidates[j].used {
+			return !candidates[i].used
+		}
+		return candidates[i].score < candidates[j].score
+	})
+	picked := make([]models.Dish, 0, min(count, len(candidates)))
+	for _, c := range candidates[:min(count, len(candidates))] {
+		picked = append(picked, c.dish)
+		globalUsed[c.dish.ID] = true
+		dayUsed[c.dish.ID] = true
+	}
 	return picked
 }
 
@@ -446,13 +489,15 @@ func shoppingItemPriority(item ShoppingItem) int {
 	}
 }
 
-func BuildShoppingList(uid uint, dates []string) []ShoppingCategory {
+func BuildShoppingList(uid uint, dates []string, dbs ...*gorm.DB) []ShoppingCategory {
+	requestDB := database.Handle(dbs...)
+
 	if len(dates) == 0 {
 		return []ShoppingCategory{}
 	}
 
 	var checks []models.ShoppingCheck
-	database.DB.Scopes(database.OwnedBy(uid)).Where("meal_date IN ?", dates).Find(&checks)
+	requestDB.Scopes(database.OwnedBy(uid)).Where("meal_date IN ?", dates).Find(&checks)
 	if len(checks) == 0 {
 		return []ShoppingCategory{}
 	}
@@ -462,12 +507,12 @@ func BuildShoppingList(uid uint, dates []string) []ShoppingCategory {
 	}
 
 	var inventory []models.HomeInventory
-	database.DB.Scopes(database.OwnedBy(uid)).Where("in_stock = ?", true).Find(&inventory)
+	requestDB.Scopes(database.OwnedBy(uid)).Where("in_stock = ?", true).Find(&inventory)
 	inStockByName := make(map[string]bool, len(inventory))
 	for _, inv := range inventory {
 		inStockByName[inv.ItemName] = true
 	}
-	return groupShoppingRows(rows, inStockByName)
+	return groupShoppingRows(rows, inStockByName, requestDB)
 }
 
 // shoppingRow 一条待合并的买菜条目（个人 ShoppingCheck 或家庭 FamilyShoppingCheck）。
@@ -479,7 +524,9 @@ type shoppingRow struct {
 
 // groupShoppingRows 同名食材合并用量（同单位数值相加），任一行已勾选即视为已买，
 // 再按蔬菜 / 肉类 / 配料 / 其他分组排序；inStock 标记家中常备（家庭清单传 nil）。
-func groupShoppingRows(rows []shoppingRow, inStock map[string]bool) []ShoppingCategory {
+func groupShoppingRows(rows []shoppingRow, inStock map[string]bool, dbs ...*gorm.DB) []ShoppingCategory {
+	requestDB := database.Handle(dbs...)
+
 	if len(rows) == 0 {
 		return []ShoppingCategory{}
 	}
@@ -502,7 +549,7 @@ func groupShoppingRows(rows []shoppingRow, inStock map[string]bool) []ShoppingCa
 		}
 	}
 
-	categoryByName := getShoppingCategoryOverrideMap()
+	categoryByName := getShoppingCategoryOverrideMap(requestDB)
 
 	grouped := map[string][]ShoppingItem{
 		"蔬菜": {},
@@ -583,9 +630,11 @@ func classifyShoppingItem(name string, overrides map[string]string) string {
 	return "其他"
 }
 
-func getShoppingCategoryOverrideMap() map[string]string {
+func getShoppingCategoryOverrideMap(dbs ...*gorm.DB) map[string]string {
+	requestDB := database.Handle(dbs...)
+
 	var overrides []models.ShoppingItemCategory
-	database.DB.Order("item_name ASC").Find(&overrides)
+	requestDB.Order("item_name ASC").Find(&overrides)
 
 	result := make(map[string]string, len(overrides))
 	for _, override := range overrides {
@@ -601,9 +650,11 @@ func isValidShoppingCategory(category string) bool {
 	return ok
 }
 
-func ListShoppingCategoryOverrides() []ShoppingCategoryOverride {
+func ListShoppingCategoryOverrides(dbs ...*gorm.DB) []ShoppingCategoryOverride {
+	requestDB := database.Handle(dbs...)
+
 	var rows []models.ShoppingItemCategory
-	database.DB.Order("category ASC, item_name ASC").Find(&rows)
+	requestDB.Order("category ASC, item_name ASC").Find(&rows)
 
 	overrides := make([]ShoppingCategoryOverride, 0, len(rows))
 	for _, row := range rows {
@@ -625,48 +676,56 @@ func ListShoppingCategoryOverrides() []ShoppingCategoryOverride {
 	return overrides
 }
 
-func UpsertShoppingCategoryOverride(itemName, category string) bool {
+func UpsertShoppingCategoryOverride(itemName, category string, dbs ...*gorm.DB) bool {
+	requestDB := database.Handle(dbs...)
+
 	itemName = strings.TrimSpace(itemName)
 	category = strings.TrimSpace(category)
 	if itemName == "" || !isValidShoppingCategory(category) {
 		return false
 	}
 
-	database.DB.Where("item_name = ?", itemName).
+	requestDB.Where("item_name = ?", itemName).
 		Assign(models.ShoppingItemCategory{Category: category}).
 		FirstOrCreate(&models.ShoppingItemCategory{ItemName: itemName})
 	return true
 }
 
-func DeleteShoppingCategoryOverride(itemName string) {
+func DeleteShoppingCategoryOverride(itemName string, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	itemName = strings.TrimSpace(itemName)
 	if itemName == "" {
 		return
 	}
-	database.DB.Where("item_name = ?", itemName).Delete(&models.ShoppingItemCategory{})
+	requestDB.Where("item_name = ?", itemName).Delete(&models.ShoppingItemCategory{})
 }
 
 // ToggleShoppingCheck 勾选/取消某食材（只影响该用户在这些日期里的清单）。
-func ToggleShoppingCheck(uid uint, itemName string, dates []string, checked bool) {
-	q := database.DB.Model(&models.ShoppingCheck{}).Scopes(database.OwnedBy(uid)).Where("item_name = ?", itemName)
+func ToggleShoppingCheck(uid uint, itemName string, dates []string, checked bool, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
+	q := requestDB.Model(&models.ShoppingCheck{}).Scopes(database.OwnedBy(uid)).Where("item_name = ?", itemName)
 	if len(dates) > 0 {
 		q = q.Where("meal_date IN ?", dates)
 	}
 	q.Update("checked", checked)
 }
 
-func ToggleHomeInventory(uid uint, itemName string, inStock bool) {
+func ToggleHomeInventory(uid uint, itemName string, inStock bool, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	itemName = strings.TrimSpace(itemName)
 	if itemName == "" {
 		return
 	}
 
 	if !inStock {
-		database.DB.Scopes(database.OwnedBy(uid)).Where("item_name = ?", itemName).Delete(&models.HomeInventory{})
+		requestDB.Scopes(database.OwnedBy(uid)).Where("item_name = ?", itemName).Delete(&models.HomeInventory{})
 		return
 	}
 
-	database.DB.Where("user_id = ? AND item_name = ?", uid, itemName).
+	requestDB.Where("user_id = ? AND item_name = ?", uid, itemName).
 		Assign(models.HomeInventory{InStock: true}).
 		FirstOrCreate(&models.HomeInventory{UserID: uid, ItemName: itemName})
 }
@@ -678,4 +737,89 @@ func hasKeyword(s string, keywords []string) bool {
 		}
 	}
 	return false
+}
+
+const MaxDishesPerMeal = 10
+
+func validMenuSetting(key string, value int) bool {
+	switch key {
+	case "lunch_dishes_per_day", "dinner_dishes_per_day":
+		return value >= 1 && value <= MaxDishesPerMeal
+	case "repeat_days":
+		return value >= 1 && value <= 30
+	}
+	return true
+}
+func ValidateMenuSettings(settings map[string]string) error {
+	if len(settings) > 50 {
+		return errors.New("设置项过多")
+	}
+	for key, raw := range settings {
+		if len(raw) > 8192 {
+			return errors.New("设置内容过长")
+		}
+		switch key {
+		case "lunch_dishes_per_day", "dinner_dishes_per_day", "repeat_days":
+			if strings.TrimSpace(raw) == "" {
+				continue
+			}
+			n, err := strconv.Atoi(strings.TrimSpace(raw))
+			if err != nil || !validMenuSetting(key, n) {
+				return errors.New("每餐菜数须为 1-10，去重天数须为 1-30")
+			}
+		}
+	}
+	return nil
+}
+
+// Menu cards omit recipe instructions and oversized legacy rows. This keeps
+// seven days of repeated cards bounded; full recipes load through /dishes/:id.
+func menuCandidates(uid uint, ids []uint, dbs ...*gorm.DB) []models.Dish {
+	requestDB := database.Handle(dbs...)
+
+	q := requestDB.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true).
+		Where("LENGTH(ingredients) <= 32768 AND LENGTH(tags) <= 4096 AND LENGTH(name) <= 400 AND LENGTH(image_url) <= 2048 AND LENGTH(images) <= 8192 AND LENGTH(category) <= 160 AND LENGTH(taste) <= 320").
+		Where("COALESCE(LENGTH(seasonings),0) <= 8192 AND COALESCE(LENGTH(remark),0) <= 4096").
+		Select("id", "name", "image_url", "images", "category", "meal_type", "taste", "ingredients", "seasonings", "remark", "cook_time", "difficulty", "owner_id", "family_id", "enabled", "tags", "updated_at")
+	if ids != nil {
+		q = q.Where("id IN ?", ids)
+	}
+	var dishes []models.Dish
+	q.Find(&dishes)
+	return dishes
+}
+func hydrateWeekPlan(uid uint, plan *WeekPlan, dbs ...*gorm.DB) bool {
+	requestDB := database.Handle(dbs...)
+
+	ids := []uint{}
+	for _, d := range plan.Days {
+		if len(d.Lunch) > MaxDishesPerMeal || len(d.Dinner) > MaxDishesPerMeal {
+			return false
+		}
+		for _, dishes := range [][]models.Dish{d.Lunch, d.Dinner} {
+			for _, dish := range dishes {
+				ids = append(ids, dish.ID)
+			}
+		}
+	}
+	current := map[uint]models.Dish{}
+	prefs := GetPreferences(uid, requestDB)
+	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
+	for _, d := range menuCandidates(uid, ids, requestDB) {
+		if !containsAny(dishSearchText(d), blocked) {
+			current[d.ID] = d
+		}
+	}
+	for i := range plan.Days {
+		for _, meal := range [][]models.Dish{plan.Days[i].Lunch, plan.Days[i].Dinner} {
+			for j := range meal {
+				d, ok := current[meal[j].ID]
+				if !ok {
+					return false
+				}
+				meal[j] = d
+			}
+		}
+	}
+	return true
 }

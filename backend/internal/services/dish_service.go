@@ -1,6 +1,7 @@
 package services
 
 import (
+	"gorm.io/gorm"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"strings"
@@ -26,8 +27,10 @@ type DishQuery struct {
 }
 
 // SearchDishes 在用户可见菜品中检索，返回当前页与总数。
-func SearchDishes(uid uint, q DishQuery) ([]models.Dish, int) {
-	query := database.DB.Scopes(database.VisibleDishes(uid))
+func SearchDishes(uid uint, q DishQuery, dbs ...*gorm.DB) ([]models.Dish, int) {
+	requestDB := database.Handle(dbs...)
+
+	query := requestDB.Scopes(database.VisibleDishes(uid))
 	if !q.IncludeDisabled {
 		query = query.Where("enabled = ?", true)
 	}
@@ -50,21 +53,42 @@ func SearchDishes(uid uint, q DishQuery) ([]models.Dish, int) {
 		query = query.Where("owner_id = ?", uid)
 	}
 
-	var all []models.Dish
-	query.Order("sort_order ASC, id ASC").Find(&all)
-
-	favs := FavoriteIDSet(uid)
+	favs := FavoriteIDSet(uid, requestDB)
 	recent := map[uint]bool{}
 	if q.ExcludeRecent {
-		recent = recentDishIDMap(uid, UserRepeatDays(uid))
+		recent = recentDishIDMap(uid, UserRepeatDays(uid, requestDB), requestDB)
 	}
 	keyword := strings.ToLower(strings.TrimSpace(q.Keyword))
 	tastes := cleanList(q.Tastes)
 	include := cleanList(q.Ingredients)
 	exclude := cleanList(q.ExcludeIngredient)
 
-	filtered := make([]models.Dish, 0, len(all))
-	for _, d := range all {
+	offset, limit := q.Offset, q.Limit
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	// Scan only searchable fields. Keep one candidate and one page of IDs,
+	// then fetch complete details for the selected page after closing the cursor.
+	rows, err := query.Model(&models.Dish{}).
+		Select("id, name, category, taste, remark, ingredients, seasonings, tags").
+		Order("sort_order ASC, id ASC").Rows()
+	if err != nil {
+		return []models.Dish{}, 0
+	}
+	ids := make([]uint, 0, limit)
+	total := 0
+	for rows.Next() {
+		var d models.Dish
+		if err := requestDB.ScanRows(rows, &d); err != nil {
+			rows.Close()
+			return []models.Dish{}, 0
+		}
 		d.Favorite = favs[d.ID]
 		if q.OnlyFavorites && !d.Favorite {
 			continue
@@ -82,29 +106,30 @@ func SearchDishes(uid uint, q DishQuery) ([]models.Dish, int) {
 		if !containsAll(text, include) || containsAny(text, exclude) {
 			continue
 		}
-		filtered = append(filtered, d)
+		if total >= offset && len(ids) < limit {
+			ids = append(ids, d.ID)
+		}
+		total++
 	}
-
-	total := len(filtered)
-	offset := q.Offset
-	if offset < 0 {
-		offset = 0
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return []models.Dish{}, 0
 	}
-	if offset > total {
-		offset = total
+	result := []models.Dish{}
+	if len(ids) > 0 {
+		details := requestDB.Scopes(database.VisibleDishes(uid)).Where("id IN ?", ids)
+		if !q.IncludeDisabled {
+			details = details.Where("enabled = ?", true)
+		}
+		if err := details.Order("sort_order ASC, id ASC").Find(&result).Error; err != nil {
+			return []models.Dish{}, 0
+		}
+		for i := range result {
+			result[i].Favorite = favs[result[i].ID]
+		}
 	}
-	limit := q.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 500 {
-		limit = 500
-	}
-	end := offset + limit
-	if end > total {
-		end = total
-	}
-	return filtered[offset:end], total
+	return result, total
 }
 
 // matchesKeyword 关键词按空格拆开后全部命中（如“牛肉 辣”）。
@@ -129,9 +154,11 @@ type DishUserStats struct {
 	Favorite   bool    `json:"favorite"`
 }
 
-func DishStatsForUser(uid uint, dishID uint) (DishUserStats, []models.MealRecord) {
+func DishStatsForUser(uid uint, dishID uint, dbs ...*gorm.DB) (DishUserStats, []models.MealRecord) {
+	requestDB := database.Handle(dbs...)
+
 	var records []models.MealRecord
-	database.DB.Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dishID).
+	requestDB.Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dishID).
 		Order("meal_date DESC, created_at DESC").Limit(50).Find(&records)
 
 	s := DishUserStats{TotalCount: len(records)}
@@ -156,9 +183,9 @@ func DishStatsForUser(uid uint, dishID uint) (DishUserStats, []models.MealRecord
 	if len(records) > 0 {
 		s.LastDate = records[0].MealDate
 	}
-	database.DB.Model(&models.BehaviorEvent{}).Scopes(database.OwnedBy(uid)).
+	requestDB.Model(&models.BehaviorEvent{}).Scopes(database.OwnedBy(uid)).
 		Where("dish_id = ? AND event_type = ?", dishID, "view").Count(&s.ViewCount)
-	s.Favorite = FavoriteIDSet(uid)[dishID]
+	s.Favorite = FavoriteIDSet(uid, requestDB)[dishID]
 	return s, records
 }
 

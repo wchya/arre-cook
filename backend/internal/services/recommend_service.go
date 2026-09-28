@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm"
 	"math"
 	"math/rand"
 	"ninimenu/internal/database"
@@ -67,7 +68,9 @@ type candidateFilter struct {
 
 // RecommendDishes 站内统一推荐引擎：候选过滤 → 画像打分 → 多样性挑选 → 记录推荐事件。
 // 首页午/晚餐推荐、心情推荐、AI 助手与 /api/agent/recommend 共用这一套逻辑；只使用 uid 本人的数据。
-func RecommendDishes(uid uint, req RecommendRequest) (*RecommendResponse, error) {
+func RecommendDishes(uid uint, req RecommendRequest, dbs ...*gorm.DB) (*RecommendResponse, error) {
+	requestDB := database.Handle(dbs...)
+
 	count := req.Count
 	if count < 1 {
 		count = 3
@@ -79,7 +82,7 @@ func RecommendDishes(uid uint, req RecommendRequest) (*RecommendResponse, error)
 	if mealType != "lunch" && mealType != "dinner" {
 		mealType = ""
 	}
-	excludeRecentDays := UserRepeatDays(uid)
+	excludeRecentDays := UserRepeatDays(uid, requestDB)
 	if req.ExcludeRecentDays != nil {
 		excludeRecentDays = *req.ExcludeRecentDays
 		if excludeRecentDays < 0 {
@@ -91,7 +94,7 @@ func RecommendDishes(uid uint, req RecommendRequest) (*RecommendResponse, error)
 		diversity = *req.Diversity
 	}
 
-	profile := BuildTasteProfile(uid, req.ProfileDays)
+	profile := BuildTasteProfile(uid, req.ProfileDays, requestDB)
 	prefs := profile.Preferences
 
 	applied := map[string]any{
@@ -106,7 +109,7 @@ func RecommendDishes(uid uint, req RecommendRequest) (*RecommendResponse, error)
 	}
 	empty := &RecommendResponse{Items: []RecommendItem{}, ProfileSummary: profile.Summary, Applied: applied}
 
-	dishes := VisibleEnabledDishes(uid)
+	dishes := VisibleEnabledDishes(uid, requestDB)
 	if len(dishes) == 0 {
 		return empty, nil
 	}
@@ -119,7 +122,7 @@ func RecommendDishes(uid uint, req RecommendRequest) (*RecommendResponse, error)
 	}
 	recent := map[uint]bool{}
 	if excludeRecentDays > 0 {
-		recent = recentDishIDMap(uid, excludeRecentDays)
+		recent = recentDishIDMap(uid, excludeRecentDays, requestDB)
 	}
 
 	exclude := cleanList(req.ExcludeIngredients)
@@ -191,7 +194,7 @@ func RecommendDishes(uid uint, req RecommendRequest) (*RecommendResponse, error)
 	})
 
 	picked := pickDiverse(scored, count, diversity)
-	logRecommendEvents(uid, picked, req, mealType)
+	logRecommendEvents(uid, picked, req, mealType, requestDB)
 
 	return &RecommendResponse{
 		Items:          picked,
@@ -450,7 +453,9 @@ func pickDiverse(scored []RecommendItem, count int, diversity bool) []RecommendI
 	return picked
 }
 
-func logRecommendEvents(uid uint, items []RecommendItem, req RecommendRequest, mealType string) {
+func logRecommendEvents(uid uint, items []RecommendItem, req RecommendRequest, mealType string, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	if len(items) == 0 {
 		return
 	}
@@ -481,15 +486,17 @@ func logRecommendEvents(uid uint, items []RecommendItem, req RecommendRequest, m
 			Meta:      string(meta),
 		})
 	}
-	database.DB.Create(&events)
+	requestDB.Create(&events)
 	if strings.HasPrefix(source, "agent") || source == "assistant" {
-		RecordAchievementEvent(uid, "agent_recommend", "")
+		RecordAchievementEvent(uid, "agent_recommend", "", requestDB)
 	}
 }
 
 // RecentDishIDs 返回用户最近 days 天（含未来日期的计划）吃过的菜品 ID。
-func RecentDishIDs(uid uint, days int) []uint {
-	recent := recentDishIDMap(uid, days)
+func RecentDishIDs(uid uint, days int, dbs ...*gorm.DB) []uint {
+	requestDB := database.Handle(dbs...)
+
+	recent := recentDishIDMap(uid, days, requestDB)
 	ids := make([]uint, 0, len(recent))
 	for id := range recent {
 		ids = append(ids, id)

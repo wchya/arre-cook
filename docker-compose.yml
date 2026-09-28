@@ -13,6 +13,10 @@ services:
     security_opt:
       - no-new-privileges:true
     pids_limit: 256
+    mem_limit: ${APP_MEMORY_LIMIT:-1g}
+    memswap_limit: ${APP_MEMORY_LIMIT:-1g}
+    cpus: ${APP_CPUS:-2}
+    stop_grace_period: 110s
     ports:
       - "127.0.0.1:9925:8080"
     networks:
@@ -23,10 +27,12 @@ services:
       GIN_MODE: release
       APP_ENV: production
       # Go runtime soft limit only; local Python ASR needs additional headroom.
-      GOMEMLIMIT: ${GOMEMLIMIT:-256MiB}
+      GOMEMLIMIT: ${GOMEMLIMIT:-192MiB}
+      GOMAXPROCS: ${GOMAXPROCS:-2}
       APP_RELEASE_NOTES: ${APP_RELEASE_NOTES:-}
       PORT: "8080"
       DB_DRIVER: ${DB_DRIVER:-mysql}
+      DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
       MYSQL_HOST: ${MYSQL_HOST:-mysql}
       MYSQL_PORT: ${MYSQL_PORT:-3306}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ninimenu}

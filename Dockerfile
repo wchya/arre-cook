@@ -13,10 +13,12 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---------- Stage 2: build backend ----------
-FROM golang:1.25-alpine AS backend-build
+FROM golang:1.25.14-alpine AS backend-build
 ARG APP_VERSION
 # goproxy.cn：境内拉 Go 模块，proxy.golang.org 直连基本不可用
 ENV GOPROXY=https://goproxy.cn,direct
+# Keep compiler processes bounded on the small production build host.
+ENV GOMAXPROCS=2 GOMEMLIMIT=384MiB GOFLAGS=-p=1
 WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 # 模块缓存 + 编译缓存挂载：改代码重编译从 40s 降到几秒，且不进镜像层

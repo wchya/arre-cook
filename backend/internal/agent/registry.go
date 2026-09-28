@@ -9,6 +9,10 @@
 package agent
 
 import (
+	"ninimenu/internal/database"
+)
+
+import (
 	"context"
 	"encoding/json"
 	"errors"
@@ -130,7 +134,7 @@ func Invoke(ctx *Ctx, name string, args json.RawMessage) (any, error) {
 			}
 		}
 		entry.Status, entry.Error = "denied", "missing scope "+strings.Join(missing, ", ")
-		services.WriteAudit(entry)
+		services.WriteAudit(entry, database.DB.WithContext(ctx.Context))
 		return nil, ErrForbidden{Scope: strings.Join(missing, ", ")}
 	}
 	if len(args) == 0 || string(args) == "null" {
@@ -145,7 +149,7 @@ func Invoke(ctx *Ctx, name string, args json.RawMessage) (any, error) {
 	}
 	// 只读调用量大，只审计外部智能体；站内助手与所有写操作都记录
 	if t.Write || ctx.Principal.IsAgent() || err != nil {
-		services.WriteAudit(entry)
+		services.WriteAudit(entry, database.DB.WithContext(ctx.Context))
 	}
 	return result, err
 }

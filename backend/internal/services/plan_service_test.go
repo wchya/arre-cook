@@ -18,32 +18,40 @@ func TestWeekPlanPersistentCacheIsolationAndFavorites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan := func(name string) *WeekPlan {
-		return &WeekPlan{Days: []WeekDayPlan{{Date: getCurrentWeekKey(), Lunch: []models.Dish{{ID: 1, Name: name, Ingredients: `[{"name":"鸡蛋","amount":"2个"}]`, VideoMeta: `{"title":"做菜视频"}`}}}}}
+	makePlan := func(owner uint, name string) *WeekPlan {
+		d := models.Dish{OwnerID: owner, Name: name, Enabled: true, Images: "[]", Tags: "[]", Ingredients: `[{"name":"鸡蛋","amount":"2个"}]`, Steps: strings.Repeat("large instructions", 1000)}
+		if err := database.DB.Create(&d).Error; err != nil {
+			t.Fatal(err)
+		}
+		return &WeekPlan{Days: []WeekDayPlan{{Date: getCurrentWeekKey(), Lunch: []models.Dish{d}}}}
 	}
-	saveWeekPlanCache(alice.ID, plan("Alice menu"))
-	saveWeekPlanCache(bob.ID, plan("Bob menu"))
+	a, b := makePlan(alice.ID, "Alice menu"), makePlan(bob.ID, "Bob menu")
+	saveWeekPlanCache(alice.ID, a)
+	saveWeekPlanCache(bob.ID, b)
+	if raw := database.GetUserSetting(alice.ID, "week_plan_cache", ""); strings.Contains(raw, "large instructions") || strings.Contains(raw, "鸡蛋") {
+		t.Fatal("cache retained recipe snapshots")
+	}
 	first := GetCachedWeekPlan(alice.ID)
 	if len(first.Days) != 1 || first.Days[0].Lunch[0].Name != "Alice menu" {
-		t.Fatal("persistent plan was regenerated")
+		t.Fatal("persistent identities were not hydrated")
 	}
-	if dish := first.Days[0].Lunch[0]; dish.Ingredients != plan("").Days[0].Lunch[0].Ingredients || dish.VideoMeta != plan("").Days[0].Lunch[0].VideoMeta {
-		t.Fatal("JSON columns or video metadata were lost from the persisted plan")
+	if first.Days[0].Lunch[0].Ingredients != a.Days[0].Lunch[0].Ingredients {
+		t.Fatal("current ingredient data lost")
 	}
 	first.Days[0].Lunch[0].Name = "client edit"
-	if err := database.DB.Create(&models.Favorite{UserID: alice.ID, DishID: 1}).Error; err != nil {
+	if err := database.DB.Create(&models.Favorite{UserID: alice.ID, DishID: a.Days[0].Lunch[0].ID}).Error; err != nil {
 		t.Fatal(err)
 	}
 	second, other := GetCachedWeekPlan(alice.ID), GetCachedWeekPlan(bob.ID)
 	if second.Days[0].Lunch[0].Name != "Alice menu" || !second.Days[0].Lunch[0].Favorite {
-		t.Fatalf("menu or current favorite was lost: %+v", second)
+		t.Fatal("request mutation or favorite isolation failed")
 	}
 	if other.Days[0].Lunch[0].Name != "Bob menu" || other.Days[0].Lunch[0].Favorite {
-		t.Fatalf("another user's menu/favorite leaked: %+v", other)
+		t.Fatal("cross-user cache contamination")
 	}
 	InvalidateWeekPlan(alice.ID)
 	if database.GetUserSetting(alice.ID, "week_plan_cache", "") != "" || database.GetUserSetting(bob.ID, "week_plan_cache", "") == "" {
-		t.Fatal("cache invalidation must affect only its owner")
+		t.Fatal("cache invalidation affected another user")
 	}
 }
 

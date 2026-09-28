@@ -26,12 +26,12 @@ func init() {
 				meal = "lunch"
 			}
 			var today []models.MealRecord
-			database.DB.Scopes(database.OwnedBy(ctx.UID())).Where("meal_date = ?", services.Today()).Find(&today)
+			database.DB.WithContext(ctx.Context).Scopes(database.OwnedBy(ctx.UID())).Where("meal_date = ?", services.Today()).Find(&today)
 			eaten := make([]map[string]any, 0, len(today))
 			for _, r := range today {
 				eaten = append(eaten, map[string]any{"record_id": r.ID, "dish_id": r.DishID, "dish_name": r.DishName, "meal_type": r.MealType})
 			}
-			journal, err := services.ListFoodJournal(ctx.UID(), services.Today(), services.Today())
+			journal, err := services.ListFoodJournal(ctx.UID(), services.Today(), services.Today(), database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}
@@ -47,7 +47,7 @@ func init() {
 				"suggested_meal":    meal,
 				"today_meals":       eaten,
 				"granted_scopes":    ctx.Principal.Scopes.List(),
-				"repeat_avoid_days": services.UserRepeatDays(ctx.UID()),
+				"repeat_avoid_days": services.UserRepeatDays(ctx.UID(), database.DB.WithContext(ctx.Context)),
 			}, nil
 		},
 	})
@@ -65,7 +65,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			p := services.BuildTasteProfile(ctx.UID(), in.Days)
+			p := services.BuildTasteProfile(ctx.UID(), in.Days, database.DB.WithContext(ctx.Context))
 			return p, nil
 		},
 	})
@@ -76,7 +76,7 @@ func init() {
 		Description: "获取用户显式设置的饮食偏好：忌口、过敏原、喜欢的口味、辣度(-1未设置/0不吃辣/1微辣/2中辣/3特辣)、就餐人数、做饭时长上限、饮食目标与备注。推荐时必须遵守过敏原与忌口。",
 		Scope:       auth.ScopeProfileRead,
 		Handler: func(ctx *Ctx, _ json.RawMessage) (any, error) {
-			return services.GetPreferences(ctx.UID()), nil
+			return services.GetPreferences(ctx.UID(), database.DB.WithContext(ctx.Context)), nil
 		},
 	})
 
@@ -101,7 +101,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return services.SavePreferences(ctx.UID(), patch)
+			return services.SavePreferences(ctx.UID(), patch, database.DB.WithContext(ctx.Context))
 		},
 	})
 
@@ -135,7 +135,7 @@ func init() {
 				q.Limit = 50
 			}
 			q.IDs, q.Offset, q.IncludeDisabled = nil, 0, false
-			list, total := services.SearchDishes(ctx.UID(), q)
+			list, total := services.SearchDishes(ctx.UID(), q, database.DB.WithContext(ctx.Context))
 			return map[string]any{"total": total, "dishes": services.ToDishCards(list)}, nil
 		},
 	})
@@ -153,11 +153,11 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			dish, err := services.FindVisibleDish(ctx.UID(), in.DishID)
+			dish, err := services.FindVisibleDish(ctx.UID(), in.DishID, database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, services.ErrDishNotFound
 			}
-			stats, _ := services.DishStatsForUser(ctx.UID(), dish.ID)
+			stats, _ := services.DishStatsForUser(ctx.UID(), dish.ID, database.DB.WithContext(ctx.Context))
 			dish.Favorite = stats.Favorite
 			return map[string]any{"dish": dish, "my_stats": stats}, nil
 		},
@@ -189,7 +189,7 @@ func init() {
 			}
 			req.Source, req.Actor, req.Mode = ctx.Source(), actorName(ctx), "agent_tool"
 			req.IgnorePreferences, req.ProfileDays = false, 0
-			res, err := services.RecommendDishes(ctx.UID(), req)
+			res, err := services.RecommendDishes(ctx.UID(), req, database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +224,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			q := database.DB.Scopes(database.OwnedBy(ctx.UID()))
+			q := database.DB.WithContext(ctx.Context).Scopes(database.OwnedBy(ctx.UID()))
 			if in.DateFrom == "" && in.DateTo == "" {
 				in.DateFrom = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
 			}
@@ -274,7 +274,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			rec, err := services.CreateMealRecord(ctx.UID(), in, ctx.Source(), actorName(ctx))
+			rec, err := services.CreateMealRecord(ctx.UID(), in, ctx.Source(), actorName(ctx), database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}
@@ -304,7 +304,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			rec, err := services.UpdateMealRecord(ctx.UID(), in.RecordID, services.MealPatch{Mood: in.Mood, Rating: in.Rating, Remark: in.Remark})
+			rec, err := services.UpdateMealRecord(ctx.UID(), in.RecordID, services.MealPatch{Mood: in.Mood, Rating: in.Rating, Remark: in.Remark}, database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}
@@ -326,7 +326,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			rec, err := services.DeleteMealRecord(ctx.UID(), in.RecordID)
+			rec, err := services.DeleteMealRecord(ctx.UID(), in.RecordID, database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}
@@ -340,7 +340,7 @@ func init() {
 		Description: "获取用户收藏的菜品。",
 		Scope:       auth.ScopeRecordsRead,
 		Handler: func(ctx *Ctx, _ json.RawMessage) (any, error) {
-			list, total := services.SearchDishes(ctx.UID(), services.DishQuery{OnlyFavorites: true, Limit: 100})
+			list, total := services.SearchDishes(ctx.UID(), services.DishQuery{OnlyFavorites: true, Limit: 100}, database.DB.WithContext(ctx.Context))
 			return map[string]any{"total": total, "dishes": services.ToDishCards(list)}, nil
 		},
 	})
@@ -363,7 +363,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			if err := services.SetFavorite(ctx.UID(), in.DishID, in.Favorite); err != nil {
+			if err := services.SetFavorite(ctx.UID(), in.DishID, in.Favorite, database.DB.WithContext(ctx.Context)); err != nil {
 				return nil, err
 			}
 			return map[string]any{"ok": true, "dish_id": in.DishID, "favorite": in.Favorite}, nil
@@ -376,7 +376,7 @@ func init() {
 		Description: "获取用户本周（周一到周日）的午/晚餐菜单。",
 		Scope:       auth.ScopeRecordsRead,
 		Handler: func(ctx *Ctx, _ json.RawMessage) (any, error) {
-			return compactPlan(services.GetCachedWeekPlan(ctx.UID())), nil
+			return compactPlan(services.GetCachedWeekPlan(ctx.UID(), database.DB.WithContext(ctx.Context))), nil
 		},
 	})
 
@@ -387,8 +387,8 @@ func init() {
 		Scope:       auth.ScopePlanWrite,
 		Write:       true,
 		Handler: func(ctx *Ctx, _ json.RawMessage) (any, error) {
-			plan := services.RegenerateWeekPlan(ctx.UID())
-			services.RecordAchievementEvent(ctx.UID(), "week_plan", "")
+			plan := services.RegenerateWeekPlan(ctx.UID(), database.DB.WithContext(ctx.Context))
+			services.RecordAchievementEvent(ctx.UID(), "week_plan", "", database.DB.WithContext(ctx.Context))
 			return compactPlan(plan), nil
 		},
 	})
@@ -399,7 +399,7 @@ func init() {
 		Description: "获取今明两天的买菜清单：个人清单（按蔬菜/肉类/配料/其他分组，含已买与家中库存标记）与家庭清单（家庭菜单自动展开 + 成员手动添加），并附各自来自哪几餐。",
 		Scope:       auth.ScopeRecordsRead,
 		Handler: func(ctx *Ctx, _ json.RawMessage) (any, error) {
-			return services.ShoppingOverview(ctx.UID()), nil
+			return services.ShoppingOverview(ctx.UID(), database.DB.WithContext(ctx.Context)), nil
 		},
 	})
 
@@ -423,7 +423,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return services.PushShoppingReminder(ctx.UID(), in.Audience, in.Date, in.Note, actorName(ctx))
+			return services.PushShoppingReminder(ctx.UID(), in.Audience, in.Date, in.Note, actorName(ctx), database.DB.WithContext(ctx.Context))
 		},
 	})
 
@@ -433,7 +433,7 @@ func init() {
 		Description: "获取用户的饮食统计：总记录、午/晚餐次数、收藏数、吃过多少道不同的菜、连续记录天数、本月餐数、最常吃的菜、菜系分布、近 7 天趋势。",
 		Scope:       auth.ScopeProfileRead,
 		Handler: func(ctx *Ctx, _ json.RawMessage) (any, error) {
-			return services.BuildUserStats(ctx.UID()), nil
+			return services.BuildUserStats(ctx.UID(), database.DB.WithContext(ctx.Context)), nil
 		},
 	})
 
@@ -456,7 +456,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			q := database.DB.Scopes(database.OwnedBy(ctx.UID()))
+			q := database.DB.WithContext(ctx.Context).Scopes(database.OwnedBy(ctx.UID()))
 			if len(in.Types) > 0 {
 				q = q.Where("event_type IN ?", in.Types)
 			}
@@ -506,7 +506,7 @@ func init() {
 			if !services.IsValidEventType(in.EventType) {
 				return nil, errors.New("event_type 无效")
 			}
-			services.LogBehavior(ctx.UID(), in.EventType, in.DishID, "", ctx.Source(), actorName(ctx), map[string]any{"note": in.Note})
+			services.LogBehavior(ctx.UID(), in.EventType, in.DishID, "", ctx.Source(), actorName(ctx), map[string]any{"note": in.Note}, database.DB.WithContext(ctx.Context))
 			return map[string]any{"ok": true}, nil
 		},
 	})
@@ -531,7 +531,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			v, err := services.CreateSuggestion(ctx.UID(), ctx.Source(), in)
+			v, err := services.CreateSuggestion(ctx.UID(), ctx.Source(), in, database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}
@@ -552,7 +552,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			list := services.ListSuggestions(ctx.UID(), in.Status, 50)
+			list := services.ListSuggestions(ctx.UID(), in.Status, 50, database.DB.WithContext(ctx.Context))
 			out := make([]map[string]any, 0, len(list))
 			for _, s := range list {
 				names := make([]string, 0, len(s.Dishes))
@@ -588,7 +588,7 @@ func init() {
 			if in.DateFrom == "" {
 				in.DateFrom = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
 			}
-			q := database.DB.Scopes(database.OwnedBy(ctx.UID())).Where("meal_date >= ?", in.DateFrom)
+			q := database.DB.WithContext(ctx.Context).Scopes(database.OwnedBy(ctx.UID())).Where("meal_date >= ?", in.DateFrom)
 			if in.DateTo != "" {
 				q = q.Where("meal_date <= ?", in.DateTo)
 			}

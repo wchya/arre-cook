@@ -17,36 +17,76 @@ for (const legacy of ["ninimenu_app_password", "token"]) {
   }
 }
 
-export function getToken(): string | null {
+function storedToken(): string | null | undefined {
   try {
     return localStorage.getItem(TOKEN_KEY)
   } catch {
-    return null
+    return undefined
   }
 }
 
+// Each tab pins its identity. Shared storage is checked before dispatch and
+// before returning results, so a delayed storage event cannot mix identities.
+let sessionToken = storedToken() ?? null
+let sessionEpoch = 0
+let memoryOnly = false
+export function getToken(): string | null { return sessionToken }
+export function getSessionEpoch(): number { return sessionEpoch }
+export function isCurrentSession(epoch: number): boolean {
+  const shared = storedToken()
+  return epoch === sessionEpoch && (memoryOnly || shared === undefined || shared === sessionToken)
+}
 export function setToken(token: string | null) {
+  if (token !== sessionToken) { sessionToken = token; sessionEpoch++ }
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token)
     else localStorage.removeItem(TOKEN_KEY)
-  } catch {
-    /* ignore */
-  }
+    memoryOnly = false
+  } catch { memoryOnly = true }
+}
+function syncSharedSession() {
+  const token = storedToken()
+  if (memoryOnly || token === undefined) return
+  if (token === sessionToken) return
+  sessionToken = token
+  sessionEpoch++
+  window.dispatchEvent(new window.Event("auth-storage-change"))
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === TOKEN_KEY || event.key === null) syncSharedSession()
+  })
+  window.addEventListener("focus", syncSharedSession)
 }
 
+declare module "axios" {
+  interface InternalAxiosRequestConfig { sessionEpoch?: number }
+}
+export class SessionChangedError extends Error {
+  constructor() { super("账号状态已变化，请在当前账号下重新操作") }
+}
 client.interceptors.request.use((config) => {
-  const token = getToken()
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (!isCurrentSession(sessionEpoch)) {
+    syncSharedSession()
+    throw new SessionChangedError()
+  }
+  config.sessionEpoch = sessionEpoch
+  if (sessionToken) config.headers.Authorization = `Bearer ${sessionToken}`
+  else delete config.headers.Authorization
   return config
-})
+}, (error) => { throw error }, { synchronous: true })
 
 client.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (!isCurrentSession(res.config.sessionEpoch ?? -1)) { syncSharedSession(); throw new SessionChangedError() }
+    return res
+  },
   (err) => {
+    if (err.config && !isCurrentSession(err.config.sessionEpoch ?? -1)) { syncSharedSession(); return Promise.reject(new SessionChangedError()) }
     const url: string = err.config?.url || ""
     if (err.response?.status === 401 && !url.startsWith("/auth/") && err.config?.headers?.Authorization === `Bearer ${getToken()}`) {
       setToken(null)
-      window.dispatchEvent(new Event("auth-expired"))
+      window.dispatchEvent(new window.Event("auth-expired"))
     }
     return Promise.reject(err)
   },

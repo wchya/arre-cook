@@ -1,0 +1,683 @@
+{
+  "GO-2026-6222": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-6222",
+    "modified": "2026-08-14T16:22:50Z",
+    "published": "2026-08-14T16:22:50Z",
+    "aliases": [
+      "CVE-2026-46603"
+    ],
+    "summary": "Excessive memory allocation during VP8L decoding in golang.org/x/image",
+    "details": "VP8L decoding in golang.org/x/image/vp8l can allocate an excessive amount of memory when processing a crafted VP8L image containing many unused Huffman tree groups. This allows a remote attacker to cause a denial of service via memory exhaustion.",
+    "affected": [
+      {
+        "package": {
+          "name": "golang.org/x/image",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "0.45.0"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "golang.org/x/image/vp8l",
+              "symbols": [
+                "Decode",
+                "decoder.decodeHuffmanGroups",
+                "decoder.decodeHuffmanTree"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/80069"
+      },
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/793460"
+      }
+    ],
+    "credits": [
+      {
+        "name": "Daniele Ballarini"
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-6222",
+      "review_status": "REVIEWED"
+    }
+  },
+  "GO-2026-5061": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-5061",
+    "modified": "2026-06-18T22:46:58Z",
+    "published": "2026-06-18T22:46:58Z",
+    "aliases": [
+      "CVE-2026-46601"
+    ],
+    "summary": "Panic on VP8 alpha channel size mismatch in x/image/webp in golang.org/x/image",
+    "details": "The webp decoder can panic when processing a VP8 chunk with dimensions that do not match the canvas size.",
+    "affected": [
+      {
+        "package": {
+          "name": "golang.org/x/image",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "0.43.0"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "golang.org/x/image/webp",
+              "symbols": [
+                "Decode",
+                "DecodeConfig",
+                "decode"
+              ]
+            },
+            {
+              "path": "golang.org/x/image/webp"
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/787681"
+      },
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/79869"
+      }
+    ],
+    "credits": [
+      {
+        "name": "Lucas Futures (GitHub: gn00295120)"
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-5061",
+      "review_status": "REVIEWED"
+    }
+  },
+  "GO-2026-6218": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-6218",
+    "modified": "2026-08-13T21:43:54Z",
+    "published": "2026-08-13T21:43:54Z",
+    "aliases": [
+      "CVE-2026-56860"
+    ],
+    "summary": "Avoid quadratic complexity in resolvePath in net/url",
+    "details": "Previously, resolving relative paths containing parent directory ('..') segments performed string conversions and buffer rewrites on each step, resulting in quadratic time complexity and high memory allocation overhead.\n\nNow, path resolution operates on a byte buffer using index-based backtracking for '..' segments, eliminating the quadratic time complexity and significantly reducing memory allocations.",
+    "affected": [
+      {
+        "package": {
+          "name": "stdlib",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "1.25.13"
+              },
+              {
+                "introduced": "1.26.0-0"
+              },
+              {
+                "fixed": "1.26.6"
+              },
+              {
+                "introduced": "1.27.0-0"
+              },
+              {
+                "fixed": "1.27.0-rc.3"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "net/url",
+              "symbols": [
+                "URL.Parse",
+                "URL.ResolveReference",
+                "resolvePath"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/803681"
+      },
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/80494"
+      },
+      {
+        "type": "WEB",
+        "url": "https://groups.google.com/g/golang-announce/c/94pEornpRlI"
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-6218",
+      "review_status": "REVIEWED"
+    }
+  },
+  "GO-2026-6090": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-6090",
+    "modified": "2026-08-13T21:43:54Z",
+    "published": "2026-08-13T21:43:54Z",
+    "aliases": [
+      "CVE-2026-56862"
+    ],
+    "summary": "Limit handshake messages we are willing to accept post-handshake in crypto/tls",
+    "details": "Handshake messages, such as KeyUpdate, are always considered as state-advancing, regardless of whether a handshake has been completed or not. As a result, a malicious client can keep sending KeyUpdate messages to force the server to keep performing key derivation operations indefinitely.",
+    "affected": [
+      {
+        "package": {
+          "name": "stdlib",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "1.25.13"
+              },
+              {
+                "introduced": "1.26.0-0"
+              },
+              {
+                "fixed": "1.26.6"
+              },
+              {
+                "introduced": "1.27.0-0"
+              },
+              {
+                "fixed": "1.27.0-rc.3"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "crypto/tls",
+              "symbols": [
+                "Conn.Handshake",
+                "Conn.HandshakeContext",
+                "Conn.Read",
+                "Conn.Write",
+                "Conn.readRecordOrCCS",
+                "Dial",
+                "DialWithDialer",
+                "Dialer.Dial",
+                "Dialer.DialContext",
+                "QUICConn.HandleData",
+                "QUICConn.Start"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/80528"
+      },
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/804261"
+      },
+      {
+        "type": "WEB",
+        "url": "https://groups.google.com/g/golang-announce/c/94pEornpRlI"
+      }
+    ],
+    "credits": [
+      {
+        "name": "Qi Deng of Aurascape.ai"
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-6090",
+      "review_status": "REVIEWED"
+    }
+  },
+  "GO-2026-6089": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-6089",
+    "modified": "2026-08-13T21:43:54Z",
+    "published": "2026-08-13T21:43:54Z",
+    "aliases": [
+      "CVE-2026-56853"
+    ],
+    "summary": "Apply ReadHeaderTimeout when doing unencrypted HTTP/2 check in net/http",
+    "details": "When a server is configured to support unencrypted HTTP/2, it reads a few bytes from each new connection to see if they contain the HTTP/2 client preface. ReadHeaderTimeout is unexpectedly not being applied when doing this.",
+    "affected": [
+      {
+        "package": {
+          "name": "stdlib",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "1.25.13"
+              },
+              {
+                "introduced": "1.26.0-0"
+              },
+              {
+                "fixed": "1.26.6"
+              },
+              {
+                "introduced": "1.27.0-0"
+              },
+              {
+                "fixed": "1.27.0-rc.3"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "net/http",
+              "symbols": [
+                "ListenAndServe",
+                "ListenAndServeTLS",
+                "Serve",
+                "ServeTLS",
+                "Server.ListenAndServe",
+                "Server.ListenAndServeTLS",
+                "Server.Serve",
+                "Server.ServeTLS",
+                "conn.readRequest",
+                "conn.serve"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/80205"
+      },
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/795540"
+      },
+      {
+        "type": "WEB",
+        "url": "https://groups.google.com/g/golang-announce/c/94pEornpRlI"
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-6089",
+      "review_status": "REVIEWED"
+    }
+  },
+  "GO-2026-5972": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-5972",
+    "modified": "2026-08-13T21:43:54Z",
+    "published": "2026-08-13T21:43:54Z",
+    "aliases": [
+      "CVE-2026-33818"
+    ],
+    "summary": "Enforce maximum recursion depth in encoding/asn1",
+    "details": "Enforce a recursion limit in Unmarshal to prevent stack exhaustion when parsing deeply-nested, recursive structures.",
+    "affected": [
+      {
+        "package": {
+          "name": "stdlib",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "1.25.13"
+              },
+              {
+                "introduced": "1.26.0-0"
+              },
+              {
+                "fixed": "1.26.6"
+              },
+              {
+                "introduced": "1.27.0-0"
+              },
+              {
+                "fixed": "1.27.0-rc.3"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "encoding/asn1",
+              "symbols": [
+                "Unmarshal",
+                "UnmarshalWithParams",
+                "parseField",
+                "parseSequenceOf"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/80405"
+      },
+      {
+        "type": "WEB",
+        "url": "https://groups.google.com/g/golang-announce/c/94pEornpRlI"
+      },
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/814980"
+      }
+    ],
+    "credits": [
+      {
+        "name": "Marwan Atia (marwansamir688@gmail.com) "
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-5972",
+      "review_status": "REVIEWED"
+    }
+  },
+  "GO-2026-5970": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-5970",
+    "modified": "2026-08-10T22:42:36Z",
+    "published": "2026-07-14T17:29:56Z",
+    "aliases": [
+      "CVE-2026-56852"
+    ],
+    "summary": "Infinite loop on invalid input in golang.org/x/text",
+    "details": "A norm.Iter can enter an infinite loop when handling input containing invalid UTF-8 bytes.",
+    "affected": [
+      {
+        "package": {
+          "name": "golang.org/x/text",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "0.39.0"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "golang.org/x/text/unicode/norm",
+              "symbols": [
+                "Form.Append",
+                "Form.AppendString",
+                "Form.Bytes",
+                "Form.FirstBoundary",
+                "Form.FirstBoundaryInString",
+                "Form.IsNormal",
+                "Form.IsNormalString",
+                "Form.LastBoundary",
+                "Form.NextBoundary",
+                "Form.NextBoundaryInString",
+                "Form.Properties",
+                "Form.PropertiesString",
+                "Form.QuickSpan",
+                "Form.QuickSpanString",
+                "Form.Span",
+                "Form.SpanString",
+                "Form.String",
+                "Form.Transform",
+                "Iter.Init",
+                "Iter.InitString",
+                "Iter.Next",
+                "Iter.Seek",
+                "nextComposed",
+                "normReader.Read",
+                "normWriter.Write"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/80142"
+      },
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/794100"
+      }
+    ],
+    "credits": [
+      {
+        "name": "Viky Choi (\"vikychoi\" on GitHub)"
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-5970",
+      "review_status": "REVIEWED"
+    }
+  },
+  "GO-2026-5026": {
+    "schema_version": "1.3.1",
+    "id": "GO-2026-5026",
+    "modified": "2026-08-21T20:38:00Z",
+    "published": "2026-05-22T02:46:43Z",
+    "aliases": [
+      "CVE-2026-39821"
+    ],
+    "summary": "Invoking failure to reject ASCII-only Punycode-encoded labels in golang.org/x/net/idna",
+    "details": "The ToASCII and ToUnicode functions incorrectly accept Punycode-encoded labels that decode to an ASCII-only label. For example, ToUnicode(\"xn--example-.com\") incorrectly returns the name \"example.com\" rather than an error.\n\nThis behavior can lead to privilege escalation in programs using the idna package. For example, a program which performs privilege checks on the ASCII hostname may reject \"example.com\" but permit \"xn--example-.com\". If that program subsequently converts the ASCII hostname to Unicode, it will inadvertently permits access to the Unicode name \"example.com\".",
+    "affected": [
+      {
+        "package": {
+          "name": "stdlib",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "1.25.13"
+              },
+              {
+                "introduced": "1.26.0-0"
+              },
+              {
+                "fixed": "1.26.6"
+              },
+              {
+                "introduced": "1.27.0-0"
+              },
+              {
+                "fixed": "1.27.0-rc.3"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "net/http",
+              "symbols": [
+                "Client.CloseIdleConnections",
+                "Client.Do",
+                "Client.Get",
+                "Client.Head",
+                "Client.Post",
+                "Client.PostForm",
+                "ClientConn.Close",
+                "ClientConn.RoundTrip",
+                "Get",
+                "Head",
+                "Post",
+                "PostForm",
+                "Transport.CloseIdleConnections",
+                "Transport.NewClientConn",
+                "Transport.RoundTrip",
+                "http1ClientConn.Close",
+                "http1ClientConn.RoundTrip",
+                "http2ClientConn.RoundTrip",
+                "http2RoundTripper.RoundTrip",
+                "idnaASCII"
+              ]
+            },
+            {
+              "path": "net/http/internal/http2",
+              "symbols": [
+                "Transport.AddConn",
+                "Transport.RoundTrip",
+                "Transport.RoundTripOpt",
+                "authorityAddr"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "package": {
+          "name": "golang.org/x/net",
+          "ecosystem": "Go"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "0.55.0"
+              }
+            ]
+          }
+        ],
+        "ecosystem_specific": {
+          "imports": [
+            {
+              "path": "golang.org/x/net/idna",
+              "symbols": [
+                "Profile.ToASCII",
+                "Profile.ToUnicode",
+                "Profile.process",
+                "ToASCII",
+                "ToUnicode"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "references": [
+      {
+        "type": "FIX",
+        "url": "https://go.dev/cl/767220"
+      },
+      {
+        "type": "REPORT",
+        "url": "https://go.dev/issue/78760"
+      },
+      {
+        "type": "WEB",
+        "url": "https://groups.google.com/g/golang-announce/c/iI-mYSI0lu8"
+      },
+      {
+        "type": "WEB",
+        "url": "https://groups.google.com/g/golang-announce/c/94pEornpRlI"
+      }
+    ],
+    "credits": [
+      {
+        "name": "KC1zs4 (https://github.com/KC1zs4)"
+      },
+      {
+        "name": "Longwei Wang (https://github.com/gn00295120)"
+      }
+    ],
+    "database_specific": {
+      "url": "https://pkg.go.dev/vuln/GO-2026-5026",
+      "review_status": "REVIEWED"
+    }
+  }
+}

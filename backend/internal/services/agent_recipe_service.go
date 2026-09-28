@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"errors"
+	"gorm.io/gorm"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"strings"
@@ -85,52 +86,51 @@ func applyPrivateRecipePatch(dish *models.Dish, patch PrivateRecipePatch) error 
 	return nil
 }
 
-func CreatePrivateRecipe(uid uint, patch PrivateRecipePatch) (*models.Dish, error) {
+func CreatePrivateRecipe(uid uint, patch PrivateRecipePatch, dbs ...*gorm.DB) (*models.Dish, error) {
+	requestDB := database.Handle(dbs...)
+
 	if patch.Name == nil {
 		return nil, errors.New("请填写菜名")
-	}
-	var count int64
-	if err := database.DB.Model(&models.Dish{}).Where("owner_id = ? AND family_id = 0", uid).Count(&count).Error; err != nil {
-		return nil, err
-	}
-	if count >= 500 {
-		return nil, errors.New("私房菜已达 500 道上限")
 	}
 	dish := &models.Dish{OwnerID: uid, Enabled: true, MealType: "all", Difficulty: "easy", Ingredients: "[]", Seasonings: "[]", Steps: "[]", Images: "[]", Tags: "[]"}
 	if err := applyPrivateRecipePatch(dish, patch); err != nil {
 		return nil, err
 	}
-	if err := database.DB.Create(dish).Error; err != nil {
+	if err := InsertDish(requestDB, dish); err != nil {
 		return nil, err
 	}
 	QueueAutoAchievementSync(uid)
 	return dish, nil
 }
 
-func UpdatePrivateRecipe(uid, id uint, patch PrivateRecipePatch) (*models.Dish, error) {
+func UpdatePrivateRecipe(uid, id uint, patch PrivateRecipePatch, dbs ...*gorm.DB) (*models.Dish, error) {
+	requestDB := database.Handle(dbs...)
+
 	var dish models.Dish
-	if err := database.DB.Where("id = ? AND owner_id = ? AND family_id = 0", id, uid).First(&dish).Error; err != nil {
+	if err := requestDB.Where("id = ? AND owner_id = ? AND family_id = 0", id, uid).First(&dish).Error; err != nil {
 		return nil, ErrDishNotFound
 	}
 	if err := applyPrivateRecipePatch(&dish, patch); err != nil {
 		return nil, err
 	}
-	if err := database.DB.Save(&dish).Error; err != nil {
+	if err := requestDB.Save(&dish).Error; err != nil {
 		return nil, err
 	}
-	InvalidateWeekPlan(uid)
+	InvalidateWeekPlan(uid, requestDB)
 	return &dish, nil
 }
 
-func DeletePrivateRecipe(uid, id uint) error {
-	result := database.DB.Where("id = ? AND owner_id = ? AND family_id = 0", id, uid).Delete(&models.Dish{})
+func DeletePrivateRecipe(uid, id uint, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
+	result := requestDB.Where("id = ? AND owner_id = ? AND family_id = 0", id, uid).Delete(&models.Dish{})
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
 		return ErrDishNotFound
 	}
-	InvalidateWeekPlan(uid)
+	InvalidateWeekPlan(uid, requestDB)
 	QueueAutoAchievementSync(uid)
 	return nil
 }

@@ -2,7 +2,7 @@
 
 ## 环境要求
 
-- Go 1.25+
+- Go 1.25.14（与 Docker 发布工具链一致；也可使用包含最新安全修复的更新版本）
 - Node.js 22.22.2+（22.x），或 24.15.0+（24.x）；Docker 构建使用 Node 22（Vite 8 / jsdom 30）
 
 ## 后端开发
@@ -56,7 +56,9 @@ chmod +x ninimenu
 | `APP_VERSION` | 空 | 语义版本 `X.Y.Z`（用户看到 `vX.Y.Z`）；由 `scripts/next-version.sh` 根据改动类型递增 |
 | `APP_RELEASE_NOTES` | 空 | 面向用户的更新摘要，多条用“；”分隔；为空时使用通用更新文案 |
 | `PORT` | `8080` | 服务端口 |
-| `GOMEMLIMIT` | Compose：`256MiB` | Go 运行时内存软目标；非容器运行需在启动进程前导出，不包含本地 ASR 子进程、数据库或对象存储，也不是 RSS 硬上限 |
+| `GOMEMLIMIT` | Compose：`192MiB` | Go 运行时内存软目标，不包含 Python ASR、数据库或对象存储，也不是 RSS 硬上限 |
+| `GOMAXPROCS` | Compose：`2` | Go 并行执行预算 |
+| `APP_MEMORY_LIMIT` / `APP_CPUS` | Compose：`1g` / `2` | 整个应用容器（含 ASR）硬限制；memory+swap 等于 memory，不额外启用 swap |
 | `ADMIN_EMAIL` | 空 | 初始管理员邮箱；旧单用户数据迁移给该管理员 |
 | `ADMIN_USERNAME` | `admin` | 初始管理员用户名 |
 | `ADMIN_PASSWORD` | 仅开发有默认值 | 仅用于首次创建管理员和密码登录兜底；生产环境必须显式设置强密码 |
@@ -64,6 +66,8 @@ chmod +x ninimenu
 | `ALLOW_REGISTER` | `true` | 是否允许新邮箱注册 |
 | `JWT_EXPIRE` | `720h` | 登录令牌有效期 |
 | `DB_DRIVER` | `sqlite` | 本地用 SQLite；生产为 `mysql` |
+| `DB_AUTO_MIGRATE` | `true` | API 多副本部署时设 `false`，先单独执行迁移 |
+| `DB_MIGRATE_ONLY` | `false` | 为 `true` 时初始化/迁移完成即退出；需同时允许自动迁移 |
 | `MYSQL_DSN` | 空 | 生产 MySQL DSN，保存在受保护的部署配置中 |
 | `DB_PATH` | `data/ninimenu.db` | SQLite 数据库路径 |
 | `UPLOAD_DIR` | `uploads` | 本地上传目录；配置 S3 后使用对象存储 |
@@ -106,11 +110,23 @@ PNG 截图转 JPG quality=85 通常减少 70-90% 体积，视觉几乎无损。
 
 ## 运行内存
 
-周菜单只保留数据库中的 `week_plan_cache`，不再按用户永久保留进程内副本；每次读取增加一次用户设置查询，仍复用当周菜单并刷新当前收藏状态。
+周菜单的 `week_plan_cache` 只保存菜谱 ID；读取时按当前权限、启用状态、食材与忌口重新解析。每餐 1–10 道、最多 7 天，菜单卡片不读取完整步骤；超长历史卡片字段不会进入推荐候选。随机列表先取 ID 再加载当前页详情，智能体搜索流式筛选轻量字段后加载当前页。
 
-Compose 默认给 Go 运行时设置 `GOMEMLIMIT=256MiB`，使其在接近目标时更积极回收内存。该配置不预分配 256 MiB，也不限制 Python 语音识别或整个容器；不要据此将容器硬限制设为 256 MiB。本地 ASR 仍需要至少 768 MiB 可用余量才能启动。进一步降低 Go 目标前，应检查 GC CPU 和请求延迟。
+Compose 默认设置 `GOMEMLIMIT=192MiB`、`GOMAXPROCS=2`，整个容器上限 1 GiB、2 CPU。图片解码与本地 ASR 共用单个重任务槽，ASR 仍需至少 768 MiB 可用余量才能启动、RSS 超过 512 MiB 会终止。Go 软目标不预分配内存，也不等于 RSS 限制。这些默认值为 4 核 / 3.32 GiB / 无 swap 的混部主机准备，仍需 Linux 组合负载验证，不能视为已测得峰值保证。
 
 局部内存分配对比可运行 `go test ./internal/imaging ./internal/handlers -run '^$' -bench 'Benchmark(CompressJPEG|ReadUploadImage)' -benchmem`。`B/op` 是每次操作累计分配的字节数，不是应用 RSS 峰值；整机容量仍需在 Linux 部署环境结合实际并发测量。
+
+## 数据库取消与对象生命周期
+
+HTTP、Agent、助手调用服务时必须显式传入 `database.DB.WithContext(ctx)`；服务使用 `database.Handle(dbs...)` 并将同一 `requestDB` / `tx` 传给下游。省略句柄只用于启动、维护与旧测试。业务事务里不要重新取全局 DB。普通 API 总期限 15 秒，AI/Agent/MCP 90 秒，上传/邮件 30 秒；MySQL 建连 5 秒、读写 15 秒，健康检查 2 秒。
+
+所有用户/家庭菜谱创建走 `services.InsertDish`，配额检查和插入同事务。记餐、建议采纳、家庭菜单与关联清单也必须共享事务。个人设置使用唯一键原子 upsert。
+
+图片由 `upload_assets` / `upload_references` 记账。默认每用户 256 MiB / 1000 个对象、站点 5 GiB / 50000 个对象；未完成与删除重试中的对象仍占额度。本地原图备份与压缩图合计字节。未引用对象 24 小时后可回收，每小时最多处理 100 个；注销后未引用对象立即到期。软删除菜谱仍需历史展示时保留引用，家庭解散后释放其引用，个人拷贝继续受保护。历史备份关联不明确的标记为 `archive`，计费但不自动删除，需单独确定保留策略。
+
+引用通过事务内 GORM 回调绑定；不要用原生 SQL 写图片字段、绕开回调或设置 `SkipDefaultTransaction`。新上传先预约额度，保存成功后完成状态；删除先锁引用并置墓碑，再做存储 I/O，失败保留额度重试。首次迁移要完成 S3 列举和本地扫描，见 [部署指南](docs/deployment.md#审计修复的首次迁移与发布)。
+
+Web 会话以标签页 token 与 session epoch 关联请求，跨标签页变化先清除旧身份；成功和失败的迟到响应都必须检查 epoch。URL 中的旧 `#token` 只清除、不消费，小程序保持原生页面登录。账号切换后异步 mutation 不得直接覆盖新会话。
 
 ## 品牌资源
 

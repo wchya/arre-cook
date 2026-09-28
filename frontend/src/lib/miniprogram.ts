@@ -1,7 +1,5 @@
-// 微信小程序 web-view 环境适配。
-// 小程序壳（miniprogram/）原生完成登录后，把令牌放在 URL 片段里打开 H5：
-//   https://cook.arrebyte.top/?from=mp#token=<jwt>
-// 片段不会随请求发往服务器、也不进 Referer；H5 读取后立即从地址栏抹掉。
+// 微信小程序环境适配。当前小程序是原生页面，不再通过链接传递登录凭证。
+// URL 中的 bearer token 永远不是登录授权；旧片段仅清除，不消费。
 
 interface WxMiniProgram {
   navigateTo(opts: { url: string }): void
@@ -53,13 +51,13 @@ export function loadMiniProgramSDK(): Promise<WxMiniProgram | null> {
   return sdkPromise
 }
 
-// 读取小程序带来的令牌（URL 片段 #token=…），读完抹掉，返回令牌或 null
+// 清除历史桥接参数；普通网页和小程序均禁止通过 URL 替换会话。
 export function consumeTokenFromURL(): string | null {
   const url = new URL(window.location.href)
   const hash = new URLSearchParams(url.hash.replace(/^#/, ""))
   const token = hash.get("token")
   const fromMP = url.searchParams.get("from") === "mp"
-  if (fromMP) {
+  if (fromMP && (window.__wxjs_environment === "miniprogram" || /miniprogram/i.test(navigator.userAgent))) {
     try {
       sessionStorage.setItem(MP_FLAG_KEY, "1")
     } catch {
@@ -70,7 +68,7 @@ export function consumeTokenFromURL(): string | null {
   url.hash = ""
   url.searchParams.delete("from")
   window.history.replaceState(window.history.state, "", url.pathname + url.search)
-  return token
+  return null
 }
 
 // 登录失效或主动退出时，回到小程序原生登录页

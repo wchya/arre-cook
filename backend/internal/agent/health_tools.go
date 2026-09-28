@@ -1,6 +1,10 @@
 package agent
 
 import (
+	"ninimenu/internal/database"
+)
+
+import (
 	"encoding/json"
 	"errors"
 	"ninimenu/internal/auth"
@@ -21,7 +25,7 @@ func init() {
 			if in.From == "" && in.To == "" {
 				in.From = services.Today()
 			}
-			items, err := services.ListFoodJournal(ctx.UID(), in.From, in.To)
+			items, err := services.ListFoodJournal(ctx.UID(), in.From, in.To, database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}
@@ -48,7 +52,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return services.CreateFoodJournalEntry(ctx.UID(), in)
+			return services.CreateFoodJournalEntry(ctx.UID(), in, database.DB.WithContext(ctx.Context))
 		},
 	})
 	register(&Tool{
@@ -66,7 +70,7 @@ func init() {
 			if in.ID == 0 {
 				return nil, errors.New("请提供记录 ID")
 			}
-			if err := services.DeleteFoodJournalEntry(ctx.UID(), in.ID); err != nil {
+			if err := services.DeleteFoodJournalEntry(ctx.UID(), in.ID, database.DB.WithContext(ctx.Context)); err != nil {
 				return nil, err
 			}
 			return map[string]any{"deleted": true, "id": in.ID}, nil
@@ -90,7 +94,7 @@ func init() {
 			if in.Days != 7 && in.Days != 30 {
 				return nil, errors.New("只支持最近 7 天或 30 天")
 			}
-			report, err := services.BuildHealthReport(ctx.UID(), in.Days)
+			report, err := services.BuildHealthReport(ctx.UID(), in.Days, database.DB.WithContext(ctx.Context))
 			if err != nil {
 				return nil, err
 			}

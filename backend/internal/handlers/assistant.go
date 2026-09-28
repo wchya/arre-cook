@@ -30,7 +30,7 @@ func GetAssistantStatus(c *gin.Context) {
 		utils.InternalError(c, "暂时无法读取助手次数，请稍后重试")
 		return
 	}
-	s := llm.Resolve()
+	s := llm.Resolve(database.DB.WithContext(c.Request.Context()))
 	suggestions := []string{"今晚吃什么？想吃辣的，半小时内", "我最近的饮食报告", "冰箱里有鸡蛋和番茄，能做什么"}
 	if s.Enabled() {
 		suggestions = append(suggestions, "帮我记下今天午餐吃了番茄面", "帮我保存一道私房菜")
@@ -64,13 +64,13 @@ func AssistantChat(c *gin.Context) {
 		return
 	}
 	if err := assistant.CheckInput(req.Message); err != nil {
-		services.WriteAudit(services.AuditEntry{UserID: uid(c), Actor: "assistant", Channel: "chat", Tool: "content_input", Status: "denied", Error: "content policy"})
+		services.WriteAudit(services.AuditEntry{UserID: uid(c), Actor: "assistant", Channel: "chat", Tool: "content_input", Status: "denied", Error: "content policy"}, database.DB.WithContext(c.Request.Context()))
 		utils.BadRequest(c, err.Error())
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), services.AssistantRequestTimeout)
 	defer cancel()
-	db := database.DB.WithContext(ctx)
+	db := database.DB.WithContext(c.Request.Context()).WithContext(ctx)
 	if req.SessionID > 0 {
 		var session models.ChatSession
 		err := db.Where("id = ? AND user_id = ?", req.SessionID, uid(c)).First(&session).Error
@@ -134,7 +134,7 @@ func AssistantChat(c *gin.Context) {
 
 func ListAssistantSessions(c *gin.Context) {
 	var rows []models.ChatSession
-	if err := database.DB.Scopes(database.OwnedBy(uid(c))).Order("updated_at DESC").Limit(50).Find(&rows).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Order("updated_at DESC").Limit(50).Find(&rows).Error; err != nil {
 		utils.InternalError(c, "对话记录加载失败，请重试")
 		return
 	}
@@ -148,7 +148,7 @@ type chatMessageView struct {
 
 func GetAssistantMessages(c *gin.Context) {
 	var s models.ChatSession
-	if err := database.DB.Scopes(database.OwnedBy(uid(c))).Where("id = ?", c.Param("id")).First(&s).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("id = ?", c.Param("id")).First(&s).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.NotFound(c, "会话不存在")
 		} else {
@@ -157,7 +157,7 @@ func GetAssistantMessages(c *gin.Context) {
 		return
 	}
 	var rows []models.ChatMessage
-	if err := database.DB.Scopes(database.OwnedBy(uid(c))).Where("session_id = ?", s.ID).Order("id ASC").Limit(200).Find(&rows).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("session_id = ?", s.ID).Order("id ASC").Limit(200).Find(&rows).Error; err != nil {
 		utils.InternalError(c, "对话加载失败，请重试")
 		return
 	}
@@ -174,7 +174,7 @@ func GetAssistantMessages(c *gin.Context) {
 
 func DeleteAssistantSession(c *gin.Context) {
 	var s models.ChatSession
-	if err := database.DB.Scopes(database.OwnedBy(uid(c))).Where("id = ?", c.Param("id")).First(&s).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("id = ?", c.Param("id")).First(&s).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.NotFound(c, "会话不存在")
 		} else {
@@ -182,7 +182,7 @@ func DeleteAssistantSession(c *gin.Context) {
 		}
 		return
 	}
-	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("session_id = ? AND user_id = ?", s.ID, uid(c)).Delete(&models.ChatMessage{}).Error; err != nil {
 			return err
 		}

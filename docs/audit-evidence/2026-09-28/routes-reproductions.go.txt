@@ -1,0 +1,134 @@
+package routes_test
+
+import (
+ "context"
+ "encoding/json"
+ "errors"
+ "fmt"
+ "net/http/httptest"
+ "strings"
+ "testing"
+ "time"
+ "ninimenu/internal/auth"
+ "ninimenu/internal/database"
+ "ninimenu/internal/models"
+ "ninimenu/internal/services"
+ "ninimenu/internal/testutil"
+ "gorm.io/gorm"
+)
+
+func TestCRCloneBypassesQuota(t *testing.T) {
+ u,tok,err:=testutil.NewUser("cr-clone@example.test"); if err!=nil {t.Fatal(err)}
+ rows:=make([]models.Dish,500)
+ for i:=range rows {rows[i]=models.Dish{OwnerID:u.ID,Name:fmt.Sprintf("quota-%d",i),MealType:"all",Enabled:true,Ingredients:"[]",Steps:"[]"}}
+ if err:=database.DB.CreateInBatches(&rows,50).Error;err!=nil {t.Fatal(err)}
+ st,r:=call(t,"POST","/api/dishes",tok,map[string]any{"name":"normal-create"});must(t,st,r,400)
+ st,r=call(t,"POST",fmt.Sprintf("/api/dishes/%d/clone",rows[0].ID),tok,nil);must(t,st,r,200)
+ var n int64;database.DB.Model(&models.Dish{}).Where("owner_id = ? AND family_id = 0",u.ID).Count(&n)
+ if n!=501 {t.Fatalf("count=%d",n)}
+ t.Logf("normal creation blocked; clone succeeded; private recipe count=%d",n)
+}
+func TestCRSettingsAdmissionAndMenuAmplification(t *testing.T) {
+ u,tok,err:=testutil.NewUser("cr-settings@example.test");if err!=nil {t.Fatal(err)}
+ st,r:=call(t,"PUT","/api/settings",tok,map[string]any{"settings":map[string]string{"lunch_dishes_per_day":"10000"},"ignored":strings.Repeat("x",2*1024*1024)})
+ must(t,st,r,200)
+ plan,err:=services.GenerateWeekPlan(u.ID);if err!=nil {t.Fatal(err)}
+ if len(plan.Days)!=7||len(plan.Days[0].Lunch)<=10 {t.Fatalf("plan lacks amplification")}
+ t.Logf("2 MiB unknown field accepted; lunch count stored=10000; first day contains %d recipes",len(plan.Days[0].Lunch))
+}
+func TestCRFailedSecurityUpdatesReportSuccess(t *testing.T) {
+ u,tok,err:=testutil.NewUser("cr-update@example.test");if err!=nil {t.Fatal(err)}
+ name:="cr_users_update_failure"
+ database.DB.Callback().Update().Before("gorm:update").Register(name,func(tx *gorm.DB){if tx.Statement.Table=="users" {tx.AddError(errors.New("CR injected write failure"))}})
+ defer database.DB.Callback().Update().Remove(name)
+ st,r:=call(t,"PUT","/api/me/password",tok,map[string]string{"new_password":"ValidNewPass123!"});must(t,st,r,200)
+ st,r=call(t,"POST","/api/me/logout-all",tok,nil);must(t,st,r,200)
+ var fresh models.User;if err:=database.DB.First(&fresh,u.ID).Error;err!=nil {t.Fatal(err)}
+ if fresh.TokenVersion!=u.TokenVersion||fresh.PasswordHash!="" {t.Fatal("injected failure did not preserve DB state")}
+ st,r=call(t,"GET","/api/me",tok,nil);must(t,st,r,200)
+ t.Log("password change and logout-all returned HTTP 200; password/version unchanged; original token still works")
+}
+func TestCRMenuCacheSurvivesDishEdit(t *testing.T) {
+ u,tok,err:=testutil.NewUser("cr-cache@example.test");if err!=nil {t.Fatal(err)}
+ d:=models.Dish{OwnerID:u.ID,Name:"old name",Enabled:true,MealType:"all",Ingredients:`[{"name":"old ingredient","amount":"1g"}]`}
+ if err:=database.DB.Create(&d).Error;err!=nil {t.Fatal(err)}
+ now:=time.Now();weekday:=int(now.Weekday());if weekday==0{weekday=7};monday:=now.AddDate(0,0,1-weekday).Format("2006-01-02")
+ b,_:=json.Marshal(services.WeekPlan{Days:[]services.WeekDayPlan{{Date:monday,Lunch:[]models.Dish{d},Dinner:[]models.Dish{}}}})
+ if err:=database.SetUserSetting(u.ID,"week_plan_cache",string(b));err!=nil{t.Fatal(err)}
+ st,r:=call(t,"PUT",fmt.Sprintf("/api/dishes/%d",d.ID),tok,map[string]string{"name":"new name","ingredients":`[{"name":"new ingredient","amount":"2g"}]`});must(t,st,r,200)
+ got:=services.GetCachedWeekPlan(u.ID)
+ if got.Days[0].Lunch[0].Name!="old name"{t.Fatal("old cache not reproduced")}
+ t.Log("dish update returned HTTP 200, cached menu still contains old name and ingredients")
+}
+func TestCRShoppingFailureLeavesMealCommitted(t *testing.T) {
+ u,_,err:=testutil.NewUser("cr-shopping@example.test");if err!=nil {t.Fatal(err)}
+ d:=models.Dish{OwnerID:u.ID,Name:"shopping",Enabled:true,MealType:"all",Ingredients:`[{"name":"egg","amount":"1"}]`}
+ if err:=database.DB.Create(&d).Error;err!=nil {t.Fatal(err)}
+ name:="cr_shopping_create_failure"
+ database.DB.Callback().Create().Before("gorm:create").Register(name,func(tx *gorm.DB){if tx.Statement.Table=="shopping_checks" {tx.AddError(errors.New("CR injected shopping write failure"))}})
+ defer database.DB.Callback().Create().Remove(name)
+ rec,err:=services.CreateMealRecord(u.ID,services.MealInput{DishID:d.ID,MealType:"lunch",MealDate:"2026-09-28"},"app","");if err!=nil {t.Fatal(err)}
+ var meals,shopping int64
+ database.DB.Model(&models.MealRecord{}).Where("id = ?",rec.ID).Count(&meals)
+ database.DB.Model(&models.ShoppingCheck{}).Where("user_id = ?",u.ID).Count(&shopping)
+ if meals!=1||shopping!=0 {t.Fatalf("meals=%d shopping=%d",meals,shopping)}
+ t.Log("CreateMealRecord returned nil error, meal committed, shopping row absent")
+}
+func TestCRCanceledRequestStillReadsDatabase(t *testing.T) {
+ _,tok,err:=testutil.NewUser("cr-context@example.test");if err!=nil {t.Fatal(err)}
+ ctx,cancel:=context.WithCancel(context.Background());cancel()
+ req:=httptest.NewRequest("GET","/api/me",nil).WithContext(ctx);req.Header.Set("Authorization","Bearer "+tok)
+ w:=httptest.NewRecorder();router.ServeHTTP(w,req)
+ if w.Code!=200 {t.Fatalf("status=%d body=%s",w.Code,w.Body)}
+ t.Log("request context canceled before entering router; database-backed UserAuth still completed and returned HTTP 200")
+}
+func TestCRTransferFamilyCanRaceWithLeave(t *testing.T) {
+ owner,_,err:=testutil.NewUser("cr-owner@example.test");if err!=nil {t.Fatal(err)}
+ member,_,err:=testutil.NewUser("cr-member@example.test");if err!=nil {t.Fatal(err)}
+ family,err:=services.CreateFamily(owner.ID,"CR family");if err!=nil {t.Fatal(err)}
+ if err:=database.DB.Create(&models.FamilyMember{FamilyID:family.ID,UserID:member.ID,JoinedAt:time.Now()}).Error;err!=nil {t.Fatal(err)}
+ name:="cr_family_interleaving";ran:=false
+ database.DB.Callback().Update().Before("gorm:begin_transaction").Register(name,func(tx *gorm.DB){
+  if tx.Statement.Table=="families"&&!ran {ran=true;if err:=services.LeaveFamily(member.ID);err!=nil {tx.AddError(err)}}
+ })
+ defer database.DB.Callback().Update().Remove(name)
+ if err:=services.TransferFamily(owner.ID,member.ID);err!=nil {t.Fatal(err)}
+ var fresh models.Family;database.DB.First(&fresh,family.ID)
+ var n int64;database.DB.Model(&models.FamilyMember{}).Where("family_id = ? AND user_id = ?",family.ID,member.ID).Count(&n)
+ if !ran||fresh.OwnerID!=member.ID||n!=0 {t.Fatalf("ran=%v owner=%d membership=%d",ran,fresh.OwnerID,n)}
+ if err:=services.RenameFamily(owner.ID,"owner tries");err==nil {t.Fatal("old owner still manages")}
+ if err:=services.RenameFamily(member.ID,"new owner tries");err==nil {t.Fatal("departed new owner still manages")}
+ t.Log("member left between transfer validation and UPDATE; transfer succeeded; neither original nor new owner can manage the family")
+}
+func TestCRPasswordWriteCanRestoreRevokedGeneration(t *testing.T) {
+ u,tok,err:=testutil.NewUser("cr-generation@example.test");if err!=nil {t.Fatal(err)}
+ previous:=u;previous.TokenVersion=2
+ revokedToken,_,err:=auth.IssueUserToken(&previous);if err!=nil {t.Fatal(err)}
+ name:="cr_version_interleaving";ran:=false
+ database.DB.Callback().Update().Before("gorm:begin_transaction").Register(name,func(tx *gorm.DB){
+  if tx.Statement.Table=="users"&&!ran {
+   ran=true
+   // Two already-committed revocations advance the generation after this handler read it.
+   if err:=database.DB.Model(&models.User{}).Where("id = ?",u.ID).UpdateColumn("token_version",gorm.Expr("token_version + 2")).Error;err!=nil{tx.AddError(err);return}
+   st,r:=call(t,"GET","/api/me",revokedToken,nil);must(t,st,r,401)
+  }
+ })
+ defer database.DB.Callback().Update().Remove(name)
+ st,r:=call(t,"PUT","/api/me/password",tok,map[string]string{"new_password":"ValidNewPass123!"});must(t,st,r,200)
+ var fresh models.User;database.DB.First(&fresh,u.ID)
+ if !ran||fresh.TokenVersion!=2 {t.Fatalf("ran=%v version=%d",ran,fresh.TokenVersion)}
+ st,r=call(t,"GET","/api/me",revokedToken,nil);must(t,st,r,200)
+ t.Log("delayed password write rolled token version 3 back to 2; token rejected before write was accepted afterwards")
+}
+func TestCRSuggestionAcceptSwallowsMealFailure(t *testing.T) {
+ u,_,err:=testutil.NewUser("cr-suggestion@example.test");if err!=nil {t.Fatal(err)}
+ d:=models.Dish{OwnerID:u.ID,Name:"suggestion",Enabled:true,MealType:"all"};if err:=database.DB.Create(&d).Error;err!=nil{t.Fatal(err)}
+ s:=models.AgentSuggestion{UserID:u.ID,DishIDs:fmt.Sprintf("[%d]",d.ID),MealDate:"2026-09-28",MealType:"lunch",Status:"pending"};if err:=database.DB.Create(&s).Error;err!=nil{t.Fatal(err)}
+ name:="cr_meal_create_failure"
+ database.DB.Callback().Create().Before("gorm:create").Register(name,func(tx *gorm.DB){if tx.Statement.Table=="meal_records" {tx.AddError(errors.New("CR injected meal write failure"))}})
+ defer database.DB.Callback().Create().Remove(name)
+ rows,err:=services.ResolveSuggestion(u.ID,s.ID,services.ResolveInput{Accept:true});if err!=nil{t.Fatal(err)}
+ var fresh models.AgentSuggestion;database.DB.First(&fresh,s.ID)
+ if fresh.Status!="accepted"||len(rows)!=0 {t.Fatalf("status=%s records=%d",fresh.Status,len(rows))}
+ t.Log("suggestion marked accepted and returned nil error even though all meal writes failed")
+}

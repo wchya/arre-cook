@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"ninimenu/internal/auth"
 	"ninimenu/internal/config"
@@ -19,6 +20,7 @@ import (
 func Setup(r *gin.Engine) {
 	r.MaxMultipartMemory = config.C.MaxUploadSize + 1<<20
 	r.Use(mw.SecurityHeaders())
+	r.Use(mw.RequestBudget())
 	r.Use(mw.AIIngress())
 	r.Use(mw.CORSMiddleware())
 	r.Use(mw.LoggerMiddleware())
@@ -42,7 +44,7 @@ func Setup(r *gin.Engine) {
 	authGroup := api.Group("/auth", mw.AuthRateLimit(30))
 	authGroup.POST("/email/code", handlers.SendEmailCode)
 	authGroup.POST("/email/login", handlers.EmailLogin)
-	authGroup.POST("/login", handlers.PasswordLogin)
+	authGroup.POST("/login", mw.PasswordBudget(), handlers.PasswordLogin)
 	authGroup.POST("/wechat", handlers.WechatLogin)
 
 	// ---------- 用户（App / 小程序 / 管理后台共用登录态） ----------
@@ -50,7 +52,7 @@ func Setup(r *gin.Engine) {
 	{
 		app.GET("/me", handlers.GetMe)
 		app.PUT("/me", handlers.UpdateMe)
-		app.PUT("/me/password", handlers.ChangePassword)
+		app.PUT("/me/password", mw.PasswordBudget(), handlers.ChangePassword)
 		app.POST("/me/logout-all", handlers.LogoutAll)
 		app.GET("/me/export", handlers.ExportMe)
 		app.DELETE("/me", handlers.DeleteMe)
@@ -239,7 +241,9 @@ func Setup(r *gin.Engine) {
 func healthz(c *gin.Context) {
 	sqlDB, err := database.DB.DB()
 	status, code := "UP", http.StatusOK
-	if err != nil || sqlDB.Ping() != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	if err != nil || sqlDB.PingContext(ctx) != nil {
 		status, code = "DOWN", http.StatusServiceUnavailable
 	}
 	c.Header("Cache-Control", "no-store")

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"gorm.io/gorm"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"time"
@@ -39,11 +40,13 @@ type UserStats struct {
 	WeekTrend      []DayCount     `json:"week_trend"`
 }
 
-func BuildUserStats(uid uint) UserStats {
+func BuildUserStats(uid uint, dbs ...*gorm.DB) UserStats {
+	requestDB := database.Handle(dbs...)
+
 	own := database.OwnedBy(uid)
 	s := UserStats{TopDishes: []TopDishCount{}, CategoryCounts: []NameCount{}, WeekTrend: []DayCount{}}
 
-	db := database.DB
+	db := requestDB
 	db.Model(&models.MealRecord{}).Scopes(own).Count(&s.TotalRecords)
 	db.Model(&models.Dish{}).Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true).Count(&s.TotalDishes)
 	// Use the same scope as the "my recipes" list and category counts.

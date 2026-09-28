@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"ninimenu/internal/resourcebudget"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -171,6 +172,11 @@ func (l *LocalASR) transcribe(ctx context.Context, data []byte, gate Gate, befor
 	default:
 		return "", &Error{Code: "asr_busy", Message: "正在处理另一个视频的语音，请稍后再试", RetryAfter: 5}
 	}
+	release, err := resourcebudget.Acquire(ctx)
+	if err != nil {
+		return "", &Error{Code: "asr_busy", Message: "正在处理图片或视频，请稍后重试", RetryAfter: 5}
+	}
+	defer release()
 	if available, ok := l.availableMemory(); !ok || available < localASRStartMemory {
 		return "", problem("asr_busy", "当前可用资源不足，语音转写已暂缓；可稍后重试或粘贴文稿")
 	}

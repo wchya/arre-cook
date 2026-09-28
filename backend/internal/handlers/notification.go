@@ -14,11 +14,11 @@ import (
 // ListNotifications GET /api/notifications
 func ListNotifications(c *gin.Context) {
 	page, pageSize := pageParams(c, 20)
-	utils.Success(c, services.ListNotifications(uid(c), queryBool(c.Query("unread")), page, pageSize))
+	utils.Success(c, services.ListNotifications(uid(c), queryBool(c.Query("unread")), page, pageSize, database.DB.WithContext(c.Request.Context())))
 }
 
 func MarkNotificationRead(c *gin.Context) {
-	if err := services.MarkNotificationRead(uid(c), c.Param("id")); err != nil {
+	if err := services.MarkNotificationRead(uid(c), c.Param("id"), database.DB.WithContext(c.Request.Context())); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.NotFound(c, "通知不存在")
 			return
@@ -30,7 +30,7 @@ func MarkNotificationRead(c *gin.Context) {
 }
 
 func MarkAllNotificationsRead(c *gin.Context) {
-	if err := services.MarkAllNotificationsRead(uid(c)); err != nil {
+	if err := services.MarkAllNotificationsRead(uid(c), database.DB.WithContext(c.Request.Context())); err != nil {
 		utils.InternalError(c, "标记通知失败")
 		return
 	}
@@ -52,12 +52,12 @@ func CreateAdminNotification(c *gin.Context) {
 	}
 	if req.UserID != 0 {
 		var user models.User
-		if err := database.DB.First(&user, req.UserID).Error; err != nil {
+		if err := database.DB.WithContext(c.Request.Context()).First(&user, req.UserID).Error; err != nil {
 			utils.NotFound(c, "通知接收人不存在")
 			return
 		}
 	}
-	n, err := services.PublishNotification(req.UserID, req.Type, req.Title, req.Content, req.Link)
+	n, err := services.PublishNotification(req.UserID, req.Type, req.Title, req.Content, req.Link, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.BadRequest(c, err.Error())
 		return

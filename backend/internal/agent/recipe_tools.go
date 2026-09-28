@@ -1,6 +1,10 @@
 package agent
 
 import (
+	"ninimenu/internal/database"
+)
+
+import (
 	"encoding/json"
 	"errors"
 	"ninimenu/internal/auth"
@@ -25,7 +29,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return services.CreatePrivateRecipe(ctx.UID(), patch)
+			return services.CreatePrivateRecipe(ctx.UID(), patch, database.DB.WithContext(ctx.Context))
 		},
 	})
 	updateFields := map[string]any{"dish_id": integer("本人私房菜 ID", 1, 1<<31-1)}
@@ -47,7 +51,7 @@ func init() {
 			if in.DishID == 0 {
 				return nil, errors.New("请提供菜谱 ID")
 			}
-			return services.UpdatePrivateRecipe(ctx.UID(), in.DishID, in.PrivateRecipePatch)
+			return services.UpdatePrivateRecipe(ctx.UID(), in.DishID, in.PrivateRecipePatch, database.DB.WithContext(ctx.Context))
 		},
 	})
 	register(&Tool{
@@ -65,7 +69,7 @@ func init() {
 			if in.DishID == 0 {
 				return nil, errors.New("请提供菜谱 ID")
 			}
-			if err := services.DeletePrivateRecipe(ctx.UID(), in.DishID); err != nil {
+			if err := services.DeletePrivateRecipe(ctx.UID(), in.DishID, database.DB.WithContext(ctx.Context)); err != nil {
 				return nil, err
 			}
 			return map[string]any{"deleted": true, "dish_id": in.DishID}, nil

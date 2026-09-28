@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ---------------- 推荐建议收件箱 ----------------
@@ -31,13 +32,15 @@ type SuggestionView struct {
 }
 
 // CreateSuggestion 智能体向用户推送一条建议。只接受该用户可见的菜品。
-func CreateSuggestion(uid uint, source string, in SuggestionInput) (*SuggestionView, error) {
+func CreateSuggestion(uid uint, source string, in SuggestionInput, dbs ...*gorm.DB) (*SuggestionView, error) {
+	requestDB := database.Handle(dbs...)
+
 	ids := uniqueIDs(in.DishIDs, 6)
 	if len(ids) == 0 {
 		return nil, errors.New("dish_ids 至少包含一道菜")
 	}
 	var dishes []models.Dish
-	database.DB.Scopes(database.VisibleDishes(uid)).Where("id IN ?", ids).Find(&dishes)
+	requestDB.Scopes(database.VisibleDishes(uid)).Where("id IN ?", ids).Find(&dishes)
 	if len(dishes) != len(ids) {
 		return nil, errors.New("包含不存在或不可见的菜品")
 	}
@@ -53,9 +56,9 @@ func CreateSuggestion(uid uint, source string, in SuggestionInput) (*SuggestionV
 		date = d
 	}
 
-	ExpireSuggestions(uid)
+	ExpireSuggestions(uid, requestDB)
 	var pending int64
-	database.DB.Model(&models.AgentSuggestion{}).Scopes(database.OwnedBy(uid)).Where("status = ?", "pending").Count(&pending)
+	requestDB.Model(&models.AgentSuggestion{}).Scopes(database.OwnedBy(uid)).Where("status = ?", "pending").Count(&pending)
 	if pending >= maxPendingSuggestions {
 		return nil, errors.New("待处理的建议过多，请等用户处理后再推送")
 	}
@@ -75,28 +78,32 @@ func CreateSuggestion(uid uint, source string, in SuggestionInput) (*SuggestionV
 		Reason: truncateRunes(strings.TrimSpace(in.Reason), 500), DishIDs: string(idsJSON),
 		MealType: in.MealType, MealDate: date, Status: "pending", ExpiresAt: &exp,
 	}
-	if err := database.DB.Create(&s).Error; err != nil {
+	if err := requestDB.Create(&s).Error; err != nil {
 		return nil, err
 	}
-	_, _ = CreateNotification(uid, "health_tip", "收到新的饮食建议", title+"，打开 AI 建议查看详情并决定是否采纳。", "/suggestions")
+	_, _ = CreateNotification(uid, "health_tip", "收到新的饮食建议", title+"，打开 AI 建议查看详情并决定是否采纳。", "/suggestions", requestDB)
 	for _, d := range dishes {
-		LogBehavior(uid, "recommend", d.ID, d.Name, source, "", map[string]any{"mode": "suggestion", "suggestion_id": s.ID})
+		LogBehavior(uid, "recommend", d.ID, d.Name, source, "", map[string]any{"mode": "suggestion", "suggestion_id": s.ID}, requestDB)
 	}
 	return &SuggestionView{AgentSuggestion: s, Dishes: orderDishes(dishes, ids)}, nil
 }
 
-func ExpireSuggestions(uid uint) {
-	database.DB.Model(&models.AgentSuggestion{}).Scopes(database.OwnedBy(uid)).
+func ExpireSuggestions(uid uint, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
+	requestDB.Model(&models.AgentSuggestion{}).Scopes(database.OwnedBy(uid)).
 		Where("status = ? AND expires_at IS NOT NULL AND expires_at < ?", "pending", time.Now()).
 		Update("status", "expired")
 }
 
-func ListSuggestions(uid uint, status string, limit int) []SuggestionView {
-	ExpireSuggestions(uid)
+func ListSuggestions(uid uint, status string, limit int, dbs ...*gorm.DB) []SuggestionView {
+	requestDB := database.Handle(dbs...)
+
+	ExpireSuggestions(uid, requestDB)
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	q := database.DB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Limit(limit)
+	q := requestDB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Limit(limit)
 	if status != "" && status != "all" {
 		q = q.Where("status = ?", status)
 	}
@@ -116,8 +123,8 @@ func ListSuggestions(uid uint, status string, limit int) []SuggestionView {
 	dishByID := map[uint]models.Dish{}
 	if len(ids) > 0 {
 		var dishes []models.Dish
-		database.DB.Scopes(database.VisibleDishes(uid)).Where("id IN ?", ids).Find(&dishes)
-		MarkFavorites(uid, dishes)
+		requestDB.Scopes(database.VisibleDishes(uid)).Where("id IN ?", ids).Find(&dishes)
+		MarkFavorites(uid, dishes, requestDB)
 		for _, d := range dishes {
 			dishByID[d.ID] = d
 		}
@@ -143,44 +150,80 @@ type ResolveInput struct {
 }
 
 // ResolveSuggestion 用户采纳或忽略建议。采纳时按餐次写入用餐记录；两种结果都回流为行为事件。
-func ResolveSuggestion(uid uint, id any, in ResolveInput) (created []models.MealRecord, err error) {
-	var s models.AgentSuggestion
-	if err := database.DB.Scopes(database.OwnedBy(uid)).First(&s, id).Error; err != nil {
-		return nil, errors.New("建议不存在")
+func ResolveSuggestion(uid uint, id any, in ResolveInput, dbs ...*gorm.DB) (created []models.MealRecord, err error) {
+	requestDB := database.Handle(dbs...)
+
+	var suggestion models.AgentSuggestion
+	var selected []uint
+	err = requestDB.Transaction(func(tx *gorm.DB) error {
+		if e := tx.Model(&models.AgentSuggestion{}).Where("id = ? AND user_id = ?", id, uid).UpdateColumn("id", gorm.Expr("id")).Error; e != nil {
+			return e
+		}
+		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", uid).First(&suggestion, id).Error; e != nil {
+			return e
+		}
+		status := "dismissed"
+		if in.Accept {
+			status = "accepted"
+		}
+		if suggestion.Status != "pending" {
+			if suggestion.Status == status {
+				return nil
+			} // retries never create another meal
+			return errors.New("这条建议已处理过")
+		}
+		now := time.Now()
+		if suggestion.ExpiresAt != nil && !suggestion.ExpiresAt.After(now) {
+			return errors.New("建议已过期")
+		}
+		allowed := map[uint]bool{}
+		for _, did := range parseIDs(suggestion.DishIDs) {
+			allowed[did] = true
+		}
+		selected = uniqueIDs(in.DishIDs, 6)
+		if len(selected) == 0 {
+			selected = parseIDs(suggestion.DishIDs)
+		}
+		for _, did := range selected {
+			if !allowed[did] {
+				return ErrDishNotFound
+			}
+		}
+		if in.Accept {
+			mealType := firstNonEmpty(in.MealType, suggestion.MealType)
+			date := firstNonEmpty(in.MealDate, suggestion.MealDate)
+			if mealType != "" {
+				for _, did := range selected {
+					rec, _, _, e := createMealRecordTx(tx, uid, MealInput{DishID: did, MealType: mealType, MealDate: date})
+					if e != nil {
+						return e
+					}
+					created = append(created, *rec)
+				}
+			}
+		}
+		result := tx.Model(&models.AgentSuggestion{}).Where("id = ? AND status = ?", suggestion.ID, "pending").Updates(map[string]any{"status": status, "resolved_at": now})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return errors.New("建议状态已变化")
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	if s.Status != "pending" {
-		return nil, errors.New("这条建议已处理过")
-	}
-	ids := parseIDs(s.DishIDs)
-	chosen := map[uint]bool{}
-	for _, id := range in.DishIDs {
-		chosen[id] = true
-	}
-	now := time.Now()
-	status := "dismissed"
+	event := "reject"
 	if in.Accept {
-		status = "accepted"
-		mealType := firstNonEmpty(in.MealType, s.MealType)
-		date := firstNonEmpty(in.MealDate, s.MealDate)
-		for _, did := range ids {
-			if len(chosen) > 0 && !chosen[did] {
-				continue
-			}
-			if mealType == "" {
-				LogBehavior(uid, "accept", did, "", s.Source, "", map[string]any{"suggestion_id": s.ID})
-				continue
-			}
-			rec, err := CreateMealRecord(uid, MealInput{DishID: did, MealType: mealType, MealDate: date}, s.Source, "user")
-			if err == nil {
-				created = append(created, *rec)
-			}
-		}
-	} else {
-		for _, did := range ids {
-			LogBehavior(uid, "reject", did, "", s.Source, "", map[string]any{"suggestion_id": s.ID})
-		}
+		event = "accept"
 	}
-	database.DB.Model(&s).Updates(map[string]any{"status": status, "resolved_at": now})
+	for _, did := range selected {
+		LogBehavior(uid, event, did, "", suggestion.Source, "", map[string]any{"suggestion_id": suggestion.ID}, requestDB)
+	}
+	if len(created) > 0 {
+		QueueAutoAchievementSync(uid)
+	}
 	return created, nil
 }
 
@@ -243,7 +286,9 @@ type AuditEntry struct {
 	DurationMs int64
 }
 
-func WriteAudit(e AuditEntry) {
+func WriteAudit(e AuditEntry, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	if e.UserID == 0 {
 		return
 	}
@@ -259,7 +304,7 @@ func WriteAudit(e AuditEntry) {
 			args = string(b)
 		}
 	}
-	database.DB.Create(&models.AgentAuditLog{
+	requestDB.Create(&models.AgentAuditLog{
 		UserID: e.UserID, TokenID: e.TokenID, Actor: truncateRunes(e.Actor, 64), Channel: e.Channel,
 		Tool: e.Tool, Args: truncateRunes(args, 2000), Status: e.Status, Error: truncateRunes(e.Error, 500), DurationMs: e.DurationMs,
 	})
@@ -290,10 +335,12 @@ type AgentUsageSummary struct {
 // AgentUsageSummaryFor returns usage data scoped to uid. Keep this query
 // separate from the admin dashboard so it cannot accidentally aggregate all
 // users when the account page is requested.
-func AgentUsageSummaryFor(uid uint) AgentUsageSummary {
+func AgentUsageSummaryFor(uid uint, dbs ...*gorm.DB) AgentUsageSummary {
+	requestDB := database.Handle(dbs...)
+
 	var summary AgentUsageSummary
 	var tokens []models.AgentToken
-	database.DB.Scopes(database.OwnedBy(uid)).Find(&tokens)
+	requestDB.Scopes(database.OwnedBy(uid)).Find(&tokens)
 	summary.TotalTokens = int64(len(tokens))
 	now := time.Now()
 	for _, token := range tokens {
@@ -306,14 +353,14 @@ func AgentUsageSummaryFor(uid uint) AgentUsageSummary {
 		}
 	}
 
-	base := func() *gorm.DB { return database.DB.Model(&models.AgentAuditLog{}).Scopes(database.OwnedBy(uid)) }
+	base := func() *gorm.DB { return requestDB.Model(&models.AgentAuditLog{}).Scopes(database.OwnedBy(uid)) }
 	base().Count(&summary.Calls)
 	base().Where("status = ?", "ok").Count(&summary.SuccessCalls)
 	base().Where("status = ?", "error").Count(&summary.ErrorCalls)
 	base().Where("status = ?", "denied").Count(&summary.DeniedCalls)
 	base().Where("created_at >= ?", now.Add(-24*time.Hour)).Count(&summary.CallsLast24Hours)
 	var latest models.AgentAuditLog
-	if err := database.DB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").First(&latest).Error; err == nil {
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").First(&latest).Error; err == nil {
 		last := latest.CreatedAt
 		summary.LastCallAt = &last
 	}
@@ -329,7 +376,9 @@ func toTokenView(t models.AgentToken) AgentTokenView {
 
 const maxTokensPerUser = 20
 
-func CreateAgentToken(uid uint, name string, scopes []string, expiresInDays int) (string, *AgentTokenView, error) {
+func CreateAgentToken(uid uint, name string, scopes []string, expiresInDays int, dbs ...*gorm.DB) (string, *AgentTokenView, error) {
+	requestDB := database.Handle(dbs...)
+
 	name = truncateRunes(strings.TrimSpace(name), 32)
 	if name == "" {
 		return "", nil, errors.New("请给令牌起个名字，例如 DeepSeek、Hermes")
@@ -339,7 +388,7 @@ func CreateAgentToken(uid uint, name string, scopes []string, expiresInDays int)
 		return "", nil, errors.New("至少选择一项权限")
 	}
 	var n int64
-	database.DB.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).Where("revoked_at IS NULL").Count(&n)
+	requestDB.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).Where("revoked_at IS NULL").Count(&n)
 	if n >= maxTokensPerUser {
 		return "", nil, errors.New("令牌数量已达上限，请先撤销不用的令牌")
 	}
@@ -353,17 +402,19 @@ func CreateAgentToken(uid uint, name string, scopes []string, expiresInDays int)
 		exp := time.Now().AddDate(0, 0, expiresInDays)
 		t.ExpiresAt = &exp
 	}
-	if err := database.DB.Create(&t).Error; err != nil {
+	if err := requestDB.Create(&t).Error; err != nil {
 		return "", nil, err
 	}
-	_, _ = CreateNotification(uid, "agent_security", "新的智能体令牌已创建", "如果这不是你的操作，请立即在 AI 连接中撤销该令牌。", "/me/ai")
+	_, _ = CreateNotification(uid, "agent_security", "新的智能体令牌已创建", "如果这不是你的操作，请立即在 AI 连接中撤销该令牌。", "/me/ai", requestDB)
 	v := toTokenView(t)
 	return plain, &v, nil
 }
 
-func ListAgentTokens(uid uint) []AgentTokenView {
+func ListAgentTokens(uid uint, dbs ...*gorm.DB) []AgentTokenView {
+	requestDB := database.Handle(dbs...)
+
 	var rows []models.AgentToken
-	database.DB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Find(&rows)
+	requestDB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Find(&rows)
 	out := make([]AgentTokenView, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, toTokenView(r))
@@ -371,13 +422,15 @@ func ListAgentTokens(uid uint) []AgentTokenView {
 	return out
 }
 
-func RevokeAgentToken(uid uint, id any) error {
-	res := database.DB.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).
+func RevokeAgentToken(uid uint, id any, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
+	res := requestDB.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).
 		Where("id = ? AND revoked_at IS NULL", id).Update("revoked_at", time.Now())
 	if res.RowsAffected == 0 {
 		return errors.New("令牌不存在或已撤销")
 	}
-	_, _ = CreateNotification(uid, "agent_security", "智能体令牌已撤销", "该令牌已立即失效，之后的第三方请求将无法访问你的数据。", "/me/ai")
+	_, _ = CreateNotification(uid, "agent_security", "智能体令牌已撤销", "该令牌已立即失效，之后的第三方请求将无法访问你的数据。", "/me/ai", requestDB)
 	return nil
 }
 
@@ -419,20 +472,22 @@ func patchAgentTokenValues(t *models.AgentToken, patch AgentTokenPatch) error {
 	return nil
 }
 
-func UpdateAgentToken(uid uint, id any, patch AgentTokenPatch) (*AgentTokenView, error) {
+func UpdateAgentToken(uid uint, id any, patch AgentTokenPatch, dbs ...*gorm.DB) (*AgentTokenView, error) {
+	requestDB := database.Handle(dbs...)
+
 	var t models.AgentToken
-	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("revoked_at IS NULL").First(&t, id).Error; err != nil {
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Where("revoked_at IS NULL").First(&t, id).Error; err != nil {
 		return nil, errors.New("令牌不存在或已撤销")
 	}
 	if err := patchAgentTokenValues(&t, patch); err != nil {
 		return nil, err
 	}
-	if err := database.DB.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).Where("id = ? AND revoked_at IS NULL", t.ID).Updates(map[string]any{
+	if err := requestDB.Model(&models.AgentToken{}).Scopes(database.OwnedBy(uid)).Where("id = ? AND revoked_at IS NULL", t.ID).Updates(map[string]any{
 		"name": t.Name, "scopes": t.Scopes, "expires_at": t.ExpiresAt,
 	}).Error; err != nil {
 		return nil, err
 	}
-	_, _ = CreateNotification(uid, "agent_security", "智能体令牌权限已更新", "请确认第三方配置仍符合你当前授权范围。", "/me/ai")
+	_, _ = CreateNotification(uid, "agent_security", "智能体令牌权限已更新", "请确认第三方配置仍符合你当前授权范围。", "/me/ai", requestDB)
 	return &AgentTokenView{AgentToken: t, ScopeList: decodeTokenScopes(t.Scopes), Active: true}, nil
 }
 
@@ -443,10 +498,12 @@ func decodeTokenScopes(raw string) []string {
 }
 
 // RotateAgentToken 原子地撤销旧令牌并签发新令牌。明文只返回本次响应，旧令牌不会被复活。
-func RotateAgentToken(uid uint, id any, patch AgentTokenPatch) (string, *AgentTokenView, error) {
+func RotateAgentToken(uid uint, id any, patch AgentTokenPatch, dbs ...*gorm.DB) (string, *AgentTokenView, error) {
+	requestDB := database.Handle(dbs...)
+
 	var plain string
 	var view *AgentTokenView
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
+	err := requestDB.Transaction(func(tx *gorm.DB) error {
 		var old models.AgentToken
 		if err := tx.Scopes(database.OwnedBy(uid)).Where("revoked_at IS NULL").First(&old, id).Error; err != nil {
 			return errors.New("令牌不存在或已撤销")
@@ -477,6 +534,6 @@ func RotateAgentToken(uid uint, id any, patch AgentTokenPatch) (string, *AgentTo
 	if err != nil {
 		return "", nil, err
 	}
-	_, _ = CreateNotification(uid, "agent_security", "智能体令牌已轮换", "旧令牌已失效，请把新令牌更新到 Hermes、DSH 或其他 Agent 配置中。", "/me/ai")
+	_, _ = CreateNotification(uid, "agent_security", "智能体令牌已轮换", "旧令牌已失效，请把新令牌更新到 Hermes、DSH 或其他 Agent 配置中。", "/me/ai", requestDB)
 	return plain, view, nil
 }

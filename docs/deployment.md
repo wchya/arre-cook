@@ -119,9 +119,9 @@ curl -fsS http://127.0.0.1:9925/healthz
 
 ## 内存预算
 
-Compose 默认注入 `GOMEMLIMIT=256MiB`，可在部署 `.env` 覆盖。它是 Go 运行时的回收软目标，不是进程 RSS 或容器硬限制，不涵盖 Python ASR、FFmpeg、tmpfs、MySQL 或 Garage。使用本地 ASR 时仍需保留至少 768 MiB 可用内存供任务准入；不要将整个容器限制为 256 MiB。降低该值会增加 GC 工作，应同时观察延迟和 CPU。
+Compose 默认注入 `GOMEMLIMIT=192MiB`、`GOMAXPROCS=2`，整个应用容器硬限制为 `APP_MEMORY_LIMIT=1g`、`APP_CPUS=2`，memory+swap 等于 memory。Go 软目标不涵盖 Python ASR、FFmpeg 或 tmpfs，容器限制涵盖这些进程；MySQL、Garage 和其他服务需要另外核算。使用本地 ASR 时仍需至少 768 MiB 可用余量，单任务 RSS 上限 512 MiB。已有 `.env` 若显式设置旧的 `256MiB` 会覆盖默认值，发布时需检查。
 
-单应用进程同时处理 1 张上传图片，最多 4 个请求等待 5 秒，忙碌返回 `429`；图片完整解码前检查 2400 万像素和单边 16384 像素上限。文件采用流式 multipart，减少重复缓冲。周菜单复用数据库持久缓存，避免进程内副本随账号数持续增长。具体限制和局部分配基准见 [开发指南](../README_DEV.md#运行内存)。这些优化需发布新版应用并重建容器后生效；尚不能据此承诺固定的整机峰值。
+单应用进程同时处理 1 张上传图片，最多 4 个请求等待 5 秒；图片解码与 ASR 进一步共用一个重任务槽，忙碌返回 `429` 或转写忙碌状态。图片完整解码前检查 2400 万像素和单边 16384 像素上限。普通 API/MCP 最多 16 个请求，密码计算最多 2 个，菜库/导出读取最多 2 个，公共图片回源最多 8 个。普通 JSON 上限 64 KiB，菜谱/Agent/MCP 上限 256 KiB。周菜单缓存只保存 ID，并重新读取当前可见内容。具体规则见 [开发指南](../README_DEV.md#运行内存)。这些配置需发布并重建容器后生效；4 核、3.32 GiB、无 swap、13 容器混部的组合负载仍需验证，不能承诺固定峰值或 QPS。
 
 ## AI 与智能体
 
@@ -150,7 +150,29 @@ LLM_CPA_MODEL=cook/glm-5.3
 
 站内 `/api/assistant/chat` 的凭证方向相反：只接受站内用户 JWT，拒绝 PAT/短期 Agent 令牌。所有站内对话经过食谱输入审核、写入操作审核和完整输出审核；新版本不再嵌入外部模型页面。审核器使用同一服务端提供商，只接受正常结束的 `ALLOW` / `BLOCK`；20 秒内无法完成或回复被截断时拒绝继续。上线后必须验证真实模型，不能仅凭 mock 测试确认审核可用。
 
-生产 `PUBLIC_URL` / `CORS_ORIGINS` 应明确填写 `https://cook.arrebyte.top`，AI 入口不会接受通配符给予的外站信任。反向代理要覆盖伪造转发头；Compose 支持通过 `TRUSTED_PROXIES` 指定实际代理地址。每分钟入口及外部 Agent 限流在应用进程内；增加副本前需改为共享限流，每日额度与租约已使用数据库。
+生产 `PUBLIC_URL` / `CORS_ORIGINS` 应明确填写 `https://cook.arrebyte.top`，AI 入口不会接受通配符给予的外站信任。反向代理要覆盖伪造转发头；Compose 支持通过 `TRUSTED_PROXIES` 指定实际代理地址。账号级认证、改密、对话、视频和 Agent 速率额度已由数据库共享窗口预约，每日额度与租约也使用数据库；进程级入口保护和重任务槽仍只保护本副本。当前混部主机保持应用/本地 ASR 单副本。
+
+### 审计修复的首次迁移与发布
+
+2026-09-28 的修复状态及验证范围见 [逐项修复记录](audit-remediation-2026-09-28.md)。代码基于 0.12.6，尚未将本轮修复发布到生产；下面是待执行流程，不代表已执行。
+
+1. 先完成实现与版本提交、构建镜像，保留旧镜像，并备份 MySQL、Garage 与本地上传目录。镜像后端固定 Go 1.25.14，`x/image` 为 0.45.0。
+2. 在隔离环境验证原数据库副本迁移和恢复。新表包括 `upload_assets`、`upload_references`、`task_claims`、`request_windows`，成就新增用户/成就唯一键，迁移先合并重复授奖；菜数非法历史设置重置为 1。离线 `dbmigrate` 使用同一模型清单，包含家庭清单/删除申请，游标读取并逐表核对行数。
+3. 首次建立对象账本需 bucket 的列举权限（ListObjectsV2）以及读写/删除权限；以每页 500 个对象扫描 S3、分批回填业务引用，并统计历史本地文件与备份。存储扫描最多 10 分钟，失败则迁移退出，不启用缺失账本的 API。历史模糊备份按 `archive` 保留并计入额度。若已有数据超额，不自动删除已引用图片，只拒绝新增。
+4. 切入维护窗口、停止新请求，并留足现有 AI 请求的 90 秒完成时间后停止旧容器；执行一次迁移任务。MySQL 迁移用固定连接的 `GET_LOCK` 串行初始化；1 连接配置仅在迁移时临时借用第二个连接。完成后再启动 API 副本并设置 `DB_AUTO_MIGRATE=false`。
+
+```sh
+docker compose --env-file ../web-arrebyte/.env --env-file .env build ninimenu
+# 完成备份、预发验证、切流和在途请求排空后：
+docker compose --env-file ../web-arrebyte/.env --env-file .env stop ninimenu
+docker compose --env-file ../web-arrebyte/.env --env-file .env run --rm --no-deps \
+  -e DB_AUTO_MIGRATE=true -e DB_MIGRATE_ONLY=true ninimenu
+DB_AUTO_MIGRATE=false docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --no-build ninimenu
+```
+
+将 `DB_AUTO_MIGRATE=false` 持久写入部署 `.env`，每次需要 schema 变更时先运行上面的独立迁移。更新后的普通请求期限 15 秒，AI/Agent/MCP 为 90 秒，应用 Shutdown 等待 100 秒，Compose stop grace 为 110 秒；请求根 context 在排空结束后才取消。代理须先停止接流，避免停止期间持续重试旧实例。
+
+发布后核对模块版本、容器 memory/CPU/stop timeout、健康、登录与会话撤销、图片上传/引用保护、菜单、家庭清单和站内信；在 Linux 预发验证最大图片与 ASR/菜单/其他容器组合负载及执行中 SIGTERM。小程序开发版还要做 iOS 真机弹层检查。回滚到不维护图片账本的旧版本后，不可直接沿用旧的 `uploads_inventory_v1=done`：再次升级前应在停写和备份之后将该标记重置为待回填，重新核对引用及对象总量。
 
 ### 发布核验
 

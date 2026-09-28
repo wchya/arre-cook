@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"ninimenu/internal/achievements"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const achievementSyncDelay = 300 * time.Millisecond
@@ -20,8 +22,11 @@ var (
 	defaultAchievementsMu      sync.Mutex
 	defaultAchievementsEnsured bool
 	achievementSyncMu          sync.Mutex
-	achievementSyncTimers      = map[uint]*time.Timer{}
-	achievementRunMu           sync.Mutex
+	achievementQueue           = make(chan uint, 128)
+	achievementPending         = map[uint]bool{}
+	achievementWorkers         sync.Once
+	achievementSlots           = make(chan struct{}, 2)
+	achievementUsers           [64]sync.Mutex
 )
 
 type achievementSnapshot struct {
@@ -81,7 +86,9 @@ type achievementRecordInfo struct {
 	hasDate bool
 }
 
-func EnsureDefaultAchievements() {
+func EnsureDefaultAchievements(dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	defaultAchievementsMu.Lock()
 	defer defaultAchievementsMu.Unlock()
 	if defaultAchievementsEnsured {
@@ -95,12 +102,12 @@ func EnsureDefaultAchievements() {
 	}
 
 	var existing []models.Achievement
-	database.DB.Where("code IN ?", codes).Find(&existing)
+	requestDB.Where("code IN ?", codes).Find(&existing)
 	existingByCode := make(map[string]models.Achievement, len(existing))
 	for _, a := range existing {
 		existingByCode[a.Code] = a
 		if a.Condition == "" || a.Condition == "manual" {
-			database.DB.Model(&a).Update("condition", "auto")
+			requestDB.Model(&a).Update("condition", "auto")
 		}
 	}
 
@@ -112,44 +119,35 @@ func EnsureDefaultAchievements() {
 		missing = append(missing, a)
 	}
 	if len(missing) > 0 {
-		database.DB.Create(&missing)
+		requestDB.Create(&missing)
 	}
 
 	defaultAchievementsEnsured = true
 }
 
-// QueueAutoAchievementSync 防抖：同一用户 300ms 内的多次变更只触发一次成就检测。
+// QueueAutoAchievementSync coalesces queued and running work per user. At most
+// two workers and 128 pending users exist. If full, the next read/write retries.
 func QueueAutoAchievementSync(uid uint) {
 	if uid == 0 {
 		return
 	}
+
 	achievementSyncMu.Lock()
 	defer achievementSyncMu.Unlock()
-
-	if t := achievementSyncTimers[uid]; t != nil {
-		t.Reset(achievementSyncDelay)
+	if _, ok := achievementPending[uid]; ok {
+		achievementPending[uid] = true
 		return
 	}
-
-	achievementSyncTimers[uid] = time.AfterFunc(achievementSyncDelay, func() {
-		achievementSyncMu.Lock()
-		delete(achievementSyncTimers, uid)
-		achievementSyncMu.Unlock()
-		SyncAutoAchievements(uid)
-	})
-}
-
-func cancelQueuedAutoAchievementSync(uid uint) {
-	achievementSyncMu.Lock()
-	defer achievementSyncMu.Unlock()
-
-	if t := achievementSyncTimers[uid]; t != nil {
-		t.Stop()
-		delete(achievementSyncTimers, uid)
+	select {
+	case achievementQueue <- uid:
+		achievementPending[uid] = false
+	default:
 	}
 }
 
-func RecordAchievementEvent(uid uint, eventType string, refKey string) {
+func RecordAchievementEvent(uid uint, eventType string, refKey string, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	eventType = strings.TrimSpace(eventType)
 	refKey = strings.TrimSpace(refKey)
 	if eventType == "" || uid == 0 {
@@ -157,12 +155,14 @@ func RecordAchievementEvent(uid uint, eventType string, refKey string) {
 	}
 
 	event := models.AchievementEvent{UserID: uid, EventType: eventType, RefKey: refKey}
-	database.DB.Create(&event)
+	requestDB.Create(&event)
 
 	QueueAutoAchievementSync(uid)
 }
 
-func RecordUniqueAchievementEvent(uid uint, eventType string, refKey string) {
+func RecordUniqueAchievementEvent(uid uint, eventType string, refKey string, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	eventType = strings.TrimSpace(eventType)
 	refKey = strings.TrimSpace(refKey)
 	if eventType == "" || refKey == "" || uid == 0 {
@@ -170,24 +170,41 @@ func RecordUniqueAchievementEvent(uid uint, eventType string, refKey string) {
 	}
 
 	event := models.AchievementEvent{UserID: uid, EventType: eventType, RefKey: refKey}
-	database.DB.Where("user_id = ? AND event_type = ? AND ref_key = ?", uid, eventType, refKey).
+	requestDB.Where("user_id = ? AND event_type = ? AND ref_key = ?", uid, eventType, refKey).
 		FirstOrCreate(&event)
 
 	QueueAutoAchievementSync(uid)
 }
 
+// Synchronous entry is retained for offline rebuilds/tests; contention is
+// deferred to the bounded queue instead of blocking request goroutines.
 func SyncAutoAchievements(uid uint) {
 	if uid == 0 {
 		return
 	}
-	cancelQueuedAutoAchievementSync(uid)
+	select {
+	case achievementSlots <- struct{}{}:
+		defer func() { <-achievementSlots }()
+	default:
+		QueueAutoAchievementSync(uid)
+		return
+	}
+	lock := &achievementUsers[uid%uint(len(achievementUsers))]
+	if !lock.TryLock() {
+		QueueAutoAchievementSync(uid)
+		return
+	}
+	defer lock.Unlock()
+	runAutoAchievementSync(uid, database.DB)
+}
+func runAutoAchievementSync(uid uint, dbs ...*gorm.DB) {
+	ctx, cancel := context.WithTimeout(database.Handle(dbs...).Statement.Context, 15*time.Second)
+	defer cancel()
+	requestDB := database.Handle(dbs...).WithContext(ctx)
 
-	achievementRunMu.Lock()
-	defer achievementRunMu.Unlock()
+	EnsureDefaultAchievements(requestDB)
 
-	EnsureDefaultAchievements()
-
-	unlockable := evaluateAchievementCodes(buildAchievementSnapshot(uid))
+	unlockable := evaluateAchievementCodes(buildAchievementSnapshot(uid, requestDB))
 	if len(unlockable) == 0 {
 		return
 	}
@@ -197,7 +214,7 @@ func SyncAutoAchievements(uid uint) {
 		codes = append(codes, code)
 	}
 
-	autoAchievements, err := findAutoAchievements(database.DB, codes)
+	autoAchievements, err := findAutoAchievements(requestDB, codes)
 	if err != nil {
 		log.Printf("查询自动成就失败（用户 %d）：%v", uid, err)
 		return
@@ -212,7 +229,7 @@ func SyncAutoAchievements(uid uint) {
 	}
 
 	var unlocked []models.UserAchievement
-	database.DB.Scopes(database.OwnedBy(uid)).Where("achievement_id IN ?", achievementIDs).Find(&unlocked)
+	requestDB.Scopes(database.OwnedBy(uid)).Where("achievement_id IN ?", achievementIDs).Find(&unlocked)
 	unlockedMap := make(map[uint]bool, len(unlocked))
 	for _, u := range unlocked {
 		unlockedMap[u.AchievementID] = true
@@ -232,7 +249,7 @@ func SyncAutoAchievements(uid uint) {
 		unlockedMap[a.ID] = true
 	}
 	if len(newUnlocks) > 0 {
-		database.DB.Create(&newUnlocks)
+		requestDB.Clauses(clause.OnConflict{DoNothing: true}).Create(&newUnlocks)
 	}
 }
 
@@ -247,7 +264,9 @@ func findAutoAchievements(db *gorm.DB, codes []string) ([]models.Achievement, er
 	return items, err
 }
 
-func buildAchievementSnapshot(uid uint) achievementSnapshot {
+func buildAchievementSnapshot(uid uint, dbs ...*gorm.DB) achievementSnapshot {
+	requestDB := database.Handle(dbs...)
+
 	own := database.OwnedBy(uid)
 	s := achievementSnapshot{
 		distinctDishes:     map[uint]bool{},
@@ -265,8 +284,8 @@ func buildAchievementSnapshot(uid uint) achievementSnapshot {
 	}
 
 	var allDishes []models.Dish
-	database.DB.Unscoped().Scopes(database.VisibleDishes(uid)).
-		Select("id", "name", "image_url", "images", "video_url", "category", "taste", "ingredients", "steps", "cook_time", "difficulty", "owner_id", "deleted_at").
+	requestDB.Unscoped().Scopes(database.VisibleDishes(uid)).
+		Select("id, name, image_url, images, video_url, category, taste, CASE WHEN ingredients IS NOT NULL AND ingredients NOT IN ('','[]') THEN '[1]' ELSE '[]' END AS ingredients, CASE WHEN steps IS NOT NULL AND steps NOT IN ('','[]') THEN '[1]' ELSE '[]' END AS steps, cook_time, difficulty, owner_id, deleted_at").
 		Find(&allDishes)
 	dishByID := make(map[uint]models.Dish, len(allDishes))
 	for _, d := range allDishes {
@@ -292,7 +311,7 @@ func buildAchievementSnapshot(uid uint) achievementSnapshot {
 	}
 
 	var records []models.MealRecord
-	database.DB.Scopes(own).
+	requestDB.Scopes(own).
 		Select("id", "dish_id", "meal_type", "meal_date", "remark", "mood", "created_at").
 		Order("created_at ASC, id ASC").
 		Find(&records)
@@ -379,7 +398,7 @@ func buildAchievementSnapshot(uid uint) achievementSnapshot {
 	s.longestDateStreak = longestDateStreak(s.recordDates)
 
 	var ratings []models.DayRating
-	database.DB.Scopes(own).Select("home_mood", "mood", "remark", "photos").Find(&ratings)
+	requestDB.Scopes(own).Select("home_mood", "mood", "remark", "photos").Find(&ratings)
 	for _, r := range ratings {
 		if strings.TrimSpace(r.Mood) != "" {
 			s.dayRatingCount++
@@ -398,11 +417,11 @@ func buildAchievementSnapshot(uid uint) achievementSnapshot {
 	}
 
 	var n int64
-	database.DB.Model(&models.Favorite{}).Scopes(own).Count(&n)
+	requestDB.Model(&models.Favorite{}).Scopes(own).Count(&n)
 	s.favoriteCount = int(n)
-	database.DB.Model(&models.ShoppingCheck{}).Scopes(own).Where("checked = ?", true).Count(&n)
+	requestDB.Model(&models.ShoppingCheck{}).Scopes(own).Where("checked = ?", true).Count(&n)
 	s.shoppingChecked = int(n)
-	database.DB.Model(&models.HomeInventory{}).Scopes(own).Where("in_stock = ?", true).Count(&n)
+	requestDB.Model(&models.HomeInventory{}).Scopes(own).Where("in_stock = ?", true).Count(&n)
 	s.inventoryCount = int(n)
 
 	type eventCount struct {
@@ -410,7 +429,7 @@ func buildAchievementSnapshot(uid uint) achievementSnapshot {
 		Count     int
 	}
 	var eventCounts []eventCount
-	database.DB.Model(&models.AchievementEvent{}).Scopes(own).
+	requestDB.Model(&models.AchievementEvent{}).Scopes(own).
 		Select("event_type, count(*) as count").
 		Group("event_type").
 		Find(&eventCounts)
@@ -420,7 +439,7 @@ func buildAchievementSnapshot(uid uint) achievementSnapshot {
 
 	// 采纳 AI 推荐：行为事件里由智能体/站内助手来源写入的 accept
 	var acceptCount int64
-	database.DB.Model(&models.BehaviorEvent{}).Scopes(own).
+	requestDB.Model(&models.BehaviorEvent{}).Scopes(own).
 		Where("event_type = ? AND (source LIKE ? OR source = ?)", "accept", "agent%", "assistant").
 		Count(&acceptCount)
 	s.agentAcceptCount = int(acceptCount)
@@ -755,4 +774,46 @@ func countMapValues(m map[string]int) int {
 		total += n
 	}
 	return total
+}
+
+// StartAchievementWorkers gives background computations the server lifetime.
+func StartAchievementWorkers(ctx context.Context) {
+	achievementWorkers.Do(func() {
+		for i := 0; i < 2; i++ {
+			go func() {
+				for {
+					var user uint
+					select {
+					case <-ctx.Done():
+						return
+					case user = <-achievementQueue:
+					}
+
+					select {
+					case <-ctx.Done():
+						return
+					case achievementSlots <- struct{}{}:
+					}
+					lock := &achievementUsers[user%uint(len(achievementUsers))]
+					lock.Lock()
+					runAutoAchievementSync(user, database.DB.WithContext(ctx))
+					lock.Unlock()
+					<-achievementSlots
+					achievementSyncMu.Lock()
+					dirty := achievementPending[user]
+					if dirty {
+						achievementPending[user] = false
+						select {
+						case achievementQueue <- user:
+						default:
+							delete(achievementPending, user)
+						}
+					} else {
+						delete(achievementPending, user)
+					}
+					achievementSyncMu.Unlock()
+				}
+			}()
+		}
+	})
 }

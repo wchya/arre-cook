@@ -34,8 +34,8 @@ type Achievement struct {
 
 type UserAchievement struct {
 	ID            uint      `json:"id" gorm:"primaryKey"`
-	UserID        uint      `json:"user_id" gorm:"not null;default:0;index:idx_user_ach_user_ach,priority:1"`
-	AchievementID uint      `json:"achievement_id" gorm:"not null;index;index:idx_user_ach_user_ach,priority:2"`
+	UserID        uint      `json:"user_id" gorm:"not null;default:0;uniqueIndex:idx_user_ach_unique,priority:1"`
+	AchievementID uint      `json:"achievement_id" gorm:"not null;index;uniqueIndex:idx_user_ach_unique,priority:2"`
 	UnlockedAt    time.Time `json:"unlocked_at"`
 }
 

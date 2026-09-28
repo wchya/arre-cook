@@ -84,7 +84,7 @@ func GetAgentCapabilities(c *gin.Context) {
 	p := principal(c)
 	base := baseURL(c)
 	utils.Success(c, gin.H{
-		"app_name":    database.GetSetting("app_name", "arre食谱推荐小助手"),
+		"app_name":    database.GetSetting("app_name", "arre食谱推荐小助手", database.DB.WithContext(c.Request.Context())),
 		"api_version": agentAPIVersion,
 		"user":        gin.H{"id": p.UserID(), "nickname": p.User.DisplayName()},
 		"credential":  gin.H{"kind": p.Kind, "actor": p.Actor, "scopes": p.Scopes.List()},
@@ -201,7 +201,7 @@ func GetAgentOpenAPI(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"openapi": "3.1.0",
 		"info": gin.H{
-			"title":       database.GetSetting("app_name", "arre食谱推荐小助手") + " Agent API",
+			"title":       database.GetSetting("app_name", "arre食谱推荐小助手", database.DB.WithContext(c.Request.Context())) + " Agent API",
 			"version":     agentAPIVersion,
 			"description": "食谱与饮食数据工具集。令牌只能访问签发者本人的数据。",
 		},
@@ -251,7 +251,7 @@ func GetAgentDishes(c *gin.Context) {
 			q.IDs = append(q.IDs, uint(id))
 		}
 	}
-	list, total := services.SearchDishes(uid(c), q)
+	list, total := services.SearchDishes(uid(c), q, database.DB.WithContext(c.Request.Context()))
 	if list == nil {
 		list = []models.Dish{}
 	}
@@ -260,12 +260,12 @@ func GetAgentDishes(c *gin.Context) {
 
 // GetAgentDish GET /api/agent/dishes/:id
 func GetAgentDish(c *gin.Context) {
-	dish, err := services.FindVisibleDish(uid(c), c.Param("id"))
+	dish, err := services.FindVisibleDish(uid(c), c.Param("id"), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.NotFound(c, "菜品不存在")
 		return
 	}
-	stats, records := services.DishStatsForUser(uid(c), dish.ID)
+	stats, records := services.DishStatsForUser(uid(c), dish.ID, database.DB.WithContext(c.Request.Context()))
 	dish.Favorite = stats.Favorite
 	if records == nil {
 		records = []models.MealRecord{}
@@ -275,7 +275,7 @@ func GetAgentDish(c *gin.Context) {
 
 // GetAgentProfile GET /api/agent/profile 与 App 的 GET /api/profile。
 func GetAgentProfile(c *gin.Context) {
-	utils.Success(c, services.BuildTasteProfile(uid(c), intQuery(c, "days", 90)))
+	utils.Success(c, services.BuildTasteProfile(uid(c), intQuery(c, "days", 90), database.DB.WithContext(c.Request.Context())))
 }
 
 // AgentRecommend POST /api/agent/recommend
@@ -289,12 +289,12 @@ func AgentRecommend(c *gin.Context) {
 	req.Source = p.Source()
 	req.Actor = p.Actor
 	req.IgnorePreferences = false
-	result, err := services.RecommendDishes(uid(c), req)
+	result, err := services.RecommendDishes(uid(c), req, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.InternalError(c, "推荐失败")
 		return
 	}
-	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "recommend", Status: "ok"})
+	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "recommend", Status: "ok"}, database.DB.WithContext(c.Request.Context()))
 	utils.Success(c, result)
 }
 
@@ -310,7 +310,7 @@ type agentRecordItem struct {
 // GetAgentRecords GET /api/agent/records（带菜品口味/菜系与当日心情，默认最近 90 天）
 func GetAgentRecords(c *gin.Context) {
 	own := database.OwnedBy(uid(c))
-	query := database.DB.Model(&models.MealRecord{}).Scopes(own)
+	query := database.DB.WithContext(c.Request.Context()).Model(&models.MealRecord{}).Scopes(own)
 	dateFrom := c.Query("date_from")
 	if dateFrom == "" && c.Query("date_to") == "" {
 		dateFrom = time.Now().AddDate(0, 0, -90).Format("2006-01-02")
@@ -352,7 +352,7 @@ func GetAgentRecords(c *gin.Context) {
 	dishMap := map[uint]models.Dish{}
 	if len(dishIDs) > 0 {
 		var list []models.Dish
-		database.DB.Unscoped().Scopes(database.VisibleDishes(uid(c))).Select("id", "category", "taste", "cook_time").Where("id IN ?", dishIDs).Find(&list)
+		database.DB.WithContext(c.Request.Context()).Unscoped().Scopes(database.VisibleDishes(uid(c))).Select("id", "category", "taste", "cook_time").Where("id IN ?", dishIDs).Find(&list)
 		for _, d := range list {
 			dishMap[d.ID] = d
 		}
@@ -360,7 +360,7 @@ func GetAgentRecords(c *gin.Context) {
 	ratingMap := map[string]models.DayRating{}
 	if len(dates) > 0 {
 		var ratings []models.DayRating
-		database.DB.Scopes(own).Where("meal_date IN ?", dates).Find(&ratings)
+		database.DB.WithContext(c.Request.Context()).Scopes(own).Where("meal_date IN ?", dates).Find(&ratings)
 		for _, r := range ratings {
 			ratingMap[r.MealDate] = r
 		}
@@ -403,14 +403,14 @@ func CreateAgentRecords(c *gin.Context) {
 	created := make([]models.MealRecord, 0, len(list))
 	errs := make([]string, 0)
 	for _, in := range list {
-		rec, err := services.CreateMealRecord(uid(c), in, p.Source(), firstNonEmpty(req.Actor, p.Actor))
+		rec, err := services.CreateMealRecord(uid(c), in, p.Source(), firstNonEmpty(req.Actor, p.Actor), database.DB.WithContext(c.Request.Context()))
 		if err != nil {
 			errs = append(errs, err.Error())
 			continue
 		}
 		created = append(created, *rec)
 	}
-	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "log_meal", Args: list, Status: "ok"})
+	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "log_meal", Args: list, Status: "ok"}, database.DB.WithContext(c.Request.Context()))
 	utils.Success(c, gin.H{"created": created, "skipped": len(list) - len(created), "total": len(list), "errors": errs})
 }
 
@@ -431,7 +431,7 @@ func DeleteAgentRecord(c *gin.Context) {
 
 // GetAgentFavorites GET /api/agent/favorites
 func GetAgentFavorites(c *gin.Context) {
-	entries, err := loadFavoriteDishEntries(uid(c))
+	entries, err := loadFavoriteDishEntries(uid(c), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.InternalError(c, "获取收藏失败")
 		return
@@ -486,7 +486,7 @@ func CreateAgentBehavior(c *gin.Context) {
 		if !services.IsValidEventType(e.EventType) {
 			continue
 		}
-		services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, p.Source(), firstNonEmpty(e.Actor, p.Actor), e.Meta)
+		services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, p.Source(), firstNonEmpty(e.Actor, p.Actor), e.Meta, database.DB.WithContext(c.Request.Context()))
 		saved++
 	}
 	utils.Success(c, gin.H{"saved": saved})
@@ -499,13 +499,13 @@ func CreateAppBehavior(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-	services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, "app", "", e.Meta)
+	services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, "app", "", e.Meta, database.DB.WithContext(c.Request.Context()))
 	utils.Success(c, nil)
 }
 
 // GetAgentBehavior GET /api/agent/behavior
 func GetAgentBehavior(c *gin.Context) {
-	query := database.DB.Model(&models.BehaviorEvent{}).Scopes(database.OwnedBy(uid(c)))
+	query := database.DB.WithContext(c.Request.Context()).Model(&models.BehaviorEvent{}).Scopes(database.OwnedBy(uid(c)))
 	if t := c.Query("type"); t != "" {
 		query = query.Where("event_type IN ?", splitParam(t))
 	}
@@ -548,7 +548,7 @@ func GetAgentBehavior(c *gin.Context) {
 
 // GetAgentDayRatings GET /api/agent/day-ratings
 func GetAgentDayRatings(c *gin.Context) {
-	query := database.DB.Model(&models.DayRating{}).Scopes(database.OwnedBy(uid(c)))
+	query := database.DB.WithContext(c.Request.Context()).Model(&models.DayRating{}).Scopes(database.OwnedBy(uid(c)))
 	from := c.Query("date_from")
 	if from == "" {
 		from = time.Now().AddDate(0, 0, -90).Format("2006-01-02")
@@ -564,7 +564,7 @@ func GetAgentDayRatings(c *gin.Context) {
 
 // GetAgentPreferences / UpdateAgentPreferences
 func GetAgentPreferences(c *gin.Context) {
-	utils.Success(c, services.GetPreferences(uid(c)))
+	utils.Success(c, services.GetPreferences(uid(c), database.DB.WithContext(c.Request.Context())))
 }
 
 func UpdateAgentPreferences(c *gin.Context) {
@@ -579,7 +579,7 @@ func CreateAgentSuggestion(c *gin.Context) {
 }
 
 func ListAgentSuggestions(c *gin.Context) {
-	utils.Success(c, services.ListSuggestions(uid(c), c.DefaultQuery("status", "all"), intQuery(c, "limit", 50)))
+	utils.Success(c, services.ListSuggestions(uid(c), c.DefaultQuery("status", "all"), intQuery(c, "limit", 50), database.DB.WithContext(c.Request.Context())))
 }
 
 // GetAgentExport GET /api/agent/export —— 分析所需数据一次导出（不含对话记录）。
@@ -598,11 +598,11 @@ func GetAgentExport(c *gin.Context) {
 		ratings   []models.DayRating
 		events    []models.BehaviorEvent
 	)
-	database.DB.Scopes(own).Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&records)
-	database.DB.Scopes(own).Find(&favorites)
-	database.DB.Scopes(own).Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&ratings)
-	database.DB.Scopes(own).Where("created_at >= ?", since).Order("created_at ASC").Limit(5000).Find(&events)
-	dishList, _ := services.SearchDishes(uid(c), services.DishQuery{Limit: 500})
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&records)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&favorites)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Where("meal_date >= ?", sinceDate).Order("meal_date ASC").Find(&ratings)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Where("created_at >= ?", since).Order("created_at ASC").Limit(5000).Find(&events)
+	dishList, _ := services.SearchDishes(uid(c), services.DishQuery{Limit: 500}, database.DB.WithContext(c.Request.Context()))
 
 	utils.Success(c, gin.H{
 		"exported_at":     time.Now().Format(time.RFC3339),
@@ -612,8 +612,8 @@ func GetAgentExport(c *gin.Context) {
 		"favorites":       favorites,
 		"day_ratings":     ratings,
 		"behavior_events": events,
-		"preferences":     services.GetPreferences(uid(c)),
-		"profile":         services.BuildTasteProfile(uid(c), days),
+		"preferences":     services.GetPreferences(uid(c), database.DB.WithContext(c.Request.Context())),
+		"profile":         services.BuildTasteProfile(uid(c), days, database.DB.WithContext(c.Request.Context())),
 	})
 }
 
@@ -623,8 +623,8 @@ func GetAgentExport(c *gin.Context) {
 func ListMyAgentTokens(c *gin.Context) {
 	userID := uid(c)
 	utils.Success(c, gin.H{
-		"tokens":  services.ListAgentTokens(userID),
-		"summary": services.AgentUsageSummaryFor(userID),
+		"tokens":  services.ListAgentTokens(userID, database.DB.WithContext(c.Request.Context())),
+		"summary": services.AgentUsageSummaryFor(userID, database.DB.WithContext(c.Request.Context())),
 		"scopes":  auth.ScopeLabels,
 		"presets": auth.ScopePresets,
 		"mcp_url": baseURL(c) + "/mcp",
@@ -647,7 +647,7 @@ func CreateMyAgentToken(c *gin.Context) {
 		utils.BadRequest(c, "有效期无效")
 		return
 	}
-	plain, view, err := services.CreateAgentToken(uid(c), req.Name, req.Scopes, req.ExpiresInDays)
+	plain, view, err := services.CreateAgentToken(uid(c), req.Name, req.Scopes, req.ExpiresInDays, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.BadRequest(c, err.Error())
 		return
@@ -666,7 +666,7 @@ func UpdateMyAgentToken(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-	view, err := services.UpdateAgentToken(uid(c), c.Param("id"), services.AgentTokenPatch{Name: req.Name, Scopes: req.Scopes, ExpiresInDays: req.ExpiresInDays})
+	view, err := services.UpdateAgentToken(uid(c), c.Param("id"), services.AgentTokenPatch{Name: req.Name, Scopes: req.Scopes, ExpiresInDays: req.ExpiresInDays}, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.BadRequest(c, err.Error())
 		return
@@ -682,7 +682,7 @@ func RotateMyAgentToken(c *gin.Context) {
 		ExpiresInDays *int      `json:"expires_in_days"`
 	}
 	_ = c.ShouldBindJSON(&req)
-	plain, view, err := services.RotateAgentToken(uid(c), c.Param("id"), services.AgentTokenPatch{Name: req.Name, Scopes: req.Scopes, ExpiresInDays: req.ExpiresInDays})
+	plain, view, err := services.RotateAgentToken(uid(c), c.Param("id"), services.AgentTokenPatch{Name: req.Name, Scopes: req.Scopes, ExpiresInDays: req.ExpiresInDays}, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.BadRequest(c, err.Error())
 		return
@@ -692,7 +692,7 @@ func RotateMyAgentToken(c *gin.Context) {
 
 // RevokeMyAgentToken DELETE /api/me/agent-tokens/:id
 func RevokeMyAgentToken(c *gin.Context) {
-	if err := services.RevokeAgentToken(uid(c), c.Param("id")); err != nil {
+	if err := services.RevokeAgentToken(uid(c), c.Param("id"), database.DB.WithContext(c.Request.Context())); err != nil {
 		utils.BadRequest(c, err.Error())
 		return
 	}
@@ -709,7 +709,7 @@ func CreateAgentSession(c *gin.Context) {
 	_ = c.ShouldBindJSON(&req)
 	scopes := req.Scopes
 	if len(scopes) == 0 {
-		scopes = splitParam(database.GetSetting("agent_embed_scopes", "full"))
+		scopes = splitParam(database.GetSetting("agent_embed_scopes", "full", database.DB.WithContext(c.Request.Context())))
 	}
 	actor := strings.TrimSpace(req.Actor)
 	if actor == "" {
@@ -732,7 +732,7 @@ func CreateAgentSession(c *gin.Context) {
 // ListMyAgentAudit GET /api/me/agent-audit
 func ListMyAgentAudit(c *gin.Context) {
 	page, pageSize := pageParams(c, 30)
-	q := database.DB.Model(&models.AgentAuditLog{}).Scopes(database.OwnedBy(uid(c)))
+	q := database.DB.WithContext(c.Request.Context()).Model(&models.AgentAuditLog{}).Scopes(database.OwnedBy(uid(c)))
 	if actor := c.Query("actor"); actor != "" {
 		q = q.Where("actor = ?", actor)
 	}
@@ -746,7 +746,7 @@ func ListMyAgentAudit(c *gin.Context) {
 // ---------------- App 侧：建议收件箱 ----------------
 
 func ListMySuggestions(c *gin.Context) {
-	utils.Success(c, services.ListSuggestions(uid(c), c.DefaultQuery("status", "pending"), intQuery(c, "limit", 20)))
+	utils.Success(c, services.ListSuggestions(uid(c), c.DefaultQuery("status", "pending"), intQuery(c, "limit", 20), database.DB.WithContext(c.Request.Context())))
 }
 
 func ResolveMySuggestion(c *gin.Context) {
@@ -755,7 +755,7 @@ func ResolveMySuggestion(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-	created, err := services.ResolveSuggestion(uid(c), c.Param("id"), req)
+	created, err := services.ResolveSuggestion(uid(c), c.Param("id"), req, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.BadRequest(c, err.Error())
 		return

@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"fmt"
+	"github.com/go-sql-driver/mysql"
 	"log"
 	"os"
 	"path/filepath"
@@ -158,6 +159,15 @@ func Load() {
 	}
 	if C.DBDriver != "mysql" {
 		C.DBDriver = "sqlite"
+	} else {
+		parsed, err := mysql.ParseDSN(C.DBDSN)
+		if err != nil {
+			log.Fatal("MYSQL_DSN 格式无效")
+		}
+		parsed.Timeout = 5 * time.Second
+		parsed.ReadTimeout = 15 * time.Second
+		parsed.WriteTimeout = 15 * time.Second
+		C.DBDSN = parsed.FormatDSN()
 	}
 	if d := getEnvInt("REPEAT_DAYS", 0); d > 0 {
 		C.RepeatDays = d
@@ -187,7 +197,7 @@ func mysqlDSNFromEnv() string {
 	password := getEnv("MYSQL_PASSWORD", "")
 	database := getEnv("MYSQL_DATABASE", "ninimenu")
 	// parseTime and utf8mb4 keep time fields and Chinese content consistent across drivers.
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Asia%%2FShanghai", user, password, host, port, database)
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Asia%%2FShanghai&timeout=5s&readTimeout=15s&writeTimeout=15s", user, password, host, port, database)
 }
 
 func (c Config) IsProduction() bool {

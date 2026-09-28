@@ -69,14 +69,14 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 	history := []llm.Message{}
 	if sessionID > 0 {
 		var err error
-		history, err = loadHistory(uid, sessionID)
+		history, err = loadHistory(uid, sessionID, database.DB.WithContext(ctx))
 		if err != nil {
 			return errors.New("对话记录读取失败，请稍后再试")
 		}
 	}
-	settings := llm.Resolve()
+	settings := llm.Resolve(database.DB.WithContext(ctx))
 	greeting := isGreeting(text)
-	userData, err := assistantUserData(p)
+	userData, err := assistantUserData(p, database.DB.WithContext(ctx))
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 		emit("status", map[string]any{"message": "正在确认你的食谱需求…"})
 		allowed, err := reviewContent(ctx, settings, "input", text, history)
 		if err != nil || !allowed {
-			logPolicy(uid, "input")
+			logPolicy(uid, "input", database.DB.WithContext(ctx))
 			if err != nil {
 				return err
 			}
@@ -93,7 +93,7 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 	} else if !greeting && !recipeTopic(text) && sessionID == 0 {
 		return errors.New(TopicOnlyMessage)
 	}
-	session, err := loadOrCreateSession(uid, sessionID, text)
+	session, err := loadOrCreateSession(uid, sessionID, text, database.DB.WithContext(ctx))
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 	if err := database.DB.WithContext(ctx).Create(&userMsg).Error; err != nil {
 		return errors.New("消息保存失败，请稍后再试")
 	}
-	services.LogBehavior(uid, "chat", 0, "", "assistant", "", nil)
+	services.LogBehavior(uid, "chat", 0, "", "assistant", "", nil, database.DB.WithContext(ctx))
 
 	// Only progress labels leave the server before the full reply is approved.
 	progress := func(event string, data any) {
@@ -150,7 +150,7 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 		approved = approved && err == nil
 	}
 	if !approved {
-		logPolicy(uid, "output")
+		logPolicy(uid, "output", database.DB.WithContext(ctx))
 		reply = "这次回复未能通过食谱内容检查，请换个问题再试。若涉及保存，请先到菜谱或记录页面确认结果。"
 		cards = nil
 	}
@@ -180,12 +180,16 @@ func Run(ctx context.Context, p *auth.Principal, sessionID uint, text string, em
 	return nil
 }
 
-func logPolicy(uid uint, stage string) {
-	services.WriteAudit(services.AuditEntry{UserID: uid, Actor: "assistant", Channel: "chat", Tool: "content_" + stage, Status: "denied", Error: "content policy"})
+func logPolicy(uid uint, stage string, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
+	services.WriteAudit(services.AuditEntry{UserID: uid, Actor: "assistant", Channel: "chat", Tool: "content_" + stage, Status: "denied", Error: "content policy"}, requestDB)
 }
 
-func assistantUserData(p *auth.Principal) (string, error) {
-	preferences, err := services.LoadPreferences(p.UserID())
+func assistantUserData(p *auth.Principal, dbs ...*gorm.DB) (string, error) {
+	requestDB := database.Handle(dbs...)
+
+	preferences, err := services.LoadPreferences(p.UserID(), requestDB)
 	if err != nil {
 		return "", errors.New("暂时无法读取饮食偏好，请稍后再试")
 	}
@@ -225,19 +229,19 @@ func runLLM(ctx context.Context, p *auth.Principal, s llm.Settings, history []ll
 			}
 			name := tc.Function.Name
 			if !allowedTools[name] {
-				logPolicy(p.UserID(), "tool")
+				logPolicy(p.UserID(), "tool", database.DB.WithContext(ctx))
 				return "", nil, errors.New("请从菜谱或记录页面确认此项操作")
 			}
 			args := json.RawMessage(orEmptyObject(tc.Function.Arguments))
 			if err := checkToolContent(args); err != nil {
-				logPolicy(p.UserID(), "tool")
+				logPolicy(p.UserID(), "tool", database.DB.WithContext(ctx))
 				return "", nil, err
 			}
 			if tool, ok := agent.Get(name); ok && tool.Write {
 				proposal, _ := json.Marshal(map[string]any{"question": text, "tool": name, "arguments": args})
 				approved, err := reviewContent(ctx, s, "tool", string(proposal), nil)
 				if err != nil || !approved {
-					logPolicy(p.UserID(), "tool")
+					logPolicy(p.UserID(), "tool", database.DB.WithContext(ctx))
 					return "", nil, errors.New("这项操作未通过检查，请到相应页面确认")
 				}
 			}
@@ -251,7 +255,7 @@ func runLLM(ctx context.Context, p *auth.Principal, s llm.Settings, history []ll
 			} else {
 				raw, _ := json.Marshal(result)
 				if err := checkToolContent(raw); err != nil {
-					logPolicy(p.UserID(), "tool_content")
+					logPolicy(p.UserID(), "tool_content", database.DB.WithContext(ctx))
 					return "", nil, err
 				}
 				content = truncate(string(raw), maxToolResult)
@@ -490,10 +494,12 @@ func dedupeCards(cards []Card) []Card {
 	return out
 }
 
-func loadOrCreateSession(uid, id uint, firstText string) (*models.ChatSession, error) {
+func loadOrCreateSession(uid, id uint, firstText string, dbs ...*gorm.DB) (*models.ChatSession, error) {
+	requestDB := database.Handle(dbs...)
+
 	var s models.ChatSession
 	if id > 0 {
-		if err := database.DB.Scopes(database.OwnedBy(uid)).First(&s, id).Error; err != nil {
+		if err := requestDB.Scopes(database.OwnedBy(uid)).First(&s, id).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, errors.New("这段对话已不存在，请新建对话")
 			}
@@ -502,15 +508,17 @@ func loadOrCreateSession(uid, id uint, firstText string) (*models.ChatSession, e
 		return &s, nil
 	}
 	s = models.ChatSession{UserID: uid, Title: truncate(firstText, 24)}
-	if err := database.DB.Create(&s).Error; err != nil {
+	if err := requestDB.Create(&s).Error; err != nil {
 		return nil, errors.New("创建对话失败，请稍后再试")
 	}
 	return &s, nil
 }
 
-func loadHistory(uid, sessionID uint) ([]llm.Message, error) {
+func loadHistory(uid, sessionID uint, dbs ...*gorm.DB) ([]llm.Message, error) {
+	requestDB := database.Handle(dbs...)
+
 	var rows []models.ChatMessage
-	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("session_id = ?", sessionID).
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Where("session_id = ?", sessionID).
 		Order("id DESC").Limit(historyMessages).Find(&rows).Error; err != nil {
 		return nil, err
 	}

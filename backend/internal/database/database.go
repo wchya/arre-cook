@@ -10,10 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -34,11 +36,15 @@ func Init() error {
 	if config.C.IsProduction() {
 		logLevel = logger.Error
 	}
+	sqlLogger := logger.New(log.New(os.Stderr, "", log.LstdFlags), logger.Config{
+		SlowThreshold: time.Second, LogLevel: logLevel,
+		IgnoreRecordNotFoundError: true, ParameterizedQueries: true,
+	})
 	var err error
 	if config.C.DBDriver == "mysql" {
-		DB, err = gorm.Open(mysql.Open(config.C.DBDSN), &gorm.Config{Logger: logger.Default.LogMode(logLevel), TranslateError: true})
+		DB, err = gorm.Open(mysql.Open(config.C.DBDSN), &gorm.Config{DefaultContextTimeout: 15 * time.Second, Logger: SafeLogger{sqlLogger}, TranslateError: true})
 	} else {
-		DB, err = gorm.Open(sqlite.Open(config.C.DBPath), &gorm.Config{Logger: logger.Default.LogMode(logLevel)})
+		DB, err = gorm.Open(sqlite.Open(config.C.DBPath), &gorm.Config{DefaultContextTimeout: 15 * time.Second, Logger: SafeLogger{sqlLogger}})
 	}
 	if err != nil {
 		return err
@@ -54,44 +60,20 @@ func Init() error {
 		sqlDB.SetConnMaxLifetime(config.C.DBConnMaxLife)
 	}
 
-	if err := DB.AutoMigrate(
-		&models.User{},
-		&models.EmailCode{},
-		&models.UserPreference{},
-		&models.UserSetting{},
-		&models.AgentToken{},
-		&models.AgentAuditLog{},
-		&models.AgentSuggestion{},
-		&models.Notification{},
-		&models.ChatSession{},
-		&models.ChatMessage{},
-		&models.AssistantUsage{},
-		&models.AssistantLease{},
-		&models.VideoPlatformBudget{},
-		&models.Family{},
-		&models.FamilyMember{},
-		&models.FamilyInvitation{},
-		&models.FamilyPlanItem{},
-		&models.FamilyShoppingItem{},
-		&models.FamilyShoppingCheck{},
-		&models.DishDeleteRequest{},
-		&models.FoodJournalEntry{},
-		&models.Dish{},
-		&models.MealRecord{},
-		&models.Favorite{},
-		&models.Quote{},
-		&models.Achievement{},
-		&models.UserAchievement{},
-		&models.AchievementEvent{},
-		&models.BlindBox{},
-		&models.Holiday{},
-		&models.Setting{},
-		&models.DayRating{},
-		&models.ShoppingCheck{},
-		&models.HomeInventory{},
-		&models.ShoppingItemCategory{},
-		&models.BehaviorEvent{},
-	); err != nil {
+	if os.Getenv("DB_AUTO_MIGRATE") == "false" {
+		return RegisterUploadReferences(DB)
+	}
+	releaseMigration, err := lockMigration(DB)
+	if err != nil {
+		return err
+	}
+	defer releaseMigration()
+	if DB.Migrator().HasTable(&models.UserAchievement{}) && DB.Migrator().HasColumn(&models.UserAchievement{}, "user_id") {
+		if err := DB.Exec("DELETE FROM user_achievements WHERE id NOT IN (SELECT id FROM (SELECT MIN(id) AS id FROM user_achievements GROUP BY user_id, achievement_id) AS kept)").Error; err != nil {
+			return err
+		}
+	}
+	if err := DB.AutoMigrate(models.SchemaModels()...); err != nil {
 		return err
 	}
 	// The old global unique index blocks two users from recording the same meal.
@@ -112,7 +94,15 @@ func Init() error {
 	if err := migrateToMultiUser(adminID); err != nil {
 		return err
 	}
-	return nil
+	for _, m := range []any{&models.Setting{}, &models.UserSetting{}} {
+		if err := DB.Model(m).Where("`key` IN ?", []string{"lunch_dishes_per_day", "dinner_dishes_per_day"}).Where("value NOT IN ?", []string{"", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}).Update("value", "1").Error; err != nil {
+			return err
+		}
+	}
+	if err := InitializeUploadLedger(DB); err != nil {
+		return err
+	}
+	return RegisterUploadReferences(DB)
 }
 
 // OwnedBy 个人数据查询作用域：所有带 user_id 的表都必须经过它，保证用户之间数据隔离。
@@ -128,7 +118,7 @@ func VisibleDishes(uid uint) func(*gorm.DB) *gorm.DB {
 		if uid == 0 {
 			return db.Where("owner_id = 0 AND family_id = 0")
 		}
-		familyIDs := DB.Model(&models.FamilyMember{}).Select("family_id").Where("user_id = ?", uid)
+		familyIDs := db.Session(&gorm.Session{NewDB: true}).Model(&models.FamilyMember{}).Select("family_id").Where("user_id = ?", uid)
 		return db.Where("(family_id = 0 AND owner_id IN ?) OR family_id IN (?)", []uint{0, uid}, familyIDs)
 	}
 }
@@ -193,8 +183,8 @@ func migrateToMultiUser(adminID uint) error {
 	if flag > 0 {
 		return nil
 	}
-	m := DB.Migrator()
 	err := DB.Transaction(func(tx *gorm.DB) error {
+		m := tx.Migrator()
 		if m.HasTable("favorites") {
 			if err := copyLegacyRows(tx, "user_favorites", "favorites", adminID, "dish_id, created_at"); err != nil {
 				return err
@@ -383,9 +373,11 @@ func ensureLegacyBrandName() {
 }
 
 // GetSetting 读取站点级设置，不存在返回 fallback。
-func GetSetting(key, fallback string) string {
+func GetSetting(key, fallback string, dbs ...*gorm.DB) string {
+	requestDB := Handle(dbs...)
+
 	var s models.Setting
-	if err := DB.Where("`key` = ?", key).First(&s).Error; err != nil {
+	if err := requestDB.Where("`key` = ?", key).First(&s).Error; err != nil {
 		return fallback
 	}
 	if strings.TrimSpace(s.Value) == "" {
@@ -394,32 +386,29 @@ func GetSetting(key, fallback string) string {
 	return s.Value
 }
 
-func SetSetting(key, value string) error {
-	var s models.Setting
-	if err := DB.Where("`key` = ?", key).First(&s).Error; err == nil {
-		return DB.Model(&models.Setting{}).Where("`key` = ?", key).Update("value", value).Error
-	}
-	return DB.Create(&models.Setting{Key: key, Value: value}).Error
+func SetSetting(key, value string, dbs ...*gorm.DB) error {
+	requestDB := Handle(dbs...)
+
+	return requestDB.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value"})}).Create(&models.Setting{Key: key, Value: value}).Error
 }
 
 // GetUserSetting / SetUserSetting 用户级设置。
-func GetUserSetting(uid uint, key, fallback string) string {
+func GetUserSetting(uid uint, key, fallback string, dbs ...*gorm.DB) string {
+	requestDB := Handle(dbs...)
+
 	var s models.UserSetting
-	if err := DB.Where("user_id = ? AND `key` = ?", uid, key).First(&s).Error; err != nil {
+	if err := requestDB.Where("user_id = ? AND `key` = ?", uid, key).First(&s).Error; err != nil {
 		return fallback
 	}
 	return s.Value
 }
 
-func SetUserSetting(uid uint, key, value string) error {
-	res := DB.Model(&models.UserSetting{}).Where("user_id = ? AND `key` = ?", uid, key).Update("value", value)
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return DB.Create(&models.UserSetting{UserID: uid, Key: key, Value: value}).Error
-	}
-	return nil
+func SetUserSetting(uid uint, key, value string, dbs ...*gorm.DB) error {
+	requestDB := Handle(dbs...)
+
+	return requestDB.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "user_id"}, {Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value"})}).Create(&models.UserSetting{UserID: uid, Key: key, Value: value}).Error
 }
 
 func jsonArrayString(values []string) string {

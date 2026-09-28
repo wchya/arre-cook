@@ -4,6 +4,7 @@ package mailer
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -19,7 +20,21 @@ import (
 var ErrNotConfigured = errors.New("邮件服务未配置")
 
 // Send 发送一封 HTML 邮件。
-func Send(to, subject, html string) error {
+var sendSlots = make(chan struct{}, 2)
+
+func Send(to, subject, html string, contexts ...context.Context) error {
+	ctx := context.Background()
+	if len(contexts) > 0 {
+		ctx = contexts[0]
+	}
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	select {
+	case sendSlots <- struct{}{}:
+		defer func() { <-sendSlots }()
+	default:
+		return errors.New("邮件发送正忙，请稍后重试")
+	}
 	c := config.C
 	if !c.SMTPEnabled() {
 		return ErrNotConfigured
@@ -29,32 +44,37 @@ func Send(to, subject, html string) error {
 	auth := smtp.PlainAuth("", c.SMTPUser, c.SMTPPassword, c.SMTPHost)
 	tlsCfg := &tls.Config{ServerName: c.SMTPHost, MinVersion: tls.VersionTLS12}
 
-	var client *smtp.Client
+	conn, err := (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("连接邮件服务器失败: %w", err)
+	}
+	defer conn.Close()
+	deadline, _ := ctx.Deadline()
+	if err := conn.SetDeadline(deadline); err != nil {
+		return err
+	}
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+	var wire net.Conn = conn
 	if c.SMTPPort == 465 {
-		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", addr, tlsCfg)
-		if err != nil {
-			return fmt.Errorf("连接邮件服务器失败: %w", err)
-		}
-		client, err = smtp.NewClient(conn, c.SMTPHost)
-		if err != nil {
-			conn.Close()
+		secure := tls.Client(conn, tlsCfg)
+		if err := secure.HandshakeContext(ctx); err != nil {
 			return err
 		}
-	} else {
-		conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
-		if err != nil {
-			return fmt.Errorf("连接邮件服务器失败: %w", err)
+		wire = secure
+	}
+	client, err := smtp.NewClient(wire, c.SMTPHost)
+	if err != nil {
+		return err
+	}
+	if c.SMTPPort != 465 {
+		if ok, _ := client.Extension("STARTTLS"); !ok {
+			client.Close()
+			return errors.New("邮件服务器不支持加密连接")
 		}
-		client, err = smtp.NewClient(conn, c.SMTPHost)
-		if err != nil {
-			conn.Close()
+		if err := client.StartTLS(tlsCfg); err != nil {
+			client.Close()
 			return err
-		}
-		if ok, _ := client.Extension("STARTTLS"); ok {
-			if err := client.StartTLS(tlsCfg); err != nil {
-				client.Close()
-				return err
-			}
 		}
 	}
 	defer client.Close()

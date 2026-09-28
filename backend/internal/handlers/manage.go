@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"gorm.io/gorm"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
 	"ninimenu/internal/llm"
@@ -19,7 +20,7 @@ import (
 
 func GetQuotes(c *gin.Context) {
 	var quotes []models.Quote
-	database.DB.Order("created_at DESC").Find(&quotes)
+	database.DB.WithContext(c.Request.Context()).Order("created_at DESC").Find(&quotes)
 	utils.Success(c, quotes)
 }
 
@@ -35,13 +36,13 @@ func CreateQuote(c *gin.Context) {
 		return
 	}
 	quote := models.Quote{Content: req.Content, Scene: req.Scene, Enabled: true}
-	database.DB.Create(&quote)
+	database.DB.WithContext(c.Request.Context()).Create(&quote)
 	utils.Success(c, quote)
 }
 
 func UpdateQuote(c *gin.Context) {
 	var quote models.Quote
-	if err := database.DB.Where("id = ?", c.Param("id")).First(&quote).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Where("id = ?", c.Param("id")).First(&quote).Error; err != nil {
 		utils.NotFound(c, "推荐语不存在")
 		return
 	}
@@ -52,12 +53,12 @@ func UpdateQuote(c *gin.Context) {
 	}
 	quote.Content = req.Content
 	quote.Scene = req.Scene
-	database.DB.Save(&quote)
+	database.DB.WithContext(c.Request.Context()).Save(&quote)
 	utils.Success(c, quote)
 }
 
 func DeleteQuote(c *gin.Context) {
-	database.DB.Where("id = ?", c.Param("id")).Delete(&models.Quote{})
+	database.DB.WithContext(c.Request.Context()).Where("id = ?", c.Param("id")).Delete(&models.Quote{})
 	utils.SuccessMsg(c, "删除成功")
 }
 
@@ -65,13 +66,13 @@ func DeleteQuote(c *gin.Context) {
 
 func GetAchievements(c *gin.Context) {
 	u := uid(c)
-	services.SyncAutoAchievements(u)
+	services.QueueAutoAchievementSync(u)
 
 	var achievements []models.Achievement
-	database.DB.Order("id ASC").Find(&achievements)
+	database.DB.WithContext(c.Request.Context()).Order("id ASC").Find(&achievements)
 
 	var unlocked []models.UserAchievement
-	database.DB.Scopes(database.OwnedBy(u)).Find(&unlocked)
+	database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(u)).Find(&unlocked)
 	unlockedAtMap := make(map[uint]time.Time, len(unlocked))
 	for _, ua := range unlocked {
 		unlockedAtMap[ua.AchievementID] = ua.UnlockedAt
@@ -96,7 +97,7 @@ func GetAchievements(c *gin.Context) {
 // UnlockAchievement 手动成就（condition=manual）由用户自己点亮；自动成就不允许手动解锁。
 func UnlockAchievement(c *gin.Context) {
 	var achievement models.Achievement
-	if err := database.DB.Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
 		utils.NotFound(c, "成就不存在")
 		return
 	}
@@ -105,18 +106,18 @@ func UnlockAchievement(c *gin.Context) {
 		return
 	}
 	var n int64
-	database.DB.Model(&models.UserAchievement{}).Scopes(database.OwnedBy(uid(c))).Where("achievement_id = ?", achievement.ID).Count(&n)
+	database.DB.WithContext(c.Request.Context()).Model(&models.UserAchievement{}).Scopes(database.OwnedBy(uid(c))).Where("achievement_id = ?", achievement.ID).Count(&n)
 	if n > 0 {
 		utils.SuccessMsg(c, "已解锁")
 		return
 	}
-	database.DB.Create(&models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()})
+	database.DB.WithContext(c.Request.Context()).Create(&models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()})
 	utils.SuccessMsg(c, "解锁成功")
 }
 
 func ToggleAchievement(c *gin.Context) {
 	var achievement models.Achievement
-	if err := database.DB.Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
 		utils.NotFound(c, "成就不存在")
 		return
 	}
@@ -125,12 +126,12 @@ func ToggleAchievement(c *gin.Context) {
 		return
 	}
 	var ua models.UserAchievement
-	if err := database.DB.Scopes(database.OwnedBy(uid(c))).Where("achievement_id = ?", achievement.ID).First(&ua).Error; err == nil {
-		database.DB.Delete(&ua)
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("achievement_id = ?", achievement.ID).First(&ua).Error; err == nil {
+		database.DB.WithContext(c.Request.Context()).Delete(&ua)
 		utils.SuccessMsg(c, "已关闭")
 		return
 	}
-	database.DB.Create(&models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()})
+	database.DB.WithContext(c.Request.Context()).Create(&models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()})
 	utils.SuccessMsg(c, "已激活")
 }
 
@@ -152,7 +153,7 @@ func CreateAchievement(c *gin.Context) {
 		req.Condition = "manual"
 	}
 	achievement := models.Achievement{Code: req.Code, Name: req.Name, Description: req.Description, Icon: req.Icon, Condition: req.Condition}
-	if err := database.DB.Create(&achievement).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Create(&achievement).Error; err != nil {
 		utils.BadRequest(c, "成就编码已存在")
 		return
 	}
@@ -161,7 +162,7 @@ func CreateAchievement(c *gin.Context) {
 
 func UpdateAchievement(c *gin.Context) {
 	var achievement models.Achievement
-	if err := database.DB.Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Where("id = ?", c.Param("id")).First(&achievement).Error; err != nil {
 		utils.NotFound(c, "成就不存在")
 		return
 	}
@@ -175,14 +176,14 @@ func UpdateAchievement(c *gin.Context) {
 	if achievement.Condition == "" {
 		achievement.Condition = "manual"
 	}
-	database.DB.Save(&achievement)
+	database.DB.WithContext(c.Request.Context()).Save(&achievement)
 	utils.Success(c, achievement)
 }
 
 func DeleteAchievement(c *gin.Context) {
 	id := c.Param("id")
-	database.DB.Where("achievement_id = ?", id).Delete(&models.UserAchievement{})
-	database.DB.Where("id = ?", id).Delete(&models.Achievement{})
+	database.DB.WithContext(c.Request.Context()).Where("achievement_id = ?", id).Delete(&models.UserAchievement{})
+	database.DB.WithContext(c.Request.Context()).Where("id = ?", id).Delete(&models.Achievement{})
 	utils.SuccessMsg(c, "删除成功")
 }
 
@@ -207,20 +208,22 @@ var userSettingKeys = map[string]bool{
 }
 
 func GetAppInfo(c *gin.Context) {
-	llmOn := llm.Resolve().Enabled()
+	llmOn := llm.Resolve(database.DB.WithContext(c.Request.Context())).Enabled()
 	utils.Success(c, gin.H{
-		"app_name":        database.GetSetting("app_name", "arre食谱推荐小助手"),
-		"agent_embed_url": database.GetSetting("agent_embed_url", ""),
-		"announcement":    database.GetSetting("announcement", ""),
+		"app_name":        database.GetSetting("app_name", "arre食谱推荐小助手", database.DB.WithContext(c.Request.Context())),
+		"agent_embed_url": database.GetSetting("agent_embed_url", "", database.DB.WithContext(c.Request.Context())),
+		"announcement":    database.GetSetting("announcement", "", database.DB.WithContext(c.Request.Context())),
 		"ai_enabled":      llmOn,
 		"wechat_login":    config.C.WechatEnabled(),
-		"register_open":   services.RegistrationOpen(),
+		"register_open":   services.RegistrationOpen(database.DB.WithContext(c.Request.Context())),
 	})
 }
 
-func publicSiteSettings() map[string]any {
+func publicSiteSettings(dbs ...*gorm.DB) map[string]any {
+	requestDB := database.Handle(dbs...)
+
 	var settings []models.Setting
-	database.DB.Where("`key` IN ?", keysOf(siteSettingKeys)).Find(&settings)
+	requestDB.Where("`key` IN ?", keysOf(siteSettingKeys)).Find(&settings)
 	m := make(map[string]any)
 	for _, s := range settings {
 		if secretSettingKeys[s.Key] {
@@ -239,7 +242,7 @@ func publicSiteSettings() map[string]any {
 
 // GetSettings 合并视图：站点设置 + 当前用户的个人设置（个人覆盖站点）。
 func GetSettings(c *gin.Context) {
-	m := publicSiteSettings()
+	m := publicSiteSettings(database.DB.WithContext(c.Request.Context()))
 	delete(m, "llm_api_key_set")
 	delete(m, "llm_base_url")
 	delete(m, "llm_model")
@@ -247,7 +250,7 @@ func GetSettings(c *gin.Context) {
 	m["blind_box_enabled"] = "1"
 	m["shopping_reminder"] = "1"
 	var mine []models.UserSetting
-	database.DB.Scopes(database.OwnedBy(uid(c))).Where("`key` IN ?", keysOf(userSettingKeys)).Find(&mine)
+	database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("`key` IN ?", keysOf(userSettingKeys)).Find(&mine)
 	for _, s := range mine {
 		if strings.TrimSpace(s.Value) != "" { // 空值表示“跟随站点默认”
 			m[s.Key] = s.Value
@@ -270,12 +273,16 @@ func UpdateSettings(c *gin.Context) {
 		utils.BadRequest(c, "请提供设置数据")
 		return
 	}
+	if err := services.ValidateMenuSettings(req.Settings); err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
 	changedPlan := false
 	for key, value := range req.Settings {
 		if !userSettingKeys[key] {
 			continue
 		}
-		if err := database.SetUserSetting(uid(c), key, strings.TrimSpace(value)); err != nil {
+		if err := database.SetUserSetting(uid(c), key, strings.TrimSpace(value), database.DB.WithContext(c.Request.Context())); err != nil {
 			utils.InternalError(c, "保存失败，请稍后重试")
 			return
 		}
@@ -284,16 +291,16 @@ func UpdateSettings(c *gin.Context) {
 		}
 	}
 	if changedPlan {
-		services.InvalidateWeekPlan(uid(c))
+		services.InvalidateWeekPlan(uid(c), database.DB.WithContext(c.Request.Context()))
 	}
 	utils.SuccessMsg(c, "更新成功")
 }
 
 // GetSiteSettings / UpdateSiteSettings 管理员维护站点设置。
 func GetSiteSettings(c *gin.Context) {
-	m := publicSiteSettings()
-	s := llm.Resolve()
-	m["llm_effective"] = gin.H{"base_url": s.BaseURL, "model": s.Model, "enabled": s.Enabled(), "from_env": database.GetSetting("llm_api_key", "") == "" && config.C.LLMAPIKey != ""}
+	m := publicSiteSettings(database.DB.WithContext(c.Request.Context()))
+	s := llm.Resolve(database.DB.WithContext(c.Request.Context()))
+	m["llm_effective"] = gin.H{"base_url": s.BaseURL, "model": s.Model, "enabled": s.Enabled(), "from_env": database.GetSetting("llm_api_key", "", database.DB.WithContext(c.Request.Context())) == "" && config.C.LLMAPIKey != ""}
 	m["smtp_enabled"] = config.C.SMTPEnabled()
 	m["wechat_enabled"] = config.C.WechatEnabled()
 	utils.Success(c, m)
@@ -303,6 +310,10 @@ func UpdateSiteSettings(c *gin.Context) {
 	var req UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "请提供设置数据")
+		return
+	}
+	if err := services.ValidateMenuSettings(req.Settings); err != nil {
+		utils.BadRequest(c, err.Error())
 		return
 	}
 	// Validate the quota before saving any key, so an invalid batch cannot partially apply.
@@ -336,7 +347,7 @@ func UpdateSiteSettings(c *gin.Context) {
 			utils.BadRequest(c, "AI 助手嵌入地址必须是 https 地址")
 			return
 		}
-		if err := database.SetSetting(key, value); err != nil {
+		if err := database.SetSetting(key, value, database.DB.WithContext(c.Request.Context())); err != nil {
 			utils.InternalError(c, "保存失败")
 			return
 		}
@@ -348,7 +359,7 @@ func UpdateSiteSettings(c *gin.Context) {
 func TestLLM(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
 	defer cancel()
-	s := llm.Resolve()
+	s := llm.Resolve(database.DB.WithContext(c.Request.Context()))
 	if !s.Enabled() {
 		utils.BadRequest(c, "请先填写 API Key")
 		return
@@ -371,7 +382,7 @@ func keysOf(m map[string]bool) []string {
 // ---------------- 管理员仪表盘（全站） ----------------
 
 func GetDashboard(c *gin.Context) {
-	db := database.DB
+	db := database.DB.WithContext(c.Request.Context())
 	var totalDishes, enabledDishes, disabledDishes, privateDishes, totalRecords, todayRecords, favoriteCount int64
 	var userCount, activeUsers7d, newUsers7d, agentTokens, chatMessages7d, pendingSuggestions int64
 	db.Model(&models.Dish{}).Where("owner_id = 0").Count(&totalDishes)
@@ -450,7 +461,7 @@ func GetDashboard(c *gin.Context) {
 		"recent_records":      recentRecords,
 		"week_trend":          weekTrend,
 		"difficulty_counts":   difficultyCounts,
-		"ai_enabled":          llm.Resolve().Enabled(),
+		"ai_enabled":          llm.Resolve(database.DB.WithContext(c.Request.Context())).Enabled(),
 		"smtp_enabled":        config.C.SMTPEnabled(),
 	})
 }

@@ -38,25 +38,31 @@ Page({
   },
 
   onUnload() {
-    this.resetNameEditor()
+    this.resetSheets()
     if (this._offTheme) this._offTheme()
   },
 
   onShow() {
     this._pageVisible = true
-    session.syncTabBar(this, 3, this.data.nameOpen || Boolean(this._nameClosing))
+    this.syncSheetTabBar()
     if (!session.requireLogin()) return
     this.load()
   },
 
   onHide() {
-    this.resetNameEditor()
+    this.resetSheets()
   },
 
-  resetNameEditor() {
+  syncSheetTabBar() {
+    const hidden = this.data.nameOpen || this.data.repeatOpen || Boolean(this._nameClosing || this._repeatClosing)
+    session.syncTabBar(this, 3, hidden)
+  },
+
+  resetSheets() {
     this._pageVisible = false
     this._nameClosing = false
-    this.setData({ nameOpen: false, nameFocus: false, nameKeyboardHeight: 0 })
+    this._repeatClosing = false
+    this.setData({ nameOpen: false, nameFocus: false, nameKeyboardHeight: 0, repeatOpen: false })
     session.resetTabBar(this, 3)
   },
 
@@ -162,7 +168,7 @@ Page({
 
   onNameClosed() {
     this._nameClosing = false
-    if (this._pageVisible) session.syncTabBar(this, 3, this.data.nameOpen)
+    if (this._pageVisible) this.syncSheetTabBar()
   },
 
   onNameInput(event) { this.setData({ nickname: event.detail.value }) },
@@ -210,15 +216,31 @@ Page({
     this.updateSetting({ shopping_reminder: next ? "1" : "0" }, { remindOn: !next })
   },
 
-  openRepeat() { this.setData({ repeatOpen: true }) },
-  closeRepeat() { this.setData({ repeatOpen: false }) },
+  openRepeat() {
+    this._repeatClosing = false
+    // Hide the real navigation before the sheet's property observer reaches the view layer.
+    session.syncTabBar(this, 3, true)
+    this.setData({ repeatOpen: true })
+  },
+
+  closeRepeat() {
+    if (!this.data.repeatOpen) return
+    this._repeatClosing = true
+    this.setData({ repeatOpen: false })
+  },
+
+  onRepeatClosed() {
+    this._repeatClosing = false
+    if (this._pageVisible) this.syncSheetTabBar()
+  },
 
   chooseRepeat(event) {
     const value = event.currentTarget.dataset.value
     const previous = this.data.repeatDays
     const next = value === "0" ? "" : value
     ui.haptic()
-    this.setData({ repeatDays: next, repeatOpen: false })
+    this.setData({ repeatDays: next })
+    this.closeRepeat()
     this.updateSetting({ repeat_days: next }, { repeatDays: previous })
   },
 

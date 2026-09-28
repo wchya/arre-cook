@@ -19,6 +19,6 @@ frontend/dist/
 backend/static/
 backend/data/
 backend/uploads_backup/
-models/
+/models/
 backend/video_asr/__pycache__/
 backend/video_asr/.venv/

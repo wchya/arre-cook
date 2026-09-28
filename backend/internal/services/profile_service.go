@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm"
 	"math"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
@@ -94,11 +95,13 @@ func normalizeProfileDays(days int) int {
 }
 
 // BuildTasteProfile 聚合用户 uid 最近 days 天的行为数据生成口味画像。只读取该用户自己的数据。
-func BuildTasteProfile(uid uint, days int) *TasteProfile {
+func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
+	requestDB := database.Handle(dbs...)
+
 	days = normalizeProfileDays(days)
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	repeatDays := UserRepeatDays(uid)
+	repeatDays := UserRepeatDays(uid, requestDB)
 
 	p := &TasteProfile{
 		GeneratedAt:       now.Format(time.RFC3339),
@@ -120,7 +123,7 @@ func BuildTasteProfile(uid uint, days int) *TasteProfile {
 		BehaviorCounts:    map[string]int{},
 		RejectedDishes:    []DishFrequency{},
 		MostViewedDishes:  []DishFrequency{},
-		Preferences:       GetPreferences(uid),
+		Preferences:       GetPreferences(uid, requestDB),
 		tasteWeightMap:    map[string]float64{},
 		categoryWeightMap: map[string]float64{},
 		favoriteSet:       map[uint]bool{},
@@ -132,7 +135,7 @@ func BuildTasteProfile(uid uint, days int) *TasteProfile {
 	}
 
 	var allDishes []models.Dish
-	database.DB.Unscoped().Scopes(database.VisibleDishes(uid)).
+	requestDB.Unscoped().Scopes(database.VisibleDishes(uid)).
 		Select("id", "name", "category", "taste", "ingredients", "seasonings", "cook_time", "difficulty", "owner_id", "deleted_at").
 		Find(&allDishes)
 	dishByID := make(map[uint]models.Dish, len(allDishes))
@@ -141,7 +144,7 @@ func BuildTasteProfile(uid uint, days int) *TasteProfile {
 	}
 
 	var records []models.MealRecord
-	database.DB.Scopes(database.OwnedBy(uid)).
+	requestDB.Scopes(database.OwnedBy(uid)).
 		Select("id", "dish_id", "dish_name", "meal_type", "meal_date", "rating", "mood", "created_at").
 		Order("meal_date ASC, created_at ASC").
 		Find(&records)
@@ -263,13 +266,13 @@ func BuildTasteProfile(uid uint, days int) *TasteProfile {
 		p.TopDishes = p.TopDishes[:10]
 	}
 
-	for id := range recentDishIDMap(uid, repeatDays) {
+	for id := range recentDishIDMap(uid, repeatDays, requestDB) {
 		p.RecentDishIDs = append(p.RecentDishIDs, id)
 	}
 	sort.Slice(p.RecentDishIDs, func(i, j int) bool { return p.RecentDishIDs[i] < p.RecentDishIDs[j] })
 
 	var favorites []models.Favorite
-	database.DB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Find(&favorites)
+	requestDB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Find(&favorites)
 	for _, f := range favorites {
 		p.favoriteSet[f.DishID] = true
 		if d, ok := dishByID[f.DishID]; ok && !d.DeletedAt.Valid {
@@ -291,7 +294,7 @@ func BuildTasteProfile(uid uint, days int) *TasteProfile {
 
 	since := today.AddDate(0, 0, -days)
 	var ratings []models.DayRating
-	database.DB.Scopes(database.OwnedBy(uid)).Select("home_mood", "mood", "meal_date").
+	requestDB.Scopes(database.OwnedBy(uid)).Select("home_mood", "mood", "meal_date").
 		Where("meal_date >= ?", since.Format("2006-01-02")).
 		Find(&ratings)
 	for _, r := range ratings {
@@ -301,7 +304,7 @@ func BuildTasteProfile(uid uint, days int) *TasteProfile {
 	}
 
 	var events []models.BehaviorEvent
-	database.DB.Scopes(database.OwnedBy(uid)).Select("event_type", "dish_id", "created_at").Where("created_at >= ?", since).Find(&events)
+	requestDB.Scopes(database.OwnedBy(uid)).Select("event_type", "dish_id", "created_at").Where("created_at >= ?", since).Find(&events)
 	rejectSince := now.AddDate(0, 0, -30)
 	for _, e := range events {
 		p.BehaviorCounts[e.EventType]++

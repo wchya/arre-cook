@@ -48,46 +48,61 @@ func normalizeMealDate(raw string) (string, error) {
 
 // CreateMealRecord 记一餐：校验菜品可见性 → 去重 → 写记录 → 生成买菜清单 → 成就检测。
 // source 非 app 时（智能体/站内助手代记）同时写一条 accept 行为事件；站内前端自己埋点。
-func CreateMealRecord(uid uint, in MealInput, source, actor string) (*models.MealRecord, error) {
-	if in.MealType != "lunch" && in.MealType != "dinner" {
-		return nil, ErrInvalidMealType
-	}
-	date, err := normalizeMealDate(in.MealDate)
+func CreateMealRecord(uid uint, in MealInput, source, actor string, dbs ...*gorm.DB) (*models.MealRecord, error) {
+	requestDB := database.Handle(dbs...)
+
+	var record *models.MealRecord
+	var dish models.Dish
+	var entries []nameAmount
+	err := requestDB.Transaction(func(tx *gorm.DB) error {
+		var err error
+		record, dish, entries, err = createMealRecordTx(tx, uid, in)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	dish, err := FindVisibleDish(uid, in.DishID)
-	if err != nil || in.DishID == 0 {
-		return nil, ErrDishNotFound
-	}
-	var existing int64
-	database.DB.Model(&models.MealRecord{}).Scopes(database.OwnedBy(uid)).
-		Where("dish_id = ? AND meal_type = ? AND meal_date = ?", dish.ID, in.MealType, date).
-		Count(&existing)
-	if existing > 0 {
-		return nil, ErrDuplicateMeal
-	}
-	record := models.MealRecord{
-		UserID:   uid,
-		DishID:   dish.ID,
-		DishName: dish.Name,
-		MealType: in.MealType,
-		MealDate: date,
-		Rating:   clampInt(in.Rating, 0, 5),
-		Remark:   truncateRunes(strings.TrimSpace(in.Remark), 500),
-		Mood:     strings.TrimSpace(in.Mood),
-		Photo:    strings.TrimSpace(in.Photo),
-	}
-	if err := database.DB.Create(&record).Error; err != nil {
-		return nil, err
-	}
-	entries := addShoppingItems(uid, dish, in.MealType, date)
-	notifyMealShopping(uid, dish, in.MealType, date, entries)
+	notifyMealShopping(uid, dish, in.MealType, record.MealDate, entries, requestDB)
 	if source != "" && source != "app" {
-		LogBehavior(uid, "accept", dish.ID, dish.Name, source, actor, map[string]any{"meal_type": in.MealType, "meal_date": date})
+		LogBehavior(uid, "accept", dish.ID, dish.Name, source, actor, map[string]any{"meal_type": in.MealType, "meal_date": record.MealDate}, requestDB)
 	}
 	QueueAutoAchievementSync(uid)
-	return &record, nil
+	return record, nil
+}
+
+// Core facts commit together; callers run notifications only after commit.
+func createMealRecordTx(tx *gorm.DB, uid uint, in MealInput) (*models.MealRecord, models.Dish, []nameAmount, error) {
+	var dish models.Dish
+	if in.MealType != "lunch" && in.MealType != "dinner" {
+		return nil, dish, nil, ErrInvalidMealType
+	}
+	date, err := normalizeMealDate(in.MealDate)
+	if err != nil {
+		return nil, dish, nil, err
+	}
+	if in.DishID == 0 {
+		return nil, dish, nil, ErrDishNotFound
+	}
+	if err := tx.Scopes(database.VisibleDishes(uid)).First(&dish, in.DishID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, dish, nil, ErrDishNotFound
+		}
+		return nil, dish, nil, err
+	}
+	var existing int64
+	if err := tx.Model(&models.MealRecord{}).Where("user_id = ? AND dish_id = ? AND meal_type = ? AND meal_date = ?", uid, dish.ID, in.MealType, date).Count(&existing).Error; err != nil {
+		return nil, dish, nil, err
+	}
+	if existing > 0 {
+		return nil, dish, nil, ErrDuplicateMeal
+	}
+	record := &models.MealRecord{UserID: uid, DishID: dish.ID, DishName: dish.Name, MealType: in.MealType, MealDate: date,
+		Rating: clampInt(in.Rating, 0, 5), Remark: truncateRunes(strings.TrimSpace(in.Remark), 500), Mood: truncateRunes(strings.TrimSpace(in.Mood), 32), Photo: strings.TrimSpace(in.Photo)}
+	if err := tx.Create(record).Error; err != nil {
+		return nil, dish, nil, err
+	}
+	entries, err := addShoppingItems(tx, uid, dish, in.MealType, date)
+	return record, dish, entries, err
 }
 
 type MealPatch struct {
@@ -97,9 +112,11 @@ type MealPatch struct {
 	Photo  *string `json:"photo"`
 }
 
-func UpdateMealRecord(uid uint, id any, patch MealPatch) (*models.MealRecord, error) {
+func UpdateMealRecord(uid uint, id any, patch MealPatch, dbs ...*gorm.DB) (*models.MealRecord, error) {
+	requestDB := database.Handle(dbs...)
+
 	var record models.MealRecord
-	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).First(&record).Error; err != nil {
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).First(&record).Error; err != nil {
 		return nil, ErrRecordNotFound
 	}
 	if patch.Rating != nil {
@@ -114,24 +131,28 @@ func UpdateMealRecord(uid uint, id any, patch MealPatch) (*models.MealRecord, er
 	if patch.Photo != nil {
 		record.Photo = strings.TrimSpace(*patch.Photo)
 	}
-	if err := database.DB.Save(&record).Error; err != nil {
+	if err := requestDB.Save(&record).Error; err != nil {
 		return nil, err
 	}
 	QueueAutoAchievementSync(uid)
 	return &record, nil
 }
 
-func DeleteMealRecord(uid uint, id any) (*models.MealRecord, error) {
+func DeleteMealRecord(uid uint, id any, dbs ...*gorm.DB) (*models.MealRecord, error) {
+	requestDB := database.Handle(dbs...)
+
 	var record models.MealRecord
-	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).First(&record).Error; err != nil {
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).First(&record).Error; err != nil {
 		return nil, ErrRecordNotFound
 	}
-	if err := database.DB.Delete(&record).Error; err != nil {
+	if err := requestDB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&record).Error; err != nil {
+			return err
+		}
+		return tx.Scopes(database.OwnedBy(uid)).Where("dish_id = ? AND meal_type = ? AND meal_date = ?", record.DishID, record.MealType, record.MealDate).Delete(&models.ShoppingCheck{}).Error
+	}); err != nil {
 		return nil, err
 	}
-	database.DB.Scopes(database.OwnedBy(uid)).
-		Where("dish_id = ? AND meal_type = ? AND meal_date = ?", record.DishID, record.MealType, record.MealDate).
-		Delete(&models.ShoppingCheck{})
 	QueueAutoAchievementSync(uid)
 	return &record, nil
 }
@@ -142,7 +163,7 @@ type nameAmount struct {
 }
 
 // addShoppingItems 把这一餐的食材与调料写入个人买菜清单，返回写入的条目。
-func addShoppingItems(uid uint, dish models.Dish, mealType, mealDate string) []nameAmount {
+func addShoppingItems(tx *gorm.DB, uid uint, dish models.Dish, mealType, mealDate string) ([]nameAmount, error) {
 	entries := dishShoppingEntries(dish)
 	items := make([]models.ShoppingCheck, 0, len(entries))
 	for _, it := range entries {
@@ -152,15 +173,19 @@ func addShoppingItems(uid uint, dish models.Dish, mealType, mealDate string) []n
 		})
 	}
 	if len(items) > 0 {
-		database.DB.Create(&items)
+		if err := tx.Create(&items).Error; err != nil {
+			return nil, err
+		}
 	}
-	return entries
+	return entries, nil
 }
 
 // SetFavorite 收藏 / 取消收藏（幂等）。
-func SetFavorite(uid, dishID uint, favorite bool) error {
+func SetFavorite(uid, dishID uint, favorite bool, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
 	if favorite {
-		dish, err := FindVisibleDish(uid, dishID)
+		dish, err := FindVisibleDish(uid, dishID, requestDB)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrDishNotFound
@@ -168,11 +193,11 @@ func SetFavorite(uid, dishID uint, favorite bool) error {
 			return err
 		}
 		fav := models.Favorite{UserID: uid, DishID: dish.ID}
-		if err := database.DB.Where("user_id = ? AND dish_id = ?", uid, dish.ID).FirstOrCreate(&fav).Error; err != nil {
+		if err := requestDB.Where("user_id = ? AND dish_id = ?", uid, dish.ID).FirstOrCreate(&fav).Error; err != nil {
 			return err
 		}
 	} else {
-		if err := database.DB.Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dishID).Delete(&models.Favorite{}).Error; err != nil {
+		if err := requestDB.Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dishID).Delete(&models.Favorite{}).Error; err != nil {
 			return err
 		}
 	}
@@ -188,7 +213,9 @@ var validEventTypes = map[string]bool{
 func IsValidEventType(t string) bool { return validEventTypes[strings.TrimSpace(t)] }
 
 // LogBehavior 写一条行为事件（归属 uid）。dish 名称缺省时从可见菜品里补齐。
-func LogBehavior(uid uint, eventType string, dishID uint, dishName, source, actor string, meta map[string]any) {
+func LogBehavior(uid uint, eventType string, dishID uint, dishName, source, actor string, meta map[string]any, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	eventType = strings.TrimSpace(eventType)
 	if eventType == "" || uid == 0 {
 		return
@@ -198,7 +225,7 @@ func LogBehavior(uid uint, eventType string, dishID uint, dishName, source, acto
 	}
 	if dishID > 0 && dishName == "" {
 		var d models.Dish
-		if err := database.DB.Unscoped().Scopes(database.VisibleDishes(uid)).Select("name").First(&d, dishID).Error; err == nil {
+		if err := requestDB.Unscoped().Scopes(database.VisibleDishes(uid)).Select("name").First(&d, dishID).Error; err == nil {
 			dishName = d.Name
 		} else {
 			// 看不到的菜（别人的私房菜）不记 ID，避免借行为接口探测
@@ -214,7 +241,7 @@ func LogBehavior(uid uint, eventType string, dishID uint, dishName, source, acto
 	if source == "" {
 		source = "app"
 	}
-	database.DB.Create(&models.BehaviorEvent{
+	requestDB.Create(&models.BehaviorEvent{
 		UserID: uid, EventType: eventType, DishID: dishID, DishName: truncateRunes(dishName, 64),
 		Source: truncateRunes(strings.TrimSpace(source), 64), Actor: truncateRunes(strings.TrimSpace(actor), 64), Meta: metaJSON,
 	})

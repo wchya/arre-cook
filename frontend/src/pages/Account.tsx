@@ -5,6 +5,7 @@ import { Download, KeyRound, LogOut, ShieldCheck, Trash2 } from "lucide-react"
 import toast from "react-hot-toast"
 import { errorMessage, meApi } from "@/api"
 import PageHeader from "@/components/PageHeader"
+import { getSessionEpoch, isCurrentSession } from "@/api/client"
 import { useAuthStore } from "@/store/useAuthStore"
 
 export default function Account() {
@@ -18,8 +19,13 @@ export default function Account() {
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [exporting, setExporting] = useState(false)
   const passwordMutation = useMutation({
-    mutationFn: () => meApi.changePassword({ old_password: oldPassword, new_password: newPassword }),
-    onSuccess: (result) => {
+    mutationFn: async () => {
+      const epoch = getSessionEpoch()
+      const result = await meApi.changePassword({ old_password: oldPassword, new_password: newPassword })
+      return { result, epoch }
+    },
+    onSuccess: ({ result, epoch }) => {
+      if (!isCurrentSession(epoch)) return
       setSession(result.token, result.user)
       setOldPassword("")
       setNewPassword("")
@@ -29,16 +35,18 @@ export default function Account() {
     onError: (error) => toast.error(errorMessage(error, "密码更新失败")),
   })
   const logoutAllMutation = useMutation({
-    mutationFn: () => meApi.logoutAll(),
-    onSuccess: () => {
+    mutationFn: async () => { const epoch = getSessionEpoch(); await meApi.logoutAll(); return epoch },
+    onSuccess: (epoch) => {
+      if (!isCurrentSession(epoch)) return
       void logout()
       navigate("/login", { replace: true })
     },
     onError: (error) => toast.error(errorMessage(error, "退出其他设备失败")),
   })
   const deleteMutation = useMutation({
-    mutationFn: () => meApi.remove(deleteConfirm),
-    onSuccess: async () => {
+    mutationFn: async () => { const epoch = getSessionEpoch(); await meApi.remove(deleteConfirm); return epoch },
+    onSuccess: async (epoch) => {
+      if (!isCurrentSession(epoch)) return
       await logout()
       navigate("/login", { replace: true })
     },

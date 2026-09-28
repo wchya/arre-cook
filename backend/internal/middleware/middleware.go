@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"encoding/json"
+	"gorm.io/gorm"
 	"log"
 	"net/http"
 	"ninimenu/internal/auth"
@@ -29,9 +30,11 @@ func bearerToken(c *gin.Context) string {
 	return strings.TrimSpace(token)
 }
 
-func loadActiveUser(id uint, version int) (*models.User, bool) {
+func loadActiveUser(id uint, version int, dbs ...*gorm.DB) (*models.User, bool) {
+	requestDB := database.Handle(dbs...)
+
 	var u models.User
-	if err := database.DB.First(&u, id).Error; err != nil {
+	if err := requestDB.First(&u, id).Error; err != nil {
 		return nil, false
 	}
 	if u.Disabled || u.TokenVersion != version {
@@ -54,14 +57,14 @@ func resolvePrincipal(c *gin.Context, allowAgent bool) (*auth.Principal, string)
 		if !allowAgent {
 			return nil, "智能体令牌不能用于此接口"
 		}
-		return resolvePAT(raw)
+		return resolvePAT(raw, database.DB.WithContext(c.Request.Context()))
 	}
 
 	claims, err := auth.ParseToken(raw)
 	if err != nil {
 		return nil, "登录已过期，请重新登录"
 	}
-	u, ok := loadActiveUser(claims.UserID(), claims.Version)
+	u, ok := loadActiveUser(claims.UserID(), claims.Version, database.DB.WithContext(c.Request.Context()))
 	if !ok {
 		return nil, "登录已失效，请重新登录"
 	}
@@ -81,9 +84,11 @@ func resolvePrincipal(c *gin.Context, allowAgent bool) (*auth.Principal, string)
 	return nil, "token 类型无效"
 }
 
-func resolvePAT(raw string) (*auth.Principal, string) {
+func resolvePAT(raw string, dbs ...*gorm.DB) (*auth.Principal, string) {
+	requestDB := database.Handle(dbs...)
+
 	var tok models.AgentToken
-	if err := database.DB.Where("token_hash = ?", auth.HashPAT(raw)).First(&tok).Error; err != nil {
+	if err := requestDB.Where("token_hash = ?", auth.HashPAT(raw)).First(&tok).Error; err != nil {
 		return nil, "智能体令牌无效"
 	}
 	now := time.Now()
@@ -94,12 +99,12 @@ func resolvePAT(raw string) (*auth.Principal, string) {
 		return nil, "智能体令牌已过期"
 	}
 	var u models.User
-	if err := database.DB.First(&u, tok.UserID).Error; err != nil || u.Disabled {
+	if err := requestDB.First(&u, tok.UserID).Error; err != nil || u.Disabled {
 		return nil, "令牌所属账号不可用"
 	}
 	// 最近使用时间按分钟级节流写入，避免每个请求都写库
 	if tok.LastUsedAt == nil || now.Sub(*tok.LastUsedAt) > time.Minute {
-		database.DB.Model(&models.AgentToken{}).Where("id = ?", tok.ID).Update("last_used_at", now)
+		requestDB.Model(&models.AgentToken{}).Where("id = ?", tok.ID).Update("last_used_at", now)
 	}
 	var scopes []string
 	_ = json.Unmarshal([]byte(tok.Scopes), &scopes)
@@ -160,7 +165,7 @@ func AgentAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if p.IsAgent() && !ReserveAgentRequests(p, 1) {
+		if p.IsAgent() && !ReserveAgentRequests(p, 1, database.DB.WithContext(c.Request.Context())) {
 			c.Header("Retry-After", "60")
 			utils.Error(c, http.StatusTooManyRequests, 42900, "请求过于频繁，请稍后再试")
 			c.Abort()
@@ -241,6 +246,16 @@ func (l *windowLimiter) AllowN(key string, limit, units int) bool {
 		return false
 	}
 	if b == nil || now.Sub(b.start) > l.window {
+		if b == nil && len(l.buckets) >= 10000 {
+			for k, v := range l.buckets {
+				if now.Sub(v.start) > l.window {
+					delete(l.buckets, k)
+				}
+			}
+			if len(l.buckets) >= 10000 {
+				return false
+			}
+		}
 		l.buckets[key] = &bucket{start: now, count: units}
 		return true
 	}
@@ -260,7 +275,7 @@ var (
 // AuthRateLimit 登录/注册按 IP 限流，防暴力破解。
 func AuthRateLimit(limit int) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !authLimiter.Allow("auth:"+c.ClientIP(), limit) {
+		if !authLimiter.Allow("auth:"+c.ClientIP(), limit) || !database.ReserveWindow(database.DB.WithContext(c.Request.Context()), "auth:"+c.ClientIP(), 10*time.Minute, limit, 1) {
 			c.Header("Retry-After", "600")
 			utils.Error(c, http.StatusTooManyRequests, 42900, "尝试次数过多，请 10 分钟后再试")
 			c.Abort()
@@ -273,7 +288,7 @@ func AuthRateLimit(limit int) gin.HandlerFunc {
 // ChatRateLimit AI 对话按用户限流，控制模型调用成本。
 func ChatRateLimit(limit int) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !chatLimiter.Allow("chat:"+itoa(auth.UID(c)), limit) {
+		if !chatLimiter.Allow("chat:"+itoa(auth.UID(c)), limit) || !database.ReserveWindow(database.DB.WithContext(c.Request.Context()), "chat:"+itoa(auth.UID(c)), time.Minute, limit, 1) {
 			utils.Error(c, http.StatusTooManyRequests, 42900, "说得太快啦，歇一会儿再聊")
 			c.Abort()
 			return

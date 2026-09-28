@@ -45,7 +45,7 @@ func familyIDParam(c *gin.Context) (uint, bool) {
 }
 
 func GetFamily(c *gin.Context) {
-	info, err := services.FamilyInfo(uid(c))
+	info, err := services.FamilyInfo(uid(c), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		utils.InternalError(c, "加载家庭失败")
 		return
@@ -54,12 +54,14 @@ func GetFamily(c *gin.Context) {
 }
 
 func CreateFamily(c *gin.Context) {
-	var req struct{ Name string `json:"name" binding:"required"` }
+	var req struct {
+		Name string `json:"name" binding:"required"`
+	}
 	if c.ShouldBindJSON(&req) != nil {
 		utils.BadRequest(c, "请填写家庭名称")
 		return
 	}
-	if _, err := services.CreateFamily(uid(c), req.Name); err != nil {
+	if _, err := services.CreateFamily(uid(c), req.Name, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -67,12 +69,14 @@ func CreateFamily(c *gin.Context) {
 }
 
 func RenameFamily(c *gin.Context) {
-	var req struct{ Name string `json:"name" binding:"required"` }
+	var req struct {
+		Name string `json:"name" binding:"required"`
+	}
 	if c.ShouldBindJSON(&req) != nil {
 		utils.BadRequest(c, "请填写家庭名称")
 		return
 	}
-	if err := services.RenameFamily(uid(c), req.Name); err != nil {
+	if err := services.RenameFamily(uid(c), req.Name, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -80,12 +84,14 @@ func RenameFamily(c *gin.Context) {
 }
 
 func InviteFamilyMember(c *gin.Context) {
-	var req struct{ Email string `json:"email" binding:"required"` }
+	var req struct {
+		Email string `json:"email" binding:"required"`
+	}
 	if c.ShouldBindJSON(&req) != nil {
 		utils.BadRequest(c, "请填写受邀人的 QQ 邮箱")
 		return
 	}
-	invite, token, err := services.CreateFamilyInvitation(uid(c), req.Email)
+	invite, token, err := services.CreateFamilyInvitation(uid(c), req.Email, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
@@ -96,8 +102,8 @@ func InviteFamilyMember(c *gin.Context) {
 	}
 	link := strings.TrimRight(base, "/") + "/family#invite=" + token
 	var family models.Family
-	database.DB.First(&family, invite.FamilyID)
-	appName := database.GetSetting("app_name", "arre食谱推荐小助手")
+	database.DB.WithContext(c.Request.Context()).First(&family, invite.FamilyID)
+	appName := database.GetSetting("app_name", "arre食谱推荐小助手", database.DB.WithContext(c.Request.Context()))
 	message := fmt.Sprintf(
 		"<p>%s 邀请你加入「%s」家庭，一起安排菜单、管理买菜清单。</p><p><a href=\"%s\">接受邀请</a></p><p>邀请 7 天内有效，只能由 %s 登录后接受。</p>",
 		html.EscapeString(appName), html.EscapeString(family.Name), html.EscapeString(link), html.EscapeString(invite.Email),
@@ -111,7 +117,7 @@ func RevokeFamilyInvitation(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := services.RevokeFamilyInvitation(uid(c), id); err != nil {
+	if err := services.RevokeFamilyInvitation(uid(c), id, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -119,12 +125,14 @@ func RevokeFamilyInvitation(c *gin.Context) {
 }
 
 func JoinFamily(c *gin.Context) {
-	var req struct{ Token string `json:"token" binding:"required"` }
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
 	if c.ShouldBindJSON(&req) != nil {
 		utils.BadRequest(c, "邀请链接无效")
 		return
 	}
-	if _, err := services.JoinFamily(uid(c), req.Token); err != nil {
+	if _, err := services.JoinFamily(uid(c), req.Token, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -132,12 +140,14 @@ func JoinFamily(c *gin.Context) {
 }
 
 func TransferFamily(c *gin.Context) {
-	var req struct{ UserID uint `json:"user_id" binding:"required"` }
+	var req struct {
+		UserID uint `json:"user_id" binding:"required"`
+	}
 	if c.ShouldBindJSON(&req) != nil {
 		utils.BadRequest(c, "请选择家庭成员")
 		return
 	}
-	if err := services.TransferFamily(uid(c), req.UserID); err != nil {
+	if err := services.TransferFamily(uid(c), req.UserID, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -149,7 +159,7 @@ func RemoveFamilyMember(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := services.RemoveFamilyMember(uid(c), id); err != nil {
+	if err := services.RemoveFamilyMember(uid(c), id, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -157,7 +167,7 @@ func RemoveFamilyMember(c *gin.Context) {
 }
 
 func LeaveFamily(c *gin.Context) {
-	if err := services.LeaveFamily(uid(c)); err != nil {
+	if err := services.LeaveFamily(uid(c), database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -165,13 +175,15 @@ func LeaveFamily(c *gin.Context) {
 }
 
 func DeleteFamily(c *gin.Context) {
-	var req struct{ Confirm string `json:"confirm"` }
+	var req struct {
+		Confirm string `json:"confirm"`
+	}
 	_ = c.ShouldBindJSON(&req)
 	if req.Confirm != "解散家庭" {
 		utils.BadRequest(c, "请输入“解散家庭”确认")
 		return
 	}
-	if err := services.DeleteFamily(uid(c)); err != nil {
+	if err := services.DeleteFamily(uid(c), database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -179,7 +191,7 @@ func DeleteFamily(c *gin.Context) {
 }
 
 func ShareFamilyDish(c *gin.Context) {
-	family, err := services.RequireFamily(uid(c))
+	family, err := services.RequireFamily(uid(c), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
@@ -189,14 +201,8 @@ func ShareFamilyDish(c *gin.Context) {
 		return
 	}
 	var dish models.Dish
-	if err := database.DB.Where("id = ? AND owner_id = ? AND family_id = 0", id, uid(c)).First(&dish).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Where("id = ? AND owner_id = ? AND family_id = 0", id, uid(c)).First(&dish).Error; err != nil {
 		utils.NotFound(c, "只能分享自己的私房菜")
-		return
-	}
-	var count int64
-	database.DB.Model(&models.Dish{}).Where("family_id = ?", family.ID).Count(&count)
-	if count >= 500 {
-		utils.BadRequest(c, "家庭菜谱已达 500 道上限")
 		return
 	}
 	shared := dish
@@ -204,15 +210,19 @@ func ShareFamilyDish(c *gin.Context) {
 	shared.FamilyID = family.ID
 	shared.Favorite = false
 	shared.CreatedAt, shared.UpdatedAt = time.Time{}, time.Time{}
-	if err := database.DB.Create(&shared).Error; err != nil {
-		utils.InternalError(c, "分享菜谱失败")
+	if err := services.InsertDish(database.DB.WithContext(c.Request.Context()), &shared); err != nil {
+		if errors.Is(err, services.ErrDishQuota) {
+			utils.BadRequest(c, err.Error())
+		} else {
+			utils.InternalError(c, "分享菜谱失败")
+		}
 		return
 	}
 	utils.Success(c, shared)
 }
 
 func GetFamilyPlan(c *gin.Context) {
-	plan, err := services.FamilyPlan(uid(c), c.Query("start"))
+	plan, err := services.FamilyPlan(uid(c), c.Query("start"), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
@@ -230,7 +240,7 @@ func SetFamilyPlan(c *gin.Context) {
 		utils.BadRequest(c, "请选择日期和餐次")
 		return
 	}
-	if err := services.SetFamilyPlan(uid(c), req.MealDate, req.MealType, req.DishID); err != nil {
+	if err := services.SetFamilyPlan(uid(c), req.MealDate, req.MealType, req.DishID, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -238,7 +248,7 @@ func SetFamilyPlan(c *gin.Context) {
 }
 
 func GetFamilyShopping(c *gin.Context) {
-	items, err := services.FamilyShopping(uid(c))
+	items, err := services.FamilyShopping(uid(c), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
@@ -255,7 +265,7 @@ func AddFamilyShopping(c *gin.Context) {
 		utils.BadRequest(c, "请填写食材")
 		return
 	}
-	if err := services.AddFamilyShopping(uid(c), req.Name, req.Amount); err != nil {
+	if err := services.AddFamilyShopping(uid(c), req.Name, req.Amount, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -267,12 +277,14 @@ func CheckFamilyShopping(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct{ Checked *bool `json:"checked" binding:"required"` }
+	var req struct {
+		Checked *bool `json:"checked" binding:"required"`
+	}
 	if c.ShouldBindJSON(&req) != nil || req.Checked == nil {
 		utils.BadRequest(c, "请指定购买状态")
 		return
 	}
-	if err := services.SetFamilyShoppingChecked(uid(c), id, *req.Checked); err != nil {
+	if err := services.SetFamilyShoppingChecked(uid(c), id, *req.Checked, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -284,7 +296,7 @@ func DeleteFamilyShopping(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := services.DeleteFamilyShopping(uid(c), id); err != nil {
+	if err := services.DeleteFamilyShopping(uid(c), id, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -292,12 +304,14 @@ func DeleteFamilyShopping(c *gin.Context) {
 }
 
 func ImportFamilyIngredients(c *gin.Context) {
-	var req struct{ DishID uint `json:"dish_id" binding:"required"` }
+	var req struct {
+		DishID uint `json:"dish_id" binding:"required"`
+	}
 	if c.ShouldBindJSON(&req) != nil {
 		utils.BadRequest(c, "请选择菜谱")
 		return
 	}
-	count, err := services.ImportFamilyIngredients(uid(c), req.DishID)
+	count, err := services.ImportFamilyIngredients(uid(c), req.DishID, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
@@ -307,7 +321,7 @@ func ImportFamilyIngredients(c *gin.Context) {
 
 // ListDishRequests 家庭菜谱删除申请列表：管理员看全家，成员看自己；?status=all 含已处理。
 func ListDishRequests(c *gin.Context) {
-	requests, err := services.ListDishRequests(uid(c), c.Query("status"))
+	requests, err := services.ListDishRequests(uid(c), c.Query("status"), database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
@@ -321,7 +335,7 @@ func ApproveDishRequest(c *gin.Context) {
 	if !ok {
 		return
 	}
-	view, err := services.ApproveDishRequest(uid(c), id)
+	view, err := services.ApproveDishRequest(uid(c), id, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
@@ -339,20 +353,21 @@ func RejectDishRequest(c *gin.Context) {
 		Reason string `json:"reason"`
 	}
 	_ = c.ShouldBindJSON(&req)
-	view, err := services.RejectDishRequest(uid(c), id, req.Reason)
+	view, err := services.RejectDishRequest(uid(c), id, req.Reason, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
 		familyError(c, err)
 		return
 	}
 	utils.Success(c, view)
 }
+
 // CancelDishRequest 申请人撤回自己仍在等待的删除申请。
 func CancelDishRequest(c *gin.Context) {
 	id, ok := familyIDParam(c)
 	if !ok {
 		return
 	}
-	if err := services.CancelDishRequest(uid(c), id); err != nil {
+	if err := services.CancelDishRequest(uid(c), id, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}
@@ -369,7 +384,7 @@ func ToggleFamilyShoppingCheck(c *gin.Context) {
 		utils.BadRequest(c, "请指定食材与购买状态")
 		return
 	}
-	if err := services.ToggleFamilyShoppingCheck(uid(c), req.ItemName, *req.Checked); err != nil {
+	if err := services.ToggleFamilyShoppingCheck(uid(c), req.ItemName, *req.Checked, database.DB.WithContext(c.Request.Context())); err != nil {
 		familyError(c, err)
 		return
 	}

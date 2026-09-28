@@ -40,15 +40,19 @@ func SpiceLevelLabel(level int) string {
 	return ""
 }
 
-func GetPreferences(uid uint) Preferences {
-	preferences, _ := LoadPreferences(uid)
+func GetPreferences(uid uint, dbs ...*gorm.DB) Preferences {
+	requestDB := database.Handle(dbs...)
+
+	preferences, _ := LoadPreferences(uid, requestDB)
 	return preferences
 }
 
 // LoadPreferences distinguishes missing preferences from storage failures for guarded AI requests.
-func LoadPreferences(uid uint) (Preferences, error) {
+func LoadPreferences(uid uint, dbs ...*gorm.DB) (Preferences, error) {
+	requestDB := database.Handle(dbs...)
+
 	var row models.UserPreference
-	if err := database.DB.Where("user_id = ?", uid).First(&row).Error; err != nil {
+	if err := requestDB.Where("user_id = ?", uid).First(&row).Error; err != nil {
 		fallback := Preferences{AvoidIngredients: []string{}, Allergies: []string{}, FavoriteTastes: []string{}, SpiceLevel: -1}
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fallback, nil
@@ -80,9 +84,11 @@ type PreferencesPatch struct {
 	Notes            *string   `json:"notes"`
 }
 
-func SavePreferences(uid uint, patch PreferencesPatch) (Preferences, error) {
+func SavePreferences(uid uint, patch PreferencesPatch, dbs ...*gorm.DB) (Preferences, error) {
+	requestDB := database.Handle(dbs...)
+
 	var row models.UserPreference
-	err := database.DB.Where("user_id = ?", uid).First(&row).Error
+	err := requestDB.Where("user_id = ?", uid).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		row = models.UserPreference{UserID: uid, AvoidIngredients: "[]", Allergies: "[]", FavoriteTastes: "[]", SpiceLevel: -1}
 	} else if err != nil {
@@ -112,10 +118,10 @@ func SavePreferences(uid uint, patch PreferencesPatch) (Preferences, error) {
 	if patch.Notes != nil {
 		row.Notes = truncateRunes(strings.TrimSpace(*patch.Notes), 500)
 	}
-	if err := database.DB.Save(&row).Error; err != nil {
+	if err := requestDB.Save(&row).Error; err != nil {
 		return Preferences{}, err
 	}
-	return GetPreferences(uid), nil
+	return GetPreferences(uid, requestDB), nil
 }
 
 func cleanTerms(values []string, max int) []string {
@@ -163,9 +169,11 @@ func truncateRunes(s string, n int) string {
 // ---------- 收藏 / 菜品可见性 ----------
 
 // FavoriteIDSet 用户收藏的菜品 ID 集合。
-func FavoriteIDSet(uid uint) map[uint]bool {
+func FavoriteIDSet(uid uint, dbs ...*gorm.DB) map[uint]bool {
+	requestDB := database.Handle(dbs...)
+
 	var ids []uint
-	database.DB.Model(&models.Favorite{}).Scopes(database.OwnedBy(uid)).Pluck("dish_id", &ids)
+	requestDB.Model(&models.Favorite{}).Scopes(database.OwnedBy(uid)).Pluck("dish_id", &ids)
 	set := make(map[uint]bool, len(ids))
 	for _, id := range ids {
 		set[id] = true
@@ -174,40 +182,46 @@ func FavoriteIDSet(uid uint) map[uint]bool {
 }
 
 // MarkFavorites 按当前用户填充菜品的 favorite 视图字段。
-func MarkFavorites(uid uint, dishes []models.Dish) {
+func MarkFavorites(uid uint, dishes []models.Dish, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	if len(dishes) == 0 {
 		return
 	}
-	set := FavoriteIDSet(uid)
+	set := FavoriteIDSet(uid, requestDB)
 	for i := range dishes {
 		dishes[i].Favorite = set[dishes[i].ID]
 	}
 }
 
-func MarkFavorite(uid uint, dish *models.Dish) {
+func MarkFavorite(uid uint, dish *models.Dish, dbs ...*gorm.DB) {
+	requestDB := database.Handle(dbs...)
+
 	if dish == nil {
 		return
 	}
 	var n int64
-	database.DB.Model(&models.Favorite{}).Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dish.ID).Count(&n)
+	requestDB.Model(&models.Favorite{}).Scopes(database.OwnedBy(uid)).Where("dish_id = ?", dish.ID).Count(&n)
 	dish.Favorite = n > 0
 }
 
 // FindVisibleDish 按 ID 取当前用户可见的菜品（公共或本人私有）。
-func FindVisibleDish(uid uint, id any) (models.Dish, error) {
+func FindVisibleDish(uid uint, id any, dbs ...*gorm.DB) (models.Dish, error) {
+	requestDB := database.Handle(dbs...)
+
 	var dish models.Dish
-	err := database.DB.Scopes(database.VisibleDishes(uid)).Where("id = ?", id).First(&dish).Error
+	err := requestDB.Scopes(database.VisibleDishes(uid)).Where("id = ?", id).First(&dish).Error
 	return dish, err
 }
 
 // VisibleEnabledDishes 当前用户可用于推荐的全部菜品。
-func VisibleEnabledDishes(uid uint) []models.Dish {
-	var dishes []models.Dish
-	database.DB.Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true).Find(&dishes)
-	return dishes
+func VisibleEnabledDishes(uid uint, dbs ...*gorm.DB) []models.Dish {
+	return menuCandidates(uid, nil, database.Handle(dbs...))
 }
 
 // UserRepeatDays 推荐去重天数：用户设置优先，其次站点设置/环境变量。
-func UserRepeatDays(uid uint) int {
-	return getUserSettingInt(uid, "repeat_days", getSettingInt("repeat_days", defaultRepeatDays()))
+func UserRepeatDays(uid uint, dbs ...*gorm.DB) int {
+	requestDB := database.Handle(dbs...)
+
+	return getUserSettingInt(uid, "repeat_days", getSettingInt("repeat_days", defaultRepeatDays(), requestDB), requestDB)
 }

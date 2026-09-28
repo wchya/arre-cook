@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"gorm.io/gorm"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"sort"
@@ -24,7 +25,9 @@ type FoodJournalInput struct {
 	Notes      string   `json:"notes"`
 }
 
-func CreateFoodJournalEntry(uid uint, in FoodJournalInput) (*models.FoodJournalEntry, error) {
+func CreateFoodJournalEntry(uid uint, in FoodJournalInput, dbs ...*gorm.DB) (*models.FoodJournalEntry, error) {
+	requestDB := database.Handle(dbs...)
+
 	date, err := normalizeMealDate(in.MealDate)
 	if err != nil {
 		return nil, err
@@ -59,14 +62,16 @@ func CreateFoodJournalEntry(uid uint, in FoodJournalInput) (*models.FoodJournalE
 		UserID: uid, MealDate: date, MealType: in.MealType, DishName: name,
 		Cuisine: strings.TrimSpace(in.Cuisine), FoodGroups: groups, Notes: strings.TrimSpace(in.Notes),
 	}
-	if err := database.DB.Create(entry).Error; err != nil {
+	if err := requestDB.Create(entry).Error; err != nil {
 		return nil, err
 	}
 	return entry, nil
 }
 
-func ListFoodJournal(uid uint, from, to string) ([]models.FoodJournalEntry, error) {
-	query := database.DB.Scopes(database.OwnedBy(uid))
+func ListFoodJournal(uid uint, from, to string, dbs ...*gorm.DB) ([]models.FoodJournalEntry, error) {
+	requestDB := database.Handle(dbs...)
+
+	query := requestDB.Scopes(database.OwnedBy(uid))
 	if from != "" {
 		if _, err := time.Parse("2006-01-02", from); err != nil {
 			return nil, ErrInvalidDate
@@ -84,8 +89,10 @@ func ListFoodJournal(uid uint, from, to string) ([]models.FoodJournalEntry, erro
 	return items, err
 }
 
-func DeleteFoodJournalEntry(uid, id uint) error {
-	res := database.DB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).Delete(&models.FoodJournalEntry{})
+func DeleteFoodJournalEntry(uid, id uint, dbs ...*gorm.DB) error {
+	requestDB := database.Handle(dbs...)
+
+	res := requestDB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).Delete(&models.FoodJournalEntry{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -126,7 +133,9 @@ type HealthReport struct {
 	Recommendations []HealthRecommendation `json:"recommendations"`
 }
 
-func BuildHealthReport(uid uint, period int) (*HealthReport, error) {
+func BuildHealthReport(uid uint, period int, dbs ...*gorm.DB) (*HealthReport, error) {
+	requestDB := database.Handle(dbs...)
+
 	if period != 30 {
 		period = 7
 	}
@@ -138,12 +147,12 @@ func BuildHealthReport(uid uint, period int) (*HealthReport, error) {
 		FoodGroupDays: map[string]int{}, Days: []HealthDay{}, Insights: []string{}, PlanActions: []string{},
 		Recommendations: []HealthRecommendation{},
 	}
-	journal, err := ListFoodJournal(uid, from, to)
+	journal, err := ListFoodJournal(uid, from, to, requestDB)
 	if err != nil {
 		return nil, err
 	}
 	var records []models.MealRecord
-	if err := database.DB.Scopes(database.OwnedBy(uid)).Where("meal_date >= ? AND meal_date <= ?", from, to).
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Where("meal_date >= ? AND meal_date <= ?", from, to).
 		Find(&records).Error; err != nil {
 		return nil, err
 	}
@@ -157,7 +166,7 @@ func BuildHealthReport(uid uint, period int) (*HealthReport, error) {
 	}
 	var categories []dishCategory
 	if len(dishIDs) > 0 {
-		if err := database.DB.Unscoped().Model(&models.Dish{}).Select("id, category").Where("id IN ?", dishIDs).Find(&categories).Error; err != nil {
+		if err := requestDB.Unscoped().Model(&models.Dish{}).Select("id, category").Where("id IN ?", dishIDs).Find(&categories).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -250,7 +259,7 @@ func BuildHealthReport(uid uint, period int) (*HealthReport, error) {
 	if len(report.PlanActions) == 0 {
 		report.PlanActions = append(report.PlanActions, "继续记录实际吃的食物，按你的偏好调整下一周菜单。")
 	}
-	recommended, err := RecommendDishes(uid, RecommendRequest{Count: 8, Source: "health_report"})
+	recommended, err := RecommendDishes(uid, RecommendRequest{Count: 8, Source: "health_report"}, requestDB)
 	if err != nil {
 		return nil, err
 	}
