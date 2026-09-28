@@ -1,17 +1,39 @@
-.tabbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid var(--glass-border); background: var(--glass-bg); box-shadow: 0 -20rpx 60rpx rgba(26, 26, 46, .07); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
-.tabbar--ios { background: var(--glass-ios-bg); -webkit-backdrop-filter: var(--glass-blur-ios); backdrop-filter: var(--glass-blur-ios); }
-.tabbar__grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; height: 144rpx; padding: 0 16rpx; }
+/* 自定义底栏可能不继承 page 的变量，兜底色与 app.wxss 的设计令牌保持一致。 */
+.tabbar {
+  --tabbar-glass: var(--glass-bg, rgba(250, 250, 248, .82));
+  --tabbar-glass-ios: var(--glass-ios-bg, rgba(250, 250, 248, .66));
+  --tabbar-border: var(--glass-border, rgba(255, 255, 255, .7));
+  --tabbar-primary: var(--primary, #B94E2B);
+  --tabbar-primary-light: var(--primary-light, #FFF0EB);
+  --tabbar-text: var(--text3, #747880);
+  position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+}
+/* 只模糊独立背景，图标和按钮位于其前方，避免 iOS 的模糊合成影响内容。 */
+.tabbar__glass { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 0; pointer-events: none; border-top: 1px solid var(--tabbar-border); background: var(--tabbar-glass); box-shadow: 0 -20rpx 60rpx rgba(26, 26, 46, .07); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+.tabbar--ios .tabbar__glass { background: var(--tabbar-glass-ios); -webkit-backdrop-filter: var(--glass-blur-ios, blur(30px) saturate(190%)); backdrop-filter: var(--glass-blur-ios, blur(30px) saturate(190%)); }
+.tabbar__grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; height: 144rpx; padding: 0 16rpx; }
 
 .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4rpx; height: 96rpx; border-radius: 26rpx; transition: transform .18s var(--ease-spring); }
 .tab--press { transform: scale(.9); }
 .tab__pill { position: relative; z-index: 0; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 48rpx; border-radius: 999rpx; }
 /* 选中胶囊：缩放淡入，而不是瞬间出现（z-index:-1 垫在图标之下） */
-.tab__pill::before { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1; border-radius: 999rpx; background: var(--primary-light); opacity: 0; transform: scale(.6); transition: opacity .22s ease, transform .32s var(--ease-spring); content: ""; }
+.tab__pill::before { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1; border-radius: 999rpx; background: var(--tabbar-primary-light); opacity: 0; transform: scale(.6); transition: opacity .22s ease, transform .32s var(--ease-spring); content: ""; }
 .tab.is-active .tab__pill::before { opacity: 1; transform: scale(1); }
-.tab__label { color: var(--text3); font-size: 24rpx; font-weight: 600; line-height: 1; transition: color .2s ease; }
-.tab.is-active .tab__label { color: var(--primary); font-weight: 700; }
+.tab__label { color: var(--tabbar-text); font-size: 24rpx; font-weight: 600; line-height: 1; transition: color .2s ease; }
+.tab.is-active .tab__label { color: var(--tabbar-primary); font-weight: 700; }
 
 .tab-center { display: flex; justify-content: center; }
-.ai-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; width:112rpx; height:112rpx; border-radius:40rpx; background:var(--primary-action); transition:transform .2s ease; }
+.ai-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; width:112rpx; height:112rpx; border-radius:40rpx; background-color:#B94E2B; background-color:var(--primary-action, #B94E2B); transition:transform .2s ease; }
 .ai-btn--press { transform: scale(.9) rotate(-4deg); box-shadow: 0 12rpx 28rpx rgba(232, 115, 74, .38); }
 .ai-btn__label { margin-top: 2rpx; color: #fff; font-size: 20rpx; font-weight: 800; line-height: 1; letter-spacing: 1rpx; }
+
+@media (prefers-color-scheme: dark) {
+  .tabbar {
+    --tabbar-glass: var(--glass-bg, rgba(18, 16, 22, .72));
+    --tabbar-glass-ios: var(--glass-ios-bg, rgba(22, 20, 28, .6));
+    --tabbar-border: var(--glass-border, rgba(255, 255, 255, .06));
+    --tabbar-primary: var(--primary, #F0825A);
+    --tabbar-primary-light: var(--primary-light, #3A2419);
+    --tabbar-text: var(--text3, #A0A0AB);
+  }
+}
