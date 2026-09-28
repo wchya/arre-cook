@@ -1,0 +1,19 @@
+{
+  "revision": "3492f5df0930109222b6db72d8e7572dd76b19a0",
+  "version": "0.12.8",
+  "image": "sha256:23a58bd607e09af00815b8cd6dd077a2ec01b5b2ee6d79bfc5d1989790832f71",
+  "schema_changed": false,
+  "local": {
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-28T15:42:19+08:00",
+    "version": "0.12.8"
+  },
+  "public": {
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-28T15:42:22+08:00",
+    "version": "0.12.8"
+  },
+  "completed_at": "2026-09-28 15:42:22"
+}
