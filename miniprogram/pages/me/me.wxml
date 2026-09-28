@@ -118,11 +118,13 @@
       <view class="group">
         <view class="group-title">偏好设置</view>
         <view class="group-body">
-          <view class="row" hover-class="tap-bg" bindtap="openRepeat">
-            <view class="row-icon tone-muted"><icon name="refresh-cw" size="34" stroke="2.3" color="text2" /></view>
-            <view class="row-main"><view class="row-title">推荐去重</view><view class="row-desc">{{repeatDays ? '近 ' + repeatDays + ' 天吃过的菜不优先推荐' : '使用默认去重天数'}}</view></view>
-            <text class="row-value">{{repeatDays ? repeatDays + ' 天' : '默认'}} ›</text>
-          </view>
+          <picker class="repeat-picker" mode="selector" range="{{repeatLabels}}" value="{{repeatIndex}}" disabled="{{savingRepeat}}" bindchange="chooseRepeat">
+            <view class="row" hover-class="tap-bg" aria-role="button" aria-label="推荐去重天数">
+              <view class="row-icon tone-muted"><icon name="refresh-cw" size="34" stroke="2.3" color="text2" /></view>
+              <view class="row-main"><view class="row-title">推荐去重</view><view class="row-desc">{{repeatDays ? '近 ' + repeatDays + ' 天吃过的菜不优先推荐' : '使用默认去重天数'}}</view></view>
+              <text class="row-value">{{savingRepeat ? '保存中…' : (repeatDays ? repeatDays + ' 天' : '默认')}} ›</text>
+            </view>
+          </picker>
           <view class="row" hover-class="tap-bg" bindtap="toggleVoice">
             <view class="row-icon tone-muted"><icon name="volume-2" size="34" stroke="2.3" color="text2" /></view>
             <view class="row-main"><view class="row-title">语音播报</view><view class="row-desc">做菜时朗读步骤</view></view>
@@ -178,13 +180,5 @@
     <button class="btn btn-primary flex-1 nickname-save {{nickname && !savingName ? '' : 'is-disabled'}}" disabled="{{!nickname || savingName}}" hover-class="tap-active" bindtap="saveName">
       <view wx:if="{{savingName}}" class="spinner"></view><text wx:else>保存</text>
     </button>
-  </view>
-</sheet>
-
-<sheet show="{{repeatOpen}}" title="推荐去重天数" subtitle="这几天内吃过的菜，推荐时会先避开" solid="{{true}}" bind:closed="onRepeatClosed" bind:close="closeRepeat">
-  <view class="sheet-body">
-    <view class="grid-4">
-      <view wx:for="{{repeatOptions}}" wx:key="*this" class="repeat {{(item === '0' && !repeatDays) || repeatDays === item ? 'is-active' : ''}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseRepeat">{{item === '0' ? '默认' : item + ' 天'}}</view>
-    </view>
   </view>
 </sheet>

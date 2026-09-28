@@ -32,12 +32,11 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .tile__label { color: var(--text3); font-size: 20rpx; font-weight: 600; }
 
 .me-content { padding-top: 32rpx; }
+.repeat-picker + .row::before { position: absolute; top: 0; right: 0; left: 32rpx; height: 1px; background: var(--border); content: ""; }
 
 .logout { display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 96rpx; margin: 8rpx 0 32rpx; border: 1px solid var(--border); border-radius: 36rpx; background: var(--card); color: var(--red); font-size: 28rpx; font-weight: 700; transition: transform .2s var(--ease-spring), opacity .15s ease; }
 .foot { padding-bottom: 16rpx; color: var(--text4); font-size: 22rpx; text-align: center; }
 
 .sheet-body { padding: 8rpx 40rpx 24rpx; }
-.repeat { display: flex; align-items: center; justify-content: center; height: 88rpx; border: 3rpx solid var(--border); border-radius: 32rpx; background: var(--bg); color: var(--text2); font-size: 26rpx; font-weight: 700; transition: border-color .2s ease, background-color .2s ease; }
-.repeat.is-active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
 
 .profile__details { min-height: 44px; }

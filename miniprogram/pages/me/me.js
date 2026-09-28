@@ -20,13 +20,14 @@ Page({
     voiceOn: true,
     remindOn: true,
     repeatDays: "",
-    repeatOptions: REPEAT_OPTIONS,
+    repeatLabels: REPEAT_OPTIONS.map(value => value === "0" ? "默认" : value + " 天"),
+    repeatIndex: REPEAT_OPTIONS.length - 1,
+    savingRepeat: false,
     nameOpen: false,
     nameFocus: false,
     nameKeyboardHeight: 0,
     nickname: "",
     savingName: false,
-    repeatOpen: false,
     uploadingAvatar: false,
     refreshing: false,
   },
@@ -54,15 +55,14 @@ Page({
   },
 
   syncSheetTabBar() {
-    const hidden = this.data.nameOpen || this.data.repeatOpen || Boolean(this._nameClosing || this._repeatClosing)
+    const hidden = this.data.nameOpen || Boolean(this._nameClosing)
     session.syncTabBar(this, 3, hidden)
   },
 
   resetSheets() {
     this._pageVisible = false
     this._nameClosing = false
-    this._repeatClosing = false
-    this.setData({ nameOpen: false, nameFocus: false, nameKeyboardHeight: 0, repeatOpen: false })
+    this.setData({ nameOpen: false, nameFocus: false, nameKeyboardHeight: 0 })
     session.resetTabBar(this, 3)
   },
 
@@ -104,10 +104,13 @@ Page({
   },
 
   applySettings(settings) {
+    const repeatDays = settings.repeat_days ? String(settings.repeat_days) : ""
+    const repeatIndex = REPEAT_OPTIONS.indexOf(repeatDays || "0")
     this.setData({
       voiceOn: String(settings.voice_enabled || "1") !== "0",
       remindOn: String(settings.shopping_reminder || "1") !== "0",
-      repeatDays: settings.repeat_days ? String(settings.repeat_days) : "",
+      repeatDays,
+      repeatIndex: repeatIndex < 0 ? REPEAT_OPTIONS.length - 1 : repeatIndex,
     })
   },
 
@@ -216,32 +219,25 @@ Page({
     this.updateSetting({ shopping_reminder: next ? "1" : "0" }, { remindOn: !next })
   },
 
-  openRepeat() {
-    this._repeatClosing = false
-    // Hide the real navigation before the sheet's property observer reaches the view layer.
-    session.syncTabBar(this, 3, true)
-    this.setData({ repeatOpen: true })
-  },
-
-  closeRepeat() {
-    if (!this.data.repeatOpen) return
-    this._repeatClosing = true
-    this.setData({ repeatOpen: false })
-  },
-
-  onRepeatClosed() {
-    this._repeatClosing = false
-    if (this._pageVisible) this.syncSheetTabBar()
-  },
-
-  chooseRepeat(event) {
-    const value = event.currentTarget.dataset.value
-    const previous = this.data.repeatDays
+  // Native picker owns its iOS presentation above the custom navigation host.
+  // Only a confirmed change writes settings; cancellation leaves the value intact.
+  async chooseRepeat(event) {
+    if (this.data.savingRepeat) return
+    const rawIndex = event.detail && event.detail.value
+    if (rawIndex === undefined || rawIndex === null || rawIndex === "") return
+    const index = Number(rawIndex)
+    if (!Number.isInteger(index) || index < 0 || index >= REPEAT_OPTIONS.length) return
+    const value = REPEAT_OPTIONS[index]
     const next = value === "0" ? "" : value
+    if (next === this.data.repeatDays) return
+    const previous = { repeatDays: this.data.repeatDays, repeatIndex: this.data.repeatIndex }
     ui.haptic()
-    this.setData({ repeatDays: next })
-    this.closeRepeat()
-    this.updateSetting({ repeat_days: next }, { repeatDays: previous })
+    this.setData({ repeatDays: next, repeatIndex: index, savingRepeat: true })
+    try {
+      await this.updateSetting({ repeat_days: next }, previous)
+    } finally {
+      this.setData({ savingRepeat: false })
+    }
   },
 
   // ---------- 导航 ----------

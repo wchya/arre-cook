@@ -55,7 +55,6 @@ function setup({ deferSheetUpdates = false } = {}) {
     return sheet
   }
   const sheet = createSheet()
-  const repeatSheet = createSheet()
 
   let pageDefinition
   const dependencies = {
@@ -74,7 +73,7 @@ function setup({ deferSheetUpdates = false } = {}) {
   page.setData = (patch) => {
     const previous = { ...page.data }
     Object.assign(page.data, patch)
-    for (const [key, component] of [['nameOpen', sheet], ['repeatOpen', repeatSheet]]) {
+    for (const [key, component] of [['nameOpen', sheet]]) {
       if (previous[key] === page.data[key]) continue
       const show = page.data[key]
       const update = () => {
@@ -91,13 +90,8 @@ function setup({ deferSheetUpdates = false } = {}) {
     if (name === 'closed') page.onNameClosed()
     if (name === 'close') page.closeName()
   }
-  repeatSheet.triggerEvent = (name) => {
-    repeatSheet.events.push(name)
-    if (name === 'closed') page.onRepeatClosed?.()
-    if (name === 'close') page.closeRepeat()
-  }
   page.onShow()
-  return { page, sheet, repeatSheet, tab, api, app, messages, session, clock }
+  return { page, sheet, tab, api, app, messages, session, clock }
 }
 
 test('opening hides the actual tab component until the close animation completes', () => {
@@ -191,73 +185,67 @@ test('leaving the page restores the menu and late close events cannot switch the
   }
 })
 
-test('repeat settings hide navigation before the sheet receives its open property', () => {
-  const { page, repeatSheet, tab, clock } = setup({ deferSheetUpdates: true })
-  page.openRepeat()
-  assert.equal(tab.data.hidden, true)
-  assert.equal(repeatSheet.data.visible, false)
-  page.onShow()
-  assert.equal(tab.data.hidden, true)
-  clock.tick(410)
-  assert.equal(repeatSheet.data.active, true)
-  repeatSheet.onMask()
-  clock.tick(379)
-  assert.equal(tab.data.hidden, true)
-  clock.tick(1)
+test('native repeat picker maps its confirmed index to days and restores the current selection', async () => {
+  const { page, api, tab } = setup()
+  const writes = []
+  api.put = async (url, body) => { writes.push({ url, body }) }
+  page.applySettings({ repeat_days: '7' })
+  assert.equal(page.data.repeatIndex, 4)
+  assert.equal(page.data.repeatLabels[page.data.repeatIndex], '7 天')
+  await page.chooseRepeat({ detail: { value: '6' } })
+  assert.equal(writes[0].url, '/settings')
+  assert.equal(writes[0].body.settings.repeat_days, '14')
+  assert.equal(page.data.repeatDays, '14')
+  assert.equal(page.data.repeatIndex, 6)
+  assert.equal(page.data.savingRepeat, false)
+  // Native presentation does not take ownership of the custom sheet/tab state.
   assert.equal(tab.data.hidden, false)
+  assert.equal(page.data.nameOpen, false)
+  await page.chooseRepeat({ detail: { value: '7' } })
+  assert.equal(writes[1].body.settings.repeat_days, '')
+  assert.equal(page.data.repeatDays, '')
+  assert.equal(page.data.repeatLabels[page.data.repeatIndex], '默认')
 })
 
-test('choosing repeat days saves the value and waits for dismissal before restoring navigation', async () => {
-  const { page, repeatSheet, tab, api, clock } = setup()
-  let saved
-  api.put = async (url, data) => { saved = { url, data } }
-  page.openRepeat()
-  clock.tick(410)
-  page.chooseRepeat({ currentTarget: { dataset: { value: '7' } } })
-  await Promise.resolve()
-  assert.equal(saved.url, '/settings')
-  assert.equal(saved.data.settings.repeat_days, '7')
+test('failed repeat save rolls back both the displayed days and the next picker selection', async () => {
+  const { page, api, messages } = setup()
+  page.applySettings({ repeat_days: '5' })
+  api.put = async () => { throw new Error('网络暂时不可用') }
+  await page.chooseRepeat({ detail: { value: 4 } })
+  assert.equal(page.data.repeatDays, '5')
+  assert.equal(page.data.repeatIndex, 3)
+  assert.equal(page.data.savingRepeat, false)
+  assert.equal(messages.at(-1), '网络暂时不可用')
+  api.put = async () => {}
+  await page.chooseRepeat({ detail: { value: 4 } })
   assert.equal(page.data.repeatDays, '7')
-  assert.equal(page.data.repeatOpen, false)
-  assert.equal(repeatSheet.data.visible, true)
-  assert.equal(tab.data.hidden, true)
-  clock.tick(380)
-  assert.equal(repeatSheet.data.visible, false)
-  assert.equal(tab.data.hidden, false)
+  assert.equal(page.data.repeatIndex, 4)
 })
 
-test('leaving repeat settings closes them so returning cannot retain a sheet over navigation', () => {
-  for (const method of ['onHide', 'onUnload']) {
-    const { page, repeatSheet, tab, session, clock } = setup()
-    page.openRepeat()
-    clock.tick(410)
-    page[method]()
-    assert.equal(page.data.repeatOpen, false)
-    assert.equal(tab.data.hidden, false)
-    session.syncTabBar(page, 0)
-    clock.tick(380)
-    assert.equal(tab.data.selected, 0)
-    assert.equal(repeatSheet.data.visible, false)
-    page.onShow()
-    assert.equal(tab.data.hidden, false)
+test('repeat picker ignores unchanged and invalid selection events without writing settings', async () => {
+  const { page, api } = setup()
+  let writes = 0
+  api.put = async () => { writes++ }
+  page.applySettings({ repeat_days: '7' })
+  for (const value of [4, '4', undefined, null, '', -1, 8, 1.5, 'invalid']) {
+    await page.chooseRepeat({ detail: { value } })
   }
+  assert.equal(writes, 0)
+  assert.equal(page.data.repeatDays, '7')
+  assert.equal(page.data.repeatIndex, 4)
 })
 
-test('reopening repeat settings or switching editors cannot reveal navigation mid-transition', () => {
-  const { page, repeatSheet, tab, clock } = setup()
-  page.openRepeat()
-  clock.tick(410)
-  page.closeRepeat()
-  clock.tick(100)
-  page.openRepeat()
-  clock.tick(410)
-  assert.equal(repeatSheet.data.active, true)
-  assert.equal(tab.data.hidden, true)
-  page.closeRepeat()
-  page.openName()
-  clock.tick(410)
-  assert.equal(tab.data.hidden, true)
-  page.closeName()
-  clock.tick(380)
-  assert.equal(tab.data.hidden, false)
+test('repeat save cannot be overtaken by another confirmation while the first request is pending', async () => {
+  const { page, api } = setup()
+  let finish
+  let writes = 0
+  api.put = () => { writes++; return new Promise(resolve => { finish = resolve }) }
+  const first = page.chooseRepeat({ detail: { value: 4 } })
+  assert.equal(page.data.savingRepeat, true)
+  await page.chooseRepeat({ detail: { value: 6 } })
+  assert.equal(writes, 1)
+  assert.equal(page.data.repeatDays, '7')
+  finish()
+  await first
+  assert.equal(page.data.savingRepeat, false)
 })
