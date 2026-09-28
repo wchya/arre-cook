@@ -1,10 +1,10 @@
 # 2026-09-28 审计修复记录
 
-本轮已实现原审计报告 F01–F19 的代码修复，并准备容器资源限制及迁移流程。**修复保留在本地工作区，尚未提交或部署；线上不能据此标记为已修复。** 基线为 `3be2e6d` / 0.12.6，保留此前的抖音改动。历史 [审计报告](audit-report-arre-cook-2026-09-28.md) 和 [缺陷复现证据](audit-evidence/2026-09-28/README.md) 不改写为通过记录。
+本轮已实现原审计报告 F01–F19 的代码修复。**实现提交 `47b62b1` 和版本提交 `8085433` 已推送，0.12.7 于 2026-09-28 15:16（北京时间）完成生产部署，小程序同版本已上传微信后台开发版本。** 容器限制和独立迁移已生效，发布证据见 [0.12.7 发布记录](releases/0.12.7.md)。代码基线为 `3be2e6d` / 0.12.6，保留此前的抖音改动；线上升级前实际运行 0.12.5。历史 [审计报告](audit-report-arre-cook-2026-09-28.md) 和 [缺陷复现证据](audit-evidence/2026-09-28/README.md) 不改写为通过记录。
 
 ## 逐项状态
 
-以下“通过”指本地列出的验证范围；容器配置需重建后生效，Linux 组合负载、真实平台调用与 iOS 真机另列。
+以下“通过”指各行列出的验证范围；生产健康、接口、容器配置及真实模型检查见发布记录，Linux 组合负载、真实视频平台调用与 iOS 真机仍另列。
 
 | 编号 | 修复内容与代码 | 已完成验证 |
 |---|---|---|
@@ -22,7 +22,7 @@
 | F12 | [成就调度](../backend/internal/services/achievement_service.go)：128 等待用户、2 worker、按用户合并 dirty 状态；GET 只排队并读现有结果；不读取完整做法；唯一授奖约束 | 一万个用户触发不会产生无界队列；重复请求合并，溢出后可重试；原成就回归通过 |
 | F13 | [SMTP](../backend/internal/mailer/mailer.go)：context、20 秒会话 deadline、建连 5 秒、取消关闭 socket、并发 2；验证码短事务预约共享额度，事务外发送，失败仍计额度 | 本地假 SMTP greeting 停滞可取消；认证/邮件服务回归通过，无真实邮件发送 |
 | F14 | [图片账本](../backend/internal/database/uploads.go)：用户 256 MiB/1000 对象，站点 5 GiB/50000 对象；上传先预约、业务事务内绑定引用、24 小时未引用可回收；删除置墓碑，失败保留额度；[清点](../backend/internal/storage/inventory.go) 分页回填历史对象与备份 | pending 占额、共享/步骤/头像引用、业务回滚、删除后拒绝绑定、原图备份回收、解散后个人副本保护、S3 分页/重复游标/双存储副本；MySQL 旧快照不能绕过墓碑 |
-| F15 | [重任务预算](../backend/internal/resourcebudget/heavy.go) 让图片解码与 ASR 共用单槽；[Compose](../docker-compose.yml) 准备 1 GiB/2 CPU、Go 192 MiB/并行度 2，保留 ASR 768 MiB 启动余量/512 MiB watchdog | 互斥准入、取消回归；Compose 静态校验通过；Linux 混部峰值尚未验证，线上限制尚未应用 |
+| F15 | [重任务预算](../backend/internal/resourcebudget/heavy.go) 让图片解码与 ASR 共用单槽；[Compose](../docker-compose.yml) 配置 1 GiB/2 CPU、Go 192 MiB/并行度 2，保留 ASR 768 MiB 启动余量/512 MiB watchdog | 互斥准入、取消回归；Compose 静态校验通过；生产容器限制已核对生效，Linux 混部峰值尚未验证 |
 | F16 | [服务排空](../backend/cmd/server/main.go)：停止接流后保留在途 request context，Shutdown 100 秒、容器 stop grace 110 秒；随后取消并等待重任务释放 | 构建/竞态/配置校验通过；执行中真实 ASR 的 Linux SIGTERM 演练尚未执行 |
 | F17 | [共享窗口/任务键](../backend/internal/database/admission.go)、成就唯一键、发布通知分批且版本幂等；[迁移锁](../backend/internal/database/migration_lock.go) 固定连接串行初始化，短轮询不超驱动读期限；可独立迁移、API 跳过迁移 | MySQL 独立连接池并发限流和通知幂等通过；两个真实迁移进程在连接池=1时均成功，最终仅1管理员/100种子菜，账本标记 done |
 | F18 | [模型注册表](../backend/internal/models/registry.go) 供启动与 [迁移工具](../backend/cmd/dbmigrate/main.go) 共用；流式读取支持复合主键/软删除记录，分批写并逐表核数 | 全部注册模型哨兵、多批读取、空表清空回归通过；含原遗漏的家庭清单、删除申请表 |
@@ -30,7 +30,7 @@
 
 ## iOS 小程序弹框
 
-[我的页面](../miniprogram/pages/me/me.js) 修复去重天数与昵称底部弹框的打开/关闭动画状态、页面离开时复位及自定义 tabbar 同步；[样式](../miniprogram/pages/me/me.wxss) 固定背景与层级。4 个新增生命周期回归通过。未上传新小程序版本，iOS 微信真机仍需检查键盘、底部安全区和关闭动画。
+[我的页面](../miniprogram/pages/me/me.js) 修复去重天数与昵称底部弹框的打开/关闭动画状态、页面离开时复位及自定义 tabbar 同步；[样式](../miniprogram/pages/me/me.wxss) 固定背景与层级。4 个新增生命周期回归通过。0.12.7 已上传微信后台开发版本；iOS 微信真机仍需检查键盘、底部安全区和关闭动画，未提交平台审核或正式发布。
 
 ## 本地验证
 
@@ -62,4 +62,4 @@ ARRE_AUDIT_MYSQL_SOCKET=/临时目录/arre-audit-mysql-example/mysql.sock \
 
 首次发布须按 [部署步骤](deployment.md#审计修复的首次迁移与发布) 备份、停写、完成引用/对象回填后启动 API；S3 密钥需要列举权限。新增配额不会自动清除已引用图片，历史备份无法确定对应关系时保守保留为 `archive`。定时 GC 每小时最多 100 个，删除失败继续计费并重试；注销不会删除其他菜谱仍引用的共享图片。
 
-本机 MySQL 验证了真实锁/事务和多连接池行为，仍不能替代 Linux 上的容器内存峰值、网络故障恢复、完整生产数据迁移恢复、ASR 排空和 iOS 真机验证。本轮没有改线上配置、执行生产压测或发布安全修复，也没有新增线上 OOM 事故的证据。
+本机 MySQL 验证了真实锁/事务和多连接池行为；发布阶段另完成生产数据库副本恢复与迁移演练、停写备份、生产迁移和线上功能检查。仍未执行 Linux 混部峰值压测、完整灾难恢复、执行中 ASR 排空或 iOS 真机验收；此次发布检查未观察到容器 OOM 或重启。

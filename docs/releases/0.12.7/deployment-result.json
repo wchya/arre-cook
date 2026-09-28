@@ -1,0 +1,17 @@
+{
+  "version": "0.12.7",
+  "revision": "8085433437646ff7ee3aedd8886786b8787a2661",
+  "local": {
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-28T15:16:48+08:00",
+    "version": "0.12.7"
+  },
+  "public": {
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-28T15:16:51+08:00",
+    "version": "0.12.7"
+  },
+  "completed_at": "2026-09-28 15:16:51"
+}

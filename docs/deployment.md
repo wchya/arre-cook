@@ -154,7 +154,7 @@ LLM_CPA_MODEL=cook/glm-5.3
 
 ### 审计修复的首次迁移与发布
 
-2026-09-28 的修复状态及验证范围见 [逐项修复记录](audit-remediation-2026-09-28.md)。代码基于 0.12.6，尚未将本轮修复发布到生产；下面是待执行流程，不代表已执行。
+2026-09-28 的修复状态及验证范围见 [逐项修复记录](audit-remediation-2026-09-28.md)。0.12.7（`8085433`）已从线上 0.12.5 升级完成，当前 `DB_AUTO_MIGRATE=false`，容器 1 GiB / 2 CPU、Go 192 MiB 和 110 秒停止等待已核对生效。执行时间、备份、回滚和小程序上传回执见 [发布记录](releases/0.12.7.md)。以下保留首次迁移的操作流程，后续发布应按当时的数据和代码重新核验。
 
 1. 先完成实现与版本提交、构建镜像，保留旧镜像，并备份 MySQL、Garage 与本地上传目录。镜像后端固定 Go 1.25.14，`x/image` 为 0.45.0。
 2. 在隔离环境验证原数据库副本迁移和恢复。新表包括 `upload_assets`、`upload_references`、`task_claims`、`request_windows`，成就新增用户/成就唯一键，迁移先合并重复授奖；菜数非法历史设置重置为 1。离线 `dbmigrate` 使用同一模型清单，包含家庭清单/删除申请，游标读取并逐表核对行数。
@@ -170,7 +170,7 @@ docker compose --env-file ../web-arrebyte/.env --env-file .env run --rm --no-dep
 DB_AUTO_MIGRATE=false docker compose --env-file ../web-arrebyte/.env --env-file .env up -d --no-build ninimenu
 ```
 
-将 `DB_AUTO_MIGRATE=false` 持久写入部署 `.env`，每次需要 schema 变更时先运行上面的独立迁移。更新后的普通请求期限 15 秒，AI/Agent/MCP 为 90 秒，应用 Shutdown 等待 100 秒，Compose stop grace 为 110 秒；请求根 context 在排空结束后才取消。代理须先停止接流，避免停止期间持续重试旧实例。
+将 `DB_AUTO_MIGRATE=false` 持久写入部署 `.env`，每次需要 schema 变更时先运行上面的独立迁移。更新后的普通请求期限 15 秒，AI/Agent/MCP 为 90 秒，应用 Shutdown 等待 100 秒，Compose stop grace 为 110 秒；请求根 context 在排空结束后才取消。代理须先停止接流，避免停止期间持续重试旧实例。Nginx reload 返回时新 worker 未必已经接流，解除维护后应在有限时间内轮询公网预期版本，不能把重载后第一次 503 直接判为部署失败；回滚重建容器后也应 reload 以刷新上游地址，并确认公网恢复。
 
 发布后核对模块版本、容器 memory/CPU/stop timeout、健康、登录与会话撤销、图片上传/引用保护、菜单、家庭清单和站内信；在 Linux 预发验证最大图片与 ASR/菜单/其他容器组合负载及执行中 SIGTERM。小程序开发版还要做 iOS 真机弹层检查。回滚到不维护图片账本的旧版本后，不可直接沿用旧的 `uploads_inventory_v1=done`：再次升级前应在停写和备份之后将该标记重置为待回填，重新核对引用及对象总量。
 
@@ -185,7 +185,7 @@ DB_AUTO_MIGRATE=false docker compose --env-file ../web-arrebyte/.env --env-file 
 
 回滚时停止新容器并以记录的旧镜像和版本启动；新增额度表可保留，不要为了回滚删除个人数据。只有确认数据库迁移导致问题时，才在保留现场副本后恢复升级前备份。
 
-站内信表会在启动时自动迁移。系统更新、Agent 安全事件、家庭邀请和 AI 饮食建议会生成对应用户的通知；管理员可在「管理 → 设置 → 站内信通知」广播更新，消息按 `user_id` 独立保存并维护各自已读状态。
+站内信表随独立迁移任务更新；生产 API 启动保持 `DB_AUTO_MIGRATE=false`。系统更新、Agent 安全事件、家庭邀请和 AI 饮食建议会生成对应用户的通知；管理员可在「管理 → 设置 → 站内信通知」广播更新，消息按 `user_id` 独立保存并维护各自已读状态。
 
 ## 数据迁移检查
 

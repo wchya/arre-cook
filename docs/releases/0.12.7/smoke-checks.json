@@ -1,0 +1,34 @@
+{
+  "admin_login": 200,
+  "/api/me": 200,
+  "/api/dishes?page=1&pageSize=1": 200,
+  "/api/week-plan": 200,
+  "/api/achievements": 200,
+  "/api/family": 200,
+  "/api/notifications": 200,
+  "/api/assistant/status": 200,
+  "llm_enabled": true,
+  "/api/assistant/video-recipe/status": 200,
+  "video_readiness": {
+    "enabled": true,
+    "asr_enabled": true,
+    "max_duration_seconds": 600
+  },
+  "container": {
+    "image": "sha256:13e27975dcd940bb252850e2a4153a390d7839f30e481f449df2979fdaf3e8cc",
+    "memory": 1073741824,
+    "memory_swap": 1073741824,
+    "nano_cpus": 2000000000,
+    "stop_timeout": 110,
+    "oom_killed": false,
+    "health": "healthy",
+    "restarts": 0
+  },
+  "safe_env": {
+    "APP_VERSION": "0.12.7",
+    "GOMEMLIMIT": "192MiB",
+    "GOMAXPROCS": "2",
+    "DB_AUTO_MIGRATE": "false",
+    "VIDEO_ASR_PROVIDER": "local"
+  }
+}
