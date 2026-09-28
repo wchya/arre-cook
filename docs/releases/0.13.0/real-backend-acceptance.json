@@ -1,0 +1,32 @@
+{
+  "backend": "http://127.0.0.1:8080",
+  "transport": "real HTTP; native runtime adapters only",
+  "checks": [
+    "password-login-and-consent",
+    "eight-themes-with-real-recommendations",
+    "meal-pick-change-record-lunch-dinner-and-duplicate-guard",
+    "dish-detail-favorite-and-unfavorite",
+    "preferences-save-and-readback",
+    "history-calendar-and-record-rating-readback",
+    "profile-and-stats",
+    "GET /settings",
+    "GET /favorites",
+    "GET /week-plan",
+    "GET /shopping-list",
+    "GET /family",
+    "GET /food-journal",
+    "GET /health-report",
+    "GET /notifications",
+    "GET /achievements",
+    "GET /profile",
+    "GET /photo-wall",
+    "GET /suggestions",
+    "GET /me/agent-tokens",
+    "GET /assistant/status",
+    "GET /assistant/video-recipe/status",
+    "tomorrow-menu-load-and-save",
+    "cleanup-and-logout-retains-appearance"
+  ],
+  "requestCount": 75,
+  "failedRequests": []
+}
