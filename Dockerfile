@@ -46,8 +46,35 @@ RUN python3 -m venv /opt/video-asr \
 COPY backend/video_asr/transcribe.py backend/video_asr/sandbox.py /app/video-asr/
 COPY backend/video_asr/licenses/ /app/video-asr/licenses/
 COPY backend/internal/video/model.lock.json /app/video-asr/model.lock.json
+# Host checkout permissions can be 0600 when deployment uses umask 077.
+RUN chmod -R a+rX /app/video-asr
 ENV OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2 MKL_NUM_THREADS=1 MALLOC_ARENA_MAX=2
 WORKDIR /app
+USER ninimenu
+RUN /opt/video-asr/bin/python3 -I -B - <<'PY'
+import ctypes
+import json
+import os
+from pathlib import Path
+import runpy
+
+import numpy
+import sherpa_onnx
+
+assert os.getuid() == 1000
+root = Path("/app/video-asr")
+for path in root.rglob("*"):
+    if path.is_file():
+        path.read_bytes()
+        assert not os.access(path, os.W_OK), path
+for name in ("transcribe.py", "sandbox.py"):
+    runpy.run_path(str(root / name), run_name="image_check")
+assert len(json.loads((root / "model.lock.json").read_text())["files"]) == 3
+assert numpy.__version__ and callable(sherpa_onnx.OfflineRecognizer.from_sense_voice)
+ctypes.CDLL("libseccomp.so.2")
+print("ASR runtime readable and importable as UID 1000")
+PY
+USER root
 
 # ---------- Stage 4: existing web/API application ----------
 FROM asr-runtime
