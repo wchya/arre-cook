@@ -69,14 +69,14 @@
           <view class="section-title">{{selectedDay.date}} · {{selectedDay.statusLabel}}</view>
           <view class="hint">{{selectedDay.meal_event_count}} 餐 · {{selectedDay.item_count}} 个食物项；原始来源 {{selectedDay.meal_count}} 条</view>
           <view wx:if="{{selectedDay.meals.length}}" class="health-evidence">
-            <view wx:for="{{selectedDay.meals}}" wx:key="meal_type" class="health-controls">
-              <view>{{item.label}} · {{item.statusLabel}}</view>
+            <view wx:for="{{selectedDay.meals}}" wx:key="meal_type" class="health-meal-row">
+              <view class="health-evidence-title">{{item.label}} · {{item.statusLabel}}</view>
               <button wx:if="{{item.status !== 'recorded'}}" size="mini" disabled="{{actionBusy}}" data-meal="{{item.meal_type}}" bindtap="setMealStatus">{{item.status === 'not_eaten' ? '撤销未吃标记' : '标记这餐未吃'}}</button>
             </view>
             <view class="hint">未吃不计作进餐或零营养；补记该餐后自动清除标记。全天完整仍需核对食物、饮料和加餐。</view>
           </view>
           <view wx:for="{{selectedDay.evidence}}" wx:key="key" class="health-evidence">
-            <view>{{item.mealLabel}} · {{item.dish_name}}</view>
+            <view class="health-evidence-title">{{item.mealLabel}} · {{item.dish_name}}</view>
             <view class="hint">{{item.sourceLabel}} · {{item.portion || '份量未记录'}} {{item.linked_record_id ? '· 已关联同一食物' : ''}}</view>
             <view wx:if="{{item.nutrition}}" class="hint">营养来源：{{item.nutrition.source_reference}} · {{item.nutrition.amount}} {{item.nutrition.unit}} · {{item.nutrition.portion_source === 'measured' ? '称量/量取' : '估计份量'}} · 来源 v{{item.nutrition.food_version}}</view>
             <view wx:if="{{item.nutrition.standard_portion}}" class="hint">标准份量估算：{{item.nutrition.standard_portion.count}} × {{item.nutrition.standard_portion.label}}（每份{{item.nutrition.standard_portion.amount}}{{item.nutrition.unit}}）；依据：{{item.nutrition.standard_portion.reference}}。</view>
@@ -113,7 +113,7 @@
       </view>
 
       <view class="card card-pad mb-24"><view class="section-title">有来源的营养记录</view><view class="hint">由个人标签、已选标准食物和食用量计算，标签未经平台核验，可能包含份量估计。未知不算零，不判断摄入是否达标。</view>
-        <view wx:for="{{nutritionMetrics}}" wx:key="code" class="health-evidence"><view>{{item.label}} · {{item.known_total === null ? '未记录' : '已知部分合计 ' + item.known_total + ' ' + item.unit}}</view><view class="hint">覆盖 {{item.covered_items}}/{{item.total_items}} 个食物项。{{item.daily_average === null ? '完整且数据齐全的日子 ' + item.complete_days + '/' + item.required_days + '，暂不显示日均值。' : item.complete_days + ' 个完整日的均值：' + item.daily_average + ' ' + item.unit + '/天。'}}</view></view>
+        <view wx:for="{{nutritionMetrics}}" wx:key="code" class="health-evidence"><view class="health-evidence-title">{{item.label}}</view><view class="health-metric-value">{{item.known_total === null ? '未记录' : '已知部分合计 ' + item.known_total + ' ' + item.unit}}</view><view class="hint">覆盖 {{item.covered_items}}/{{item.total_items}} 个食物项。{{item.daily_average === null ? '完整且数据齐全的日子 ' + item.complete_days + '/' + item.required_days + '，暂不显示日均值。' : item.complete_days + ' 个完整日的均值：' + item.daily_average + ' ' + item.unit + '/天。'}}</view></view>
         <view class="hint">日均值要求本期至少 4/7 的天数记录完整且该营养素齐全，这是记录覆盖规则。</view>
       </view>
       <view wx:if="{{report.comparison}}" class="card card-pad mb-24">
@@ -122,10 +122,8 @@
 上期 {{report.comparison.from}} — {{report.comparison.to}}</view>
         <view class="hint">按相同星期几匹配完整且营养齐全的日子。可能包含份量估计，升降不表示健康改善或恶化。</view>
         <view wx:for="{{comparisonMetrics}}" wx:key="code" class="health-evidence">
-          <view>{{item.label}} · 已匹配 {{item.matched_days}}/{{item.required_days}} 对日期</view>
-          <view wx:if="{{item.status === 'available'}}" class="hint">上期配对日均 {{item.previous_average}} {{item.unit}}/天
-本期配对日均 {{item.current_average}} {{item.unit}}/天
-差值 {{item.deltaText}} {{item.unit}}/天</view>
+          <view class="health-evidence-title">{{item.label}} · 已匹配 {{item.matched_days}}/{{item.required_days}} 对日期</view>
+          <view wx:if="{{item.status === 'available'}}" class="health-metric-lines"><view>上期配对日均 {{item.previous_average}} {{item.unit}}/天</view><view>本期配对日均 {{item.current_average}} {{item.unit}}/天</view><view>差值 {{item.deltaText}} {{item.unit}}/天</view></view>
           <view class="hint">{{item.reason}}</view>
           <button wx:if="{{item.matched_days > 0}}" class="btn btn-soft btn-sm mt-16" data-code="{{item.code}}" bindtap="toggleComparison">{{comparisonExpanded === item.code ? "收起配对日期" : "查看配对日期（上期 → 本期）"}}</button>
           <view wx:if="{{comparisonExpanded === item.code}}" wx:for="{{item.datePairs}}" wx:for-item="pair" wx:key="current" class="hint">{{pair.previous}} → {{pair.current}}</view>
@@ -151,7 +149,7 @@
         </view>
       </view>
 
-      <view wx:if="{{plans.length}}" class="card card-pad mb-24"><view class="section-title">已安排与复盘</view><view wx:for="{{plans}}" wx:key="id" class="health-evidence"><view>{{item.meal_date}} · {{item.mealLabel}} · {{item.dish_name}}</view><view class="hint">{{item.statusLabel}}{{item.available ? '' : ' · 菜谱不可用或与当前忌口冲突'}}</view><button wx:if="{{item.status !== 'recorded' && item.available && item.meal_date <= today}}" size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="recordPlan">记为吃过</button><button size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="cancelPlan">撤销安排</button></view></view>
+      <view wx:if="{{plans.length}}" class="card card-pad mb-24"><view class="section-title">已安排与复盘</view><view wx:for="{{plans}}" wx:key="id" class="health-evidence"><view class="health-evidence-title">{{item.meal_date}} · {{item.mealLabel}} · {{item.dish_name}}</view><view class="hint">{{item.statusLabel}}{{item.available ? '' : ' · 菜谱不可用或与当前忌口冲突'}}</view><view class="health-controls"><button wx:if="{{item.status !== 'recorded' && item.available && item.meal_date <= today}}" size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="recordPlan">记为吃过</button><button size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="cancelPlan">撤销安排</button></view></view></view>
       <view class="card card-pad mb-24"><view class="section-title">统计口径与数据说明</view><view wx:for="{{report.method_notes}}" wx:key="*this" class="hint">{{item}}</view></view>
       <view class="btn btn-ghost btn-block" hover-class="tap-active" bindtap="goChat"><icon name="sparkles" size="30" stroke="2.4" color="text2" /><text>和 AI 助手聊聊饮食规划</text></view>
       <view class="disclaimer">报告用于整理你填写的饮食信息，不提供营养诊断或医疗建议。</view>

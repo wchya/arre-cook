@@ -900,4 +900,17 @@ export interface SiteSettings {
 
 export interface HealthMealDraftItem { dish_name: string; portion: string; evidence: string }
 export interface HealthDraftStatus { enabled: boolean; max_chars: number; max_items: number; quota: { limit: number; used: number; remaining: number; reset_at: string } }
-export interface HealthJournalBatchInput { request_key: string; confirmed: boolean; meal_date: string; meal_type: string; items: { dish_name: string; portion: string }[] }
+export interface HealthDraftCandidates { personal: NutritionFood[]; catalog: NutritionCatalogFood[] }
+export interface HealthDraftBatchItem {
+  dish_name: string
+  portion: string
+  nutrition_mode?: "replace"
+  nutrition_food_id?: number
+  nutrition_amount?: number
+  nutrition_unit?: "g" | "ml"
+  food_state?: string
+  portion_source?: "measured" | "estimated"
+  nutrition_portion_key?: string
+  nutrition_portion_count?: number
+}
+export interface HealthJournalBatchInput { request_key: string; confirmed: boolean; meal_date: string; meal_type: string; items: HealthDraftBatchItem[] }

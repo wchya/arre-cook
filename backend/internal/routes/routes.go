@@ -96,6 +96,7 @@ func Setup(r *gin.Engine) {
 		app.GET("/health-report", handlers.GetHealthReport)
 		app.GET("/health/summary", handlers.GetHealthSummary)
 		app.GET("/health/meal-drafts/status", handlers.GetHealthDraftStatus)
+		app.GET("/health/meal-drafts/candidates", handlers.GetHealthDraftCandidates)
 		app.POST("/health/meal-drafts/parse", handlers.ParseHealthMealDraft)
 		app.POST("/health/meal-drafts/confirm", handlers.SaveHealthMealDraft)
 		app.PUT("/health/days/:date/meals/:meal/status", handlers.SetHealthMealStatus)

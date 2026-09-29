@@ -1,16 +1,47 @@
-.draft { margin-bottom: 32rpx; padding: 28rpx; border: 1px solid var(--border); border-radius: 24rpx; background: var(--card); color: var(--text); }
-.draft-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; font-size: 28rpx; font-weight: 600; }
-.draft-body { margin-top: 20rpx; }
-button { min-height: 88rpx; margin: 12rpx 0; padding: 12rpx 20rpx; display: flex; align-items: center; justify-content: center; line-height: 1.4; font-size: 26rpx; border: 1px solid var(--border); border-radius: 18rpx; background: var(--bg); color: var(--text); }
-button[disabled] { opacity: .5; }
-button::after { border: 0; }
-.hint { font-size: 24rpx; line-height: 1.7; color: var(--text2); overflow-wrap: anywhere; }
-.label { margin: 20rpx 0 8rpx; font-size: 24rpx; font-weight: 600; }
-textarea, input, .field { box-sizing: border-box; width: 100%; border: 1px solid var(--border); border-radius: 16rpx; padding: 16rpx; background: var(--bg); color: var(--text); font-size: 28rpx; }
-input, .field { height: 88rpx; line-height: 54rpx; }
-textarea { min-height: 180rpx; }
-.actions { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
-.item { border-top: 1px solid var(--border); margin-top: 24rpx; padding-top: 20rpx; }
-.consent { display: block; padding: 20rpx 0; min-height: 88rpx; font-size: 26rpx; line-height: 1.7; }
-.message { margin-top: 20rpx; font-size: 26rpx; line-height: 1.7; }
+.draft { box-sizing: border-box; width: 100%; margin-bottom: 28rpx; padding: 28rpx; border: 1px solid var(--border); border-radius: 28rpx; background: var(--card); color: var(--text); }
+.draft-head { display: flex; align-items: center; gap: 20rpx; min-width: 0; }
+.draft-head-copy { flex: 1; min-width: 0; }
+.draft-title { font-size: 30rpx; font-weight: 700; line-height: 1.35; }
+.draft-subtitle { margin-top: 4rpx; color: var(--text2); font-size: 22rpx; line-height: 1.45; }
+.draft-body { min-width: 0; margin-top: 24rpx; padding-top: 24rpx; border-top: 1px solid var(--border); }
+.draft-hint, .draft-evidence, .draft-message, .draft-link { display: block; color: var(--text2); font-size: 24rpx; line-height: 1.6; overflow-wrap: anywhere; word-break: break-word; }
+.draft-hint + .draft-hint { margin-top: 8rpx; }
+.draft-status { margin: 16rpx 0 24rpx; padding: 14rpx 18rpx; border-radius: 12rpx; background: var(--inset); color: var(--text2); font-size: 24rpx; line-height: 1.55; overflow-wrap: anywhere; }
+.draft-status--pending { display: flex; flex-wrap: wrap; align-items: center; gap: 12rpx; }
+.draft-section-title { margin: 28rpx 0 8rpx; color: var(--text); font-size: 28rpx; font-weight: 700; line-height: 1.4; }
+.draft-list-title { margin-top: 24rpx; color: var(--text); font-size: 26rpx; font-weight: 700; }
+.draft-field { min-width: 0; margin: 20rpx 0; }
+.draft-label { display: block; margin-bottom: 10rpx; color: var(--text2); font-size: 24rpx; font-weight: 600; line-height: 1.45; }
+.draft-optional { color: var(--text3); font-weight: 400; }
+.draft-input, .draft-textarea, .draft-select { box-sizing: border-box; display: block; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-size: 28rpx; }
+.draft-input { height: 44px; padding: 0 20rpx; line-height: 1.4; }
+.draft-textarea { height: 180rpx; padding: 18rpx 20rpx; line-height: 1.5; }
+.draft-select { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; min-height: 44px; padding: 12rpx 20rpx; line-height: 1.45; overflow-wrap: anywhere; }
+.draft-select text:first-child { min-width: 0; flex: 1; }
+.draft-select-arrow { flex-shrink: 0; color: var(--text2); font-size: 34rpx; }
+.draft-actions { display: flex; flex-wrap: wrap; gap: 16rpx; margin: 18rpx 0; }
+.draft-actions .draft-button { flex: 1 1 180rpx; }
+.draft-button { box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: auto; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 22rpx; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-size: 26rpx; font-weight: 600; line-height: 1.35; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.draft-button::after { border: 0; }
+.draft-button[disabled] { opacity: .5; }
+.draft-button--primary { border-color: var(--primary-action); background: var(--primary-action); color: var(--on-primary); }
+.draft-button--full { width: 100%; }
+.draft-button--quiet { border-color: transparent; background: transparent; color: var(--primary); }
+.draft-toggle { flex-shrink: 0; min-width: 108rpx; padding: 10rpx 18rpx; color: var(--primary); }
+.draft-item { min-width: 0; margin-top: 28rpx; padding-top: 24rpx; border-top: 1px solid var(--border); }
+.draft-item-title { margin-bottom: 12rpx; font-size: 28rpx; font-weight: 700; }
+.draft-evidence { padding: 12rpx 16rpx; border-left: 4rpx solid var(--primary); background: var(--inset); }
+.draft-nutrition { min-width: 0; margin: 20rpx 0; padding: 0 0 0 20rpx; border-left: 4rpx solid var(--primary); }
+.draft-nutrition-name, .draft-candidate-name { color: var(--text); font-size: 26rpx; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.draft-nutrition .draft-button { margin-top: 12rpx; }
+.draft-candidates { min-width: 0; margin-top: 22rpx; padding: 4rpx 0 20rpx; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.draft-candidate { min-width: 0; padding: 18rpx 0; border-bottom: 1px solid var(--border); }
+.draft-candidate:last-child { border-bottom: 0; }
+.draft-candidate .draft-button { width: 100%; margin-top: 14rpx; }
+.draft-button--select { background: var(--primary-light); color: var(--primary); }
+.draft-button--remove { margin-top: 18rpx; color: var(--red); }
+.draft-link { margin-top: 8rpx; word-break: break-all; }
+.draft-consent { box-sizing: border-box; display: flex; align-items: flex-start; gap: 12rpx; width: 100%; min-height: 88rpx; margin: 26rpx 0 18rpx; color: var(--text); font-size: 26rpx; line-height: 1.6; }
+.draft-consent checkbox { flex-shrink: 0; }
+.draft-consent text { min-width: 0; flex: 1; }
+.draft-message { margin: 14rpx 0; color: var(--text); }

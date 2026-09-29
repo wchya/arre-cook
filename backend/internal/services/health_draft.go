@@ -79,8 +79,16 @@ func ConsumeHealthDraftQuota(db *gorm.DB, uid uint, now time.Time) error {
 }
 
 type HealthDraftItemInput struct {
-	DishName string `json:"dish_name"`
-	Portion  string `json:"portion"`
+	DishName              string   `json:"dish_name"`
+	Portion               string   `json:"portion"`
+	NutritionMode         string   `json:"nutrition_mode,omitempty"`
+	NutritionFoodID       uint     `json:"nutrition_food_id,omitempty"`
+	NutritionAmount       *float64 `json:"nutrition_amount,omitempty"`
+	NutritionUnit         string   `json:"nutrition_unit,omitempty"`
+	FoodState             string   `json:"food_state,omitempty"`
+	PortionSource         string   `json:"portion_source,omitempty"`
+	NutritionPortionKey   string   `json:"nutrition_portion_key,omitempty"`
+	NutritionPortionCount *float64 `json:"nutrition_portion_count,omitempty"`
 }
 type HealthJournalBatchInput struct {
 	RequestKey string                 `json:"request_key"`
@@ -98,6 +106,14 @@ func SaveHealthJournalBatch(uid uint, in HealthJournalBatchInput, dbs ...*gorm.D
 	for i := range in.Items {
 		in.Items[i].DishName = strings.TrimSpace(in.Items[i].DishName)
 		in.Items[i].Portion = strings.TrimSpace(in.Items[i].Portion)
+		item := &in.Items[i]
+		if item.NutritionFoodID == 0 {
+			if item.NutritionMode != "" || item.NutritionAmount != nil || item.NutritionUnit != "" || item.FoodState != "" || item.PortionSource != "" || item.NutritionPortionKey != "" || item.NutritionPortionCount != nil {
+				return nil, ErrHealthDraftInput
+			}
+		} else if item.NutritionMode != "replace" || item.NutritionUnit == "" || item.FoodState == "" || (item.NutritionAmount == nil && (item.NutritionPortionKey == "" || item.NutritionPortionCount == nil)) {
+			return nil, ErrHealthDraftInput
+		}
 	}
 	raw, _ := json.Marshal(in)
 	sum := sha256.Sum256(raw)
@@ -121,7 +137,7 @@ func SaveHealthJournalBatch(uid uint, in HealthJournalBatchInput, dbs ...*gorm.D
 		}
 		entries := make([]*models.FoodJournalEntry, 0, len(in.Items))
 		for _, item := range in.Items {
-			entry, err := prepareFoodJournal(uid, FoodJournalInput{MealDate: in.MealDate, MealType: in.MealType, DishName: item.DishName, Portion: item.Portion, EventKey: in.RequestKey}, tx)
+			entry, err := prepareFoodJournal(uid, FoodJournalInput{MealDate: in.MealDate, MealType: in.MealType, DishName: item.DishName, Portion: item.Portion, EventKey: in.RequestKey, NutritionMode: item.NutritionMode, NutritionFoodID: item.NutritionFoodID, NutritionAmount: item.NutritionAmount, NutritionUnit: item.NutritionUnit, FoodState: item.FoodState, PortionSource: item.PortionSource, NutritionPortionKey: item.NutritionPortionKey, NutritionPortionCount: item.NutritionPortionCount}, tx)
 			if err != nil {
 				return errors.Join(ErrHealthDraftInput, err)
 			}

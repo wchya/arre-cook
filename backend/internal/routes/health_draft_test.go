@@ -146,3 +146,39 @@ func TestHealthDraftRejectsUntrustedIngressAndLegacyCredentials(t *testing.T) {
 		t.Fatal("invalid ingress spent quota")
 	}
 }
+
+func TestHealthDraftCandidateRouteIsPersonalAndReadOnly(t *testing.T) {
+	user, token, err := testutil.NewUser(t.Name() + "@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, other, err := testutil.NewUser(t.Name() + "-other@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	energy := 120.0
+	food, err := services.SaveNutritionFood(user.ID, 0, services.NutritionFoodInput{Name: "候选食物", BasisUnit: "g", FoodState: "ready_to_eat", SourceReference: "本人标签", Nutrients: models.NutrientValues{EnergyKcal: &energy}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, res := call(t, "GET", "/api/health/meal-drafts/candidates?q=候选", "", nil)
+	must(t, status, res, 401)
+	status, res = call(t, "GET", "/api/health/meal-drafts/candidates?q=%20", token, nil)
+	must(t, status, res, 400)
+	status, res = call(t, "GET", "/api/health/meal-drafts/candidates?q=候选", token, nil)
+	must(t, status, res, 200)
+	matches := decode[services.HealthDraftCandidates](t, res.Data)
+	if len(matches.Personal) != 1 || matches.Personal[0].ID != food.ID {
+		t.Fatal("own label not matched")
+	}
+	status, res = call(t, "GET", "/api/health/meal-drafts/candidates?q=候选", other, nil)
+	must(t, status, res, 200)
+	matches = decode[services.HealthDraftCandidates](t, res.Data)
+	if len(matches.Personal) != 0 {
+		t.Fatal("private food leaked to another account")
+	}
+	var count int64
+	if err := database.DB.Model(&models.FoodJournalEntry{}).Where("user_id = ?", user.ID).Count(&count).Error; err != nil || count != 0 {
+		t.Fatal("candidate lookup wrote intake")
+	}
+}

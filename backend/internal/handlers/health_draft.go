@@ -26,6 +26,19 @@ func GetHealthDraftStatus(c *gin.Context) {
 	utils.Success(c, gin.H{"enabled": llm.Resolve(db).Enabled(), "quota": quota, "max_chars": assistant.HealthDraftMaxChars, "max_items": assistant.HealthDraftMaxItems})
 }
 
+func GetHealthDraftCandidates(c *gin.Context) {
+	candidates, err := services.FindHealthDraftCandidates(uid(c), c.Query("q"), database.DB.WithContext(c.Request.Context()))
+	if err != nil {
+		if errors.Is(err, services.ErrHealthDraftCandidateQuery) {
+			utils.BadRequest(c, "食物搜索词需为1至100字")
+		} else {
+			utils.InternalError(c, "食物候选暂时无法读取")
+		}
+		return
+	}
+	utils.Success(c, candidates)
+}
+
 func decodeHealthDraftBody(c *gin.Context, dest any) bool {
 	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10))
 	decoder.DisallowUnknownFields()

@@ -157,3 +157,106 @@ func TestHealthDraftQuotaIndependentUserAndSharedSiteCaps(t *testing.T) {
 		t.Fatal("rejected site request burned user quota")
 	}
 }
+
+func TestHealthDraftCandidatesRequireExplicitNutritionChoiceAndAtomicSnapshot(t *testing.T) {
+	u, _, err := testutil.NewUser(t.Name() + "@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, _, err := testutil.NewUser(t.Name() + "-other@qq.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	energy := 200.0
+	food, err := SaveNutritionFood(u.ID, 0, NutritionFoodInput{Name: "鸡蛋标签", BasisUnit: "g", FoodState: "ready_to_eat", SourceReference: "测试标签", Nutrients: models.NutrientValues{EnergyKcal: &energy}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := FindHealthDraftCandidates(u.ID, " "); !errors.Is(err, ErrHealthDraftCandidateQuery) {
+		t.Fatal("blank query accepted")
+	}
+	candidates, err := FindHealthDraftCandidates(u.ID, "鸡蛋")
+	if err != nil || len(candidates.Personal) != 1 || candidates.Personal[0].ID != food.ID {
+		t.Fatalf("personal candidate missing: %+v %v", candidates, err)
+	}
+	candidates, err = FindHealthDraftCandidates(other.ID, "鸡蛋")
+	if err != nil || len(candidates.Personal) != 0 {
+		t.Fatal("personal candidate crossed accounts")
+	}
+	provenance := models.CatalogProvenance{Dataset: "draft-fixture", Version: "v1", RecordID: "egg-1", URL: "https://example.test/egg", License: "test license", ReviewedBy: "test reviewer", ReviewedAt: healthToday()}
+	if err := ImportNutritionCatalog([]CatalogFoodInput{{Name: "熟鸡蛋", Aliases: []string{"水煮蛋"}, BasisUnit: "g", FoodState: "ready_to_eat", EdibleBasis: "edible_portion", Nutrients: models.NutrientValues{EnergyKcal: &energy}, Provenance: provenance}}, database.DB); err != nil {
+		t.Fatal(err)
+	}
+	candidates, err = FindHealthDraftCandidates(other.ID, "水煮蛋")
+	if err != nil || len(candidates.Catalog) != 1 || len(candidates.Personal) != 0 {
+		t.Fatalf("alias matching did not preserve explicit catalog choice: %+v %v", candidates, err)
+	}
+	if err := WithdrawNutritionCatalog(candidates.Catalog[0].ID, database.DB); err != nil {
+		t.Fatal(err)
+	}
+	candidates, err = FindHealthDraftCandidates(other.ID, "水煮蛋")
+	if err != nil || len(candidates.Catalog) != 0 {
+		t.Fatal("withdrawn catalog food remained a candidate")
+	}
+	amount := 75.0
+	base := HealthJournalBatchInput{RequestKey: "draft_nutrition_choice_1", Confirmed: true, MealDate: healthToday(), MealType: "breakfast", Items: []HealthDraftItemInput{{DishName: "鸡蛋", Portion: "一份", NutritionMode: "replace", NutritionFoodID: food.ID, NutritionAmount: &amount, NutritionUnit: "g", FoodState: "ready_to_eat", PortionSource: "estimated"}}}
+	if _, err := SaveHealthJournalBatch(other.ID, base); !errors.Is(err, ErrHealthDraftInput) {
+		t.Fatal("another account used private label")
+	}
+	broken := base
+	broken.Items = append([]HealthDraftItemInput{}, base.Items...)
+	broken.Items[0].NutritionUnit = "ml"
+	if _, err := SaveHealthJournalBatch(u.ID, broken); !errors.Is(err, ErrHealthDraftInput) {
+		t.Fatal("unit mismatch accepted")
+	}
+	if n := mealStatusReport(t, u.ID).ItemCount; n != 0 {
+		t.Fatal("invalid nutrition left a partial journal")
+	}
+	ids, err := SaveHealthJournalBatch(u.ID, base)
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("selected food save failed: %v %v", ids, err)
+	}
+	var entry models.FoodJournalEntry
+	if err := database.DB.First(&entry, ids[0]).Error; err != nil || entry.Nutrition == nil || entry.Nutrition.Consumed.EnergyKcal == nil || *entry.Nutrition.Consumed.EnergyKcal != 150 || entry.Nutrition.PortionSource != "estimated" {
+		t.Fatalf("snapshot missing: %+v %v", entry.Nutrition, err)
+	}
+	if err := DeleteNutritionFood(u.ID, food.ID); err != nil {
+		t.Fatal(err)
+	}
+	again, err := SaveHealthJournalBatch(u.ID, base)
+	if err != nil || !reflect.DeepEqual(ids, again) {
+		t.Fatal("committed batch retry relied on removed food")
+	}
+	base.RequestKey = "draft_nutrition_choice_2"
+	if _, err := SaveHealthJournalBatch(u.ID, base); !errors.Is(err, ErrHealthDraftInput) {
+		t.Fatal("new batch used deleted food")
+	}
+	portionFood := catalogFixture(t.Name() + "-portion")
+	portionFood.Portions = []models.CatalogPortion{{Key: "bowl", Label: "一平碗", Amount: 150, Reference: "测试称量"}}
+	if err := ImportNutritionCatalog([]CatalogFoodInput{portionFood}, database.DB); err != nil {
+		t.Fatal(err)
+	}
+	var source models.NutritionCatalogFood
+	if err := database.DB.Where("dataset = ?", portionFood.Provenance.Dataset).First(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	personal, err := AdoptNutritionCatalog(u.ID, source.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	portionBatch := HealthJournalBatchInput{RequestKey: "draft_portion_choice_1", Confirmed: true, MealDate: healthToday(), MealType: "lunch", Items: []HealthDraftItemInput{{DishName: "未匹配的配菜"}, {DishName: "半碗主食", NutritionMode: "replace", NutritionFoodID: personal.ID, NutritionUnit: "g", FoodState: "raw", PortionSource: "estimated", NutritionPortionKey: "bowl", NutritionPortionCount: nutrient(0.5)}}}
+	brokenPortion := portionBatch
+	brokenPortion.Items = append([]HealthDraftItemInput{}, portionBatch.Items...)
+	brokenPortion.Items[1].NutritionPortionCount = nutrient(0)
+	if _, err := SaveHealthJournalBatch(u.ID, brokenPortion); !errors.Is(err, ErrHealthDraftInput) || mealStatusReport(t, u.ID).ItemCount != 1 {
+		t.Fatal("invalid standard portion left a partial batch")
+	}
+	portionIDs, err := SaveHealthJournalBatch(u.ID, portionBatch)
+	if err != nil || len(portionIDs) != 2 {
+		t.Fatalf("standard portion batch failed: %v %v", portionIDs, err)
+	}
+	var portionEntry models.FoodJournalEntry
+	if err := database.DB.First(&portionEntry, portionIDs[1]).Error; err != nil || portionEntry.Nutrition == nil || portionEntry.Nutrition.Amount != 75 || portionEntry.Nutrition.StandardPortion == nil || portionEntry.Nutrition.StandardPortion.Count != 0.5 || portionEntry.Nutrition.Consumed.EnergyKcal == nil || *portionEntry.Nutrition.Consumed.EnergyKcal != 150 {
+		t.Fatalf("batch standard portion snapshot incorrect: %+v %v", portionEntry.Nutrition, err)
+	}
+}

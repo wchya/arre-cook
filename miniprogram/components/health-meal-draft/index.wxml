@@ -1,25 +1,51 @@
 <view class="draft">
-  <view class="draft-head"><text>用一句话记餐</text><button disabled="{{saving}}" bindtap="toggle">{{open ? '收起' : '打开文字记餐'}}</button></view>
+  <view class="draft-head">
+    <view class="draft-head-copy">
+      <view class="draft-title">用一句话记餐</view>
+      <view class="draft-subtitle">先核对食物，再保存这餐</view>
+    </view>
+    <button class="draft-button draft-toggle" disabled="{{saving}}" bindtap="toggle">{{open ? '收起' : '打开'}}</button>
+  </view>
   <view wx:if="{{open}}" class="draft-body">
-    <view class="hint">仅把这段描述发送给已配置的 AI 整理，不读取健康档案。草稿需核对后保存，份量未知可留空，不自动计算营养。</view>
-    <view wx:if="{{status}}" class="hint">{{status.enabled ? '今日可整理 ' + status.quota.remaining + '/' + status.quota.limit + ' 次；请求发起后计次，失败也可能消耗额度。' : '文字整理尚未启用，可继续手动记餐。'}}</view>
-    <view wx:else class="hint">正在读取服务状态；读取失败可重试。<button bindtap="loadStatus">重试状态</button></view>
-    <view class="label">描述自己实际吃过的一餐</view>
-    <textarea value="{{text}}" maxlength="1000" disabled="{{busy || submitted}}" placeholder="例如：中午我吃了番茄鸡蛋和半碗米饭" bindinput="onText" />
-    <view class="actions"><button disabled="{{busy || submitted || !text || !status.enabled || !status.quota.remaining}}" bindtap="parse">{{busy ? '正在整理…' : '整理成草稿'}}</button><button wx:if="{{busy}}" bindtap="cancel">停止整理</button></view>
+    <view class="draft-hint">仅把这段描述发送给已配置的 AI 整理，不读取健康档案。未选择营养来源的食物仍可保存为文字记录。</view>
+    <view wx:if="{{status}}" class="draft-status">{{status.enabled ? '今日可整理 ' + status.quota.remaining + '/' + status.quota.limit + ' 次；请求发起后计次，失败也可能消耗额度。' : '文字整理尚未启用，可继续手动记餐。'}}</view>
+    <view wx:else class="draft-status draft-status--pending"><text>正在读取服务状态；读取失败可重试。</text><button class="draft-button draft-button--quiet" bindtap="loadStatus">重试</button></view>
+    <view class="draft-field"><text class="draft-label">描述自己实际吃过的一餐</text><textarea class="draft-textarea" value="{{text}}" maxlength="1000" disabled="{{busy || submitted}}" placeholder="例如：中午我吃了番茄鸡蛋和半碗米饭" bindinput="onText" /></view>
+    <view class="draft-actions"><button class="draft-button draft-button--primary" disabled="{{busy || submitted || !text || !status.enabled || !status.quota.remaining}}" bindtap="parse">{{busy ? '正在整理…' : '整理成草稿'}}</button><button wx:if="{{busy}}" class="draft-button" bindtap="cancel">停止整理</button></view>
     <block wx:if="{{items.length}}">
-      <view class="label">待核对 · {{items.length}} 个食物项，尚未保存</view>
-      <view class="columns"><view><view class="label">实际日期</view><picker mode="date" value="{{date}}" end="{{today}}" disabled="{{submitted}}" bindchange="onDate"><view class="field">{{date}}</view></picker></view><view><view class="label">实际餐次</view><picker range="{{mealLabels}}" value="{{mealIndex}}" disabled="{{submitted}}" bindchange="onMeal"><view class="field">{{mealLabels[mealIndex]}}</view></picker></view></view>
-      <view wx:for="{{items}}" wx:key="index" class="item">
-        <view class="hint">原文：{{item.evidence}}</view>
-        <view class="label">食物 {{index + 1}}</view><input value="{{item.dish_name}}" maxlength="100" disabled="{{submitted}}" data-index="{{index}}" data-field="dish_name" bindinput="onItem" />
-        <view class="label">本人吃下的份量（可留空）</view><input value="{{item.portion}}" maxlength="100" disabled="{{submitted}}" data-index="{{index}}" data-field="portion" bindinput="onItem" />
-        <button disabled="{{submitted}}" data-index="{{index}}" bindtap="removeItem">移除食物 {{index + 1}}</button>
+      <view class="draft-section-title">待核对 · {{items.length}} 个食物项</view><view class="draft-hint">以下内容尚未保存。</view>
+      <view class="draft-field"><text class="draft-label">实际日期</text><picker mode="date" value="{{date}}" end="{{today}}" disabled="{{submitted}}" bindchange="onDate"><view class="draft-select"><text>{{date}}</text><text class="draft-select-arrow">⌄</text></view></picker></view>
+      <view class="draft-field"><text class="draft-label">实际餐次</text><picker range="{{mealLabels}}" value="{{mealIndex}}" disabled="{{submitted}}" bindchange="onMeal"><view class="draft-select"><text>{{mealLabels[mealIndex]}}</text><text class="draft-select-arrow">⌄</text></view></picker></view>
+      <view wx:for="{{items}}" wx:key="index" class="draft-item">
+        <view class="draft-item-title">食物 {{index + 1}}</view><view class="draft-evidence">原文：{{item.evidence}}</view>
+        <view class="draft-field"><text class="draft-label">食物名称</text><input class="draft-input" value="{{item.dish_name}}" maxlength="100" disabled="{{submitted}}" data-index="{{index}}" data-field="dish_name" bindinput="onItem" /></view>
+        <view class="draft-field"><text class="draft-label">本人吃下的份量 <text class="draft-optional">可留空</text></text><input class="draft-input" value="{{item.portion}}" maxlength="100" disabled="{{submitted}}" data-index="{{index}}" data-field="portion" bindinput="onItem" /></view>
+        <button class="draft-button draft-button--full" disabled="{{submitted}}" data-index="{{index}}" bindtap="openCandidates">{{item.food ? '更换营养来源' : '查找营养来源'}}</button>
+        <view wx:if="{{item.food}}" class="draft-nutrition">
+          <view class="draft-nutrition-name">{{item.food.name}} · {{item.food.stateLabel}}</view><view class="draft-hint">每 100 {{item.food.basis_unit}} · {{item.food.source_reference}}</view>
+          <view class="draft-field" wx:if="{{item.portionChoices.length > 1}}"><text class="draft-label">用量方式</text><picker range="{{item.portionChoices}}" range-key="label" value="{{item.portionIndex}}" disabled="{{submitted}}" data-index="{{index}}" bindchange="onPortionMode"><view class="draft-select"><text>{{item.portionChoices[item.portionIndex].label}}</text><text class="draft-select-arrow">⌄</text></view></picker></view>
+          <view class="draft-field" wx:if="{{item.portionKey}}"><text class="draft-label">本人实际吃下的份数</text><input class="draft-input" type="digit" value="{{item.portionCount}}" disabled="{{submitted}}" data-index="{{index}}" data-field="portionCount" bindinput="onNutritionValue" /></view>
+          <block wx:else>
+            <view class="draft-field"><text class="draft-label">本人实际吃下的可食部分（{{item.food.basis_unit}}）</text><input class="draft-input" type="digit" value="{{item.amount}}" disabled="{{submitted}}" data-index="{{index}}" data-field="amount" bindinput="onNutritionValue" /></view>
+            <view class="draft-field" wx:if="{{!item.food.recipe}}"><text class="draft-label">份量依据</text><picker range="{{sourceLabels}}" value="{{item.sourceIndex}}" disabled="{{submitted}}" data-index="{{index}}" bindchange="onSource"><view class="draft-select"><text>{{sourceLabels[item.sourceIndex]}}</text><text class="draft-select-arrow">⌄</text></view></picker></view>
+          </block>
+          <button class="draft-button draft-button--quiet" disabled="{{submitted}}" data-index="{{index}}" bindtap="clearNutrition">清除营养来源</button>
+        </view>
+        <view wx:if="{{candidateIndex === index}}" class="draft-candidates">
+          <view class="draft-section-title">搜索食物来源</view>
+          <view class="draft-field"><text class="draft-label">食物名称或别名</text><input class="draft-input" value="{{candidateQuery}}" maxlength="100" disabled="{{submitted}}" bindinput="onCandidateQuery" /></view>
+          <view class="draft-actions"><button class="draft-button draft-button--primary" disabled="{{submitted || candidateBusy || !candidateQuery}}" bindtap="searchCandidates">查找</button><button class="draft-button" bindtap="closeCandidates">关闭</button></view>
+          <view wx:if="{{candidateBusy}}" class="draft-hint">正在查找…</view><view wx:if="{{candidateMessage}}" class="draft-message">{{candidateMessage}}</view>
+          <block wx:if="{{candidates.personal.length}}"><view class="draft-list-title">我的食物</view><view wx:for="{{candidates.personal}}" wx:for-item="candidate" wx:key="id" class="draft-candidate"><view class="draft-candidate-name">{{candidate.name}} · {{candidate.stateLabel}}</view><view class="draft-hint">每 100 {{candidate.basis_unit}} · {{candidate.source_reference}}</view><button class="draft-button draft-button--select" disabled="{{candidateBusy}}" data-id="{{candidate.id}}" bindtap="choosePersonal">选择此食物</button></view></block>
+          <block wx:if="{{candidates.catalog.length}}"><view class="draft-list-title">标准目录</view><view wx:for="{{candidates.catalog}}" wx:for-item="candidate" wx:key="id" class="draft-candidate"><view class="draft-candidate-name">{{candidate.name}} · {{candidate.stateLabel}}</view><view class="draft-hint">{{candidate.provenance.dataset}} · {{candidate.provenance.version}}</view><view class="draft-hint">{{candidate.provenance.license}} · {{candidate.provenance.reviewed_by}} · {{candidate.provenance.reviewed_at}}</view><text class="draft-link" selectable="true">{{candidate.provenance.url}}</text><button class="draft-button draft-button--select" disabled="{{candidateBusy}}" data-id="{{candidate.id}}" bindtap="adoptCatalog">加入我的食物并选择</button></view></block>
+        </view>
+        <button class="draft-button draft-button--remove" disabled="{{submitted}}" data-index="{{index}}" bindtap="removeItem">移除食物 {{index + 1}}</button>
       </view>
-      <checkbox-group bindchange="onConsent"><label class="consent"><checkbox value="confirmed" checked="{{confirmed}}" disabled="{{submitted}}" />已核对同一次实际食用、日期和餐次；份量属于我本人，已移除未吃或重复项目。</label></checkbox-group>
-      <button disabled="{{saving || !confirmed || !mealIndex || !date}}" bindtap="save">{{saving ? '正在保存…' : submitted ? '重试确认保存' : '确认保存这餐'}}</button>
-      <view wx:if="{{submitted}}" class="hint">正在核对这次提交的保存结果，暂时保留同一份内容供重试。</view>
+      <checkbox-group bindchange="onConsent"><label class="draft-consent"><checkbox value="confirmed" checked="{{confirmed}}" disabled="{{submitted}}" /><text>已核对同一次实际食用、日期和餐次；份量属于我本人，已移除未吃或重复项目。</text></label></checkbox-group>
+      <view wx:if="{{invalidNutrition}}" class="draft-message">请补全所选营养来源的实际用量，或清除该来源后仅保存文字。</view>
+      <button class="draft-button draft-button--primary draft-button--full" disabled="{{saving || candidateBusy || invalidNutrition || !confirmed || !mealIndex || !date}}" bindtap="save">{{saving ? '正在保存…' : submitted ? '重试确认保存' : '确认保存这餐'}}</button>
+      <view wx:if="{{submitted}}" class="draft-hint">正在核对这次提交的保存结果，暂时保留同一份内容供重试。</view>
     </block>
-    <view wx:if="{{message}}" class="message">{{message}}</view>
+    <view wx:if="{{message}}" class="draft-message">{{message}}</view>
   </view>
 </view>

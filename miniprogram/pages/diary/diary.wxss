@@ -69,10 +69,27 @@
 .cuisine-row .chip { flex-shrink: 0; }
 .sheet-foot { display: flex; gap: 20rpx; padding: 20rpx 40rpx calc(28rpx + env(safe-area-inset-bottom)); }
 
-.health-calendar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12rpx; margin: 28rpx 0; }
-.health-day { width: 100%; min-height: 112rpx; margin: 0; padding: 12rpx 0; background: var(--bg); color: var(--text); font-size: 24rpx; line-height: 1.7; border: 2rpx solid var(--border); }
+.health-calendar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12rpx; margin: 24rpx 0; }
+.health-day { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 10rpx 4rpx; border: 2rpx solid var(--border); border-radius: 14rpx; background: var(--bg); color: var(--text); font-size: 26rpx; line-height: 1.35; white-space: normal; }
 .health-day.is-selected { border-color: var(--primary); background: var(--primary-light); }
-.health-day-label { font-size: 18rpx; color: var(--text2); }
-.health-evidence { padding: 24rpx 0; border-bottom: 1px solid var(--border); font-size: 26rpx; line-height: 1.6; }
-.health-controls { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
-.health-controls button, .health-evidence button, .rec button { min-height: 88rpx; margin: 0; background: var(--bg); color: var(--text); }
+.health-day-label { margin-top: 2rpx; color: var(--text2); font-size: 24rpx; line-height: 1.35; }
+.health-evidence { min-width: 0; padding: 20rpx 0; border-bottom: 1px solid var(--border); color: var(--text2); font-size: 26rpx; line-height: 1.6; overflow-wrap: anywhere; word-break: break-word; }
+.health-evidence-title { color: var(--text); font-size: 27rpx; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.health-metric-value { margin-top: 6rpx; color: var(--text); font-size: 28rpx; line-height: 1.45; }
+.health-metric-lines { margin-top: 10rpx; color: var(--text2); font-size: 25rpx; line-height: 1.6; }
+.health-metric-lines view + view { margin-top: 4rpx; }
+.health-meal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12rpx; padding: 10rpx 0; border-bottom: 1px solid var(--border); }
+.health-meal-row .health-evidence-title { flex: 1 1 180rpx; }
+.health-controls { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12rpx; min-width: 0; margin-top: 18rpx; }
+.health-controls > button, .health-meal-row > button, .health-evidence > button, .rec button, .form-block button { box-sizing: border-box; display: flex; align-items: center; justify-content: center; max-width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 20rpx; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-size: 25rpx; line-height: 1.35; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.health-controls > button, .health-controls > picker { flex: 1 1 180rpx; }
+.health-controls > picker .btn { box-sizing: border-box; width: 100%; min-width: 0; padding: 0 20rpx; }
+.health-meal-row > button { flex: 1 1 180rpx; }
+.health-evidence > button { width: 100%; margin-top: 14rpx; }
+.health-controls > button[disabled], .health-meal-row > button[disabled], .health-evidence > button[disabled], .rec button[disabled], .form-block button[disabled] { opacity: .5; }
+.form-block > button { margin-top: 14rpx; }
+.form-block picker .field { box-sizing: border-box; width: 100%; height: auto; min-height: 44px; padding: 14rpx 24rpx; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
+.form-block picker .field text { min-width: 0; }
+.rec { min-width: 0; }
+.rec button { flex-shrink: 0; }
+@media (min-width: 360px) { .health-calendar { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

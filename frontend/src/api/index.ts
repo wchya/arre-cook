@@ -6,7 +6,7 @@ import type {
   FavoriteOverview, SmartPickRequest, SmartPickResult, TasteProfile, BehaviorEventInput, AuthOptions, LoginResult, User,
   Preferences, UserStats, AgentTokenList, AgentToken, AgentAuditLog, AgentSession, Suggestion, ChatSession, ChatMessage,
   ChatCard, AssistantStatus, AssistantQuota, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
-  FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport, HealthSummary, HealthDraftStatus, HealthMealDraftItem, HealthJournalBatchInput, HealthProfile, HealthProfileInput, NutritionFood, NutritionRecipeInput, NutritionCatalogFood,
+  FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport, HealthSummary, HealthDraftStatus, HealthMealDraftItem, HealthDraftCandidates, HealthJournalBatchInput, HealthProfile, HealthProfileInput, NutritionFood, NutritionRecipeInput, NutritionCatalogFood,
   NotificationPage,
   DishVideoMeta,
 } from "@/types"
@@ -60,6 +60,7 @@ export const familyApi = {
 
 export const healthApi = {
   draftStatus: () => api<HealthDraftStatus>("GET", "/health/meal-drafts/status"),
+  draftCandidates: (query: string, signal?: AbortSignal) => api<HealthDraftCandidates>("GET", "/health/meal-drafts/candidates", { q: query }, { signal }),
   parseDraft: (text: string, signal?: AbortSignal) => api<{ items: HealthMealDraftItem[] }>("POST", "/health/meal-drafts/parse", { text }, { signal, timeout: 45000 }),
   confirmDraft: (input: HealthJournalBatchInput) => api<{ entry_ids: number[] }>("POST", "/health/meal-drafts/confirm", input),
   summary: () => api<HealthSummary>("GET", "/health/summary"),
