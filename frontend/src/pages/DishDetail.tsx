@@ -170,6 +170,7 @@ export default function DishDetail() {
     onSuccess: (_res, mealType) => {
       toast.success("❤ 已记录！")
       qc.invalidateQueries({ queryKey: ["records"] })
+      qc.invalidateQueries({ queryKey: ["health-report"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       qc.invalidateQueries({ queryKey: ["dish-records", dishId] })
       void behaviorApi.log({ event_type: "accept", dish_id: dishId, dish_name: dish?.name || "", meta: { from: "detail", meal_type: mealType } })
@@ -443,7 +444,7 @@ export default function DishDetail() {
                           <span className="text-[13px] font-semibold">{formatRelativeDate(r.meal_date)}</span>
                           <span className="text-[10px] text-text3">{formatWeekday(r.meal_date)}</span>
                           <span className={`px-1.5 py-px rounded-full text-[10px] font-medium ${r.meal_type === "lunch" ? "bg-primary-light text-primary" : "bg-mint-light text-mint"}`}>
-                            {r.meal_type === "lunch" ? "午餐" : "晚餐"}
+                            {r.meal_type === "breakfast" ? "早餐" : r.meal_type === "lunch" ? "午餐" : "晚餐"}
                           </span>
                         </div>
                         {r.mood && (

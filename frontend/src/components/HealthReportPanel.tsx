@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import toast from "react-hot-toast"
-import { healthApi, errorMessage } from "@/api"
+import { healthApi, recordsApi, errorMessage, ApiError } from "@/api"
 import { getSessionEpoch, isCurrentSession } from "@/api/client"
 import { healthDate } from "@/lib/health-date"
 import type { CatalogProvenance, HealthReport } from "@/types"
@@ -28,17 +28,18 @@ export default function HealthReportPanel({ report, onRecord }: { report: Health
   const [date, setDate] = useState(healthDate)
   const [meal, setMeal] = useState("dinner")
   const [busy, setBusy] = useState(false)
+  const [ownerEpoch] = useState(getSessionEpoch)
   const day = report.days.find(d => d.date === selected) || report.days[report.days.length - 1]
   async function act(work: () => Promise<unknown>, message: string) {
-    if (busy) return
+    if (busy || !isCurrentSession(ownerEpoch)) return
     const epoch = getSessionEpoch()
     setBusy(true)
     try {
       await work()
       if (!isCurrentSession(epoch)) return
-      await Promise.all(["health-report", "food-journal", "week-plan", "shopping-list", "shopping-overview"].map(key => qc.invalidateQueries({ queryKey: [key] })))
+      await Promise.all(["health-report", "food-journal", "week-plan", "shopping-list", "shopping-overview", "records"].map(key => qc.invalidateQueries({ queryKey: [key] })))
       if (isCurrentSession(epoch)) toast.success(message)
-    } catch (error) { if (isCurrentSession(epoch)) toast.error(errorMessage(error)) }
+    } catch (error) { if (isCurrentSession(epoch)) { toast.error(errorMessage(error)); if (error instanceof ApiError && error.status === 409) await qc.invalidateQueries({ queryKey: ["health-report"] }) } }
     finally { if (isCurrentSession(epoch)) setBusy(false) }
   }
   return <div className="space-y-5">
@@ -61,6 +62,16 @@ export default function HealthReportPanel({ report, onRecord }: { report: Health
       {day && <div className="mt-5 border-t border-border pt-4">
         <h3 className="font-semibold">{day.date} · {statusNames[day.status]}</h3>
         <p className="mt-1 text-xs text-text2">{day.meal_event_count} 餐 · {day.item_count} 个食物项；原始来源 {day.meal_count} 条</p>
+        {day.meals && <div className="mt-4 space-y-2" aria-label="主餐记录状态">
+          {day.meals.map(m => <div key={m.meal_type} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3">
+            <span className="text-sm">{mealNames[m.meal_type]} · {m.status === "not_eaten" ? "明确未吃" : m.status === "recorded" ? "已有实际记录" : "尚未记录"}</span>
+            {m.status !== "recorded" && <button disabled={busy} className={button} onClick={() => {
+              if (m.status !== "not_eaten" && !window.confirm(`确认 ${day.date} 的${mealNames[m.meal_type]}没有吃？若吃过但尚未记录，请使用补记。`)) return
+              void act(() => healthApi.setMealStatus(day.date, m.meal_type, day.fingerprint, m.status !== "not_eaten"), "餐次状态已更新")
+            }}>{m.status === "not_eaten" ? "撤销未吃标记" : "标记这餐未吃"}</button>}
+          </div>)}
+          <p className="text-xs leading-5 text-text2">未吃不计作进餐或零营养；补记该餐后自动清除标记。全天完整仍需核对食物、饮料和加餐。</p>
+        </div>}
         <ul className="mt-3 divide-y divide-border">
           {day.evidence.map(e => <li key={`${e.source}-${e.id}`} className="py-3 text-sm">
             <div>{mealNames[e.meal_type]} · {e.dish_name}</div>
@@ -78,7 +89,7 @@ export default function HealthReportPanel({ report, onRecord }: { report: Health
             </details>}
             {e.possible_duplicate_ids.map(id => <button key={id} disabled={busy} className={`${button} mt-2`} onClick={() => {
               if (!window.confirm("确认这条日记和菜谱记录是同一次食用？关联后只计一个食物项，原始记录仍保留。")) return
-              void act(async () => { const entry = await healthApi.entry(e.id); await healthApi.update(e.id, { ...entry, linked_record_id: id }) }, "已关联，同一食物只计算一次")
+              void act(async () => { const entry = await healthApi.entry(e.id); if (!isCurrentSession(ownerEpoch)) return; await healthApi.update(e.id, { ...entry, linked_record_id: id }) }, "已关联，同一食物只计算一次")
             }}>与菜谱记录相同？确认关联</button>)}
           </li>)}
         </ul>
@@ -128,7 +139,7 @@ export default function HealthReportPanel({ report, onRecord }: { report: Health
       {report.plan_actions.map(text => <p key={text} className="mt-3 text-sm leading-6 text-text2">{text}</p>)}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <label className="text-xs">安排日期<input aria-label="安排日期" type="date" min={healthDate()} max={healthDate(6)} value={date} onChange={e => setDate(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-bg px-2 text-sm" /></label>
-        <label className="text-xs">餐次<select value={meal} onChange={e => setMeal(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-bg px-2 text-sm"><option value="lunch">午餐</option><option value="dinner">晚餐</option></select></label>
+        <label className="text-xs">餐次<select value={meal} onChange={e => setMeal(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-bg px-2 text-sm"><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option></select></label>
       </div>
       <p className="mt-3 text-xs leading-5 text-text2">加入后以你的选择替换该餐随机推荐，食材同步到买菜清单。今明两天的食材在现有清单页展示；实际吃过后再记餐。</p>
       {report.recommendations.length === 0 && <p className="mt-4 text-sm">暂无符合当前筛选条件的菜谱，可以补充适合自己的私房菜。不会为了凑数放宽档案中的过敏与禁忌。</p>}
@@ -141,6 +152,10 @@ export default function HealthReportPanel({ report, onRecord }: { report: Health
     {report.plans.length > 0 && <section className={section}><h2 className="font-bold">已安排与复盘</h2>{report.plans.map(p => <div key={p.id} className="mt-4 border-t border-border pt-4">
       <p className="text-sm">{p.meal_date} · {mealNames[p.meal_type]} · {p.dish_name}</p>
       <p className="my-2 text-xs text-text2">{p.status === "recorded" ? "已有菜谱用餐记录支持完成" : p.status === "unconfirmed" ? "日期已过，尚无实际记录" : "已计划，尚未记为吃过"}{!p.available ? " · 当前菜谱不可用或与忌口冲突，请重新安排" : ""}</p>
+      {p.status !== "recorded" && p.available && p.meal_date <= healthDate() && <button disabled={busy} className={`${button} mr-2 mb-2`} onClick={() => {
+        if (!window.confirm(`确认 ${p.meal_date} 的${mealNames[p.meal_type]}实际吃过「${p.dish_name}」？`)) return
+        void act(() => recordsApi.create({ dish_id: p.dish_id, meal_type: p.meal_type, meal_date: p.meal_date }), "已记录实际吃过；需要营养数据可再补充份量")
+      }}>记为吃过</button>}
       <button disabled={busy} className={button} onClick={() => void act(() => healthApi.cancelPlan(p.id), "已撤销计划，实际用餐记录保留")}>撤销安排</button>
     </div>)}<button className={`${button} mt-4`} onClick={() => navigate("/plan")}>查看菜单与买菜清单</button></section>}
     <details className={section}><summary className="cursor-pointer py-2 text-sm font-semibold">统计口径与数据说明</summary>{report.method_notes.map(text => <p key={text} className="mt-3 text-xs leading-6 text-text2">{text}</p>)}<p className="mt-3 text-xs text-text2">规则版本：{report.rule_version}</p></details>

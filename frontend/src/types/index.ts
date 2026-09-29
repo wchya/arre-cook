@@ -244,7 +244,19 @@ export interface HealthEvidence {
   linked_record_id: number | null
   possible_duplicate_ids: number[]
 }
+export interface HealthSummary {
+  from: string
+  to: string
+  logged_days: number
+  complete_days: number
+  meal_event_count: number
+  item_count: number
+  not_eaten_meals: number
+  headline: string
+}
+
 export interface HealthDay {
+  meals?: { meal_type: "breakfast" | "lunch" | "dinner"; status: "unknown" | "recorded" | "not_eaten" }[]
   date: string
   meal_count: number
   meal_event_count: number
@@ -282,6 +294,7 @@ export interface HealthProfileInput {
   dietary_exclusions: string[]
 }
 export interface HealthReport {
+  not_eaten_meals?: number
   comparison?: {
     from: string
     to: string
@@ -403,6 +416,7 @@ export interface Achievement {
 }
 
 export interface WeekDayPlan {
+  breakfast?: Dish[]
   date: string
   day_name: string
   lunch: Dish[]
@@ -883,3 +897,7 @@ export interface SiteSettings {
   smtp_enabled?: boolean
   wechat_enabled?: boolean
 }
+
+export interface HealthMealDraftItem { dish_name: string; portion: string; evidence: string }
+export interface HealthDraftStatus { enabled: boolean; max_chars: number; max_items: number; quota: { limit: number; used: number; remaining: number; reset_at: string } }
+export interface HealthJournalBatchInput { request_key: string; confirmed: boolean; meal_date: string; meal_type: string; items: { dish_name: string; portion: string }[] }

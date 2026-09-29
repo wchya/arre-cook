@@ -490,6 +490,9 @@ func mealDateLabel(date string) string {
 }
 
 func mealTypeLabel(mealType string) string {
+	if mealType == "breakfast" {
+		return "早餐"
+	}
 	if mealType == "lunch" {
 		return "午餐"
 	}

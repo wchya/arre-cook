@@ -33,7 +33,7 @@ type HealthEvidence struct {
 	PossibleDuplicateIDs []uint                    `json:"possible_duplicate_ids"`
 }
 
-func healthFingerprint(journal []models.FoodJournalEntry, records []models.MealRecord) string {
+func healthFingerprint(journal []models.FoodJournalEntry, records []models.MealRecord, omissions ...models.HealthMealOmission) string {
 	if journal == nil {
 		journal = []models.FoodJournalEntry{}
 	}
@@ -47,6 +47,11 @@ func healthFingerprint(journal []models.FoodJournalEntry, records []models.MealR
 		Journal []models.FoodJournalEntry
 		Records []models.MealRecord
 	}{journal, records})
+	if len(omissions) > 0 {
+		sort.Slice(omissions, func(i, j int) bool { return omissions[i].MealType < omissions[j].MealType })
+		extra, _ := json.Marshal(omissions)
+		raw = append(raw, extra...)
+	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
 }
@@ -88,6 +93,7 @@ func enrichHealthReport(uid uint, report *HealthReport, journal []models.FoodJou
 		"营养根据本人录入的标签或已选标准食物与同单位可食部分食用量计算，混合配方按成品重量比例估算，标签未经平台核验。未知项不计为零，不从菜系推测油盐。食物类别展示出现天数，不是摄入占比。",
 		"份量依据按去重食物项统计：称量/量取、标准份量估算、其他估算、仅文字份量和份量未知；称量不表示营养来源已核验。",
 		"统计采用北京时间自然日；未来菜单不计实际饮食。推荐依据口味偏好，不表示能补足营养。",
+		"明确未吃与漏记分开保存；未吃不计作一餐、食物项或零营养摄入，补记同一餐后自动清除标记。",
 	}
 	jByDay := map[string][]models.FoodJournalEntry{}
 	rByDay := map[string][]models.MealRecord{}
@@ -101,6 +107,14 @@ func enrichHealthReport(uid uint, report *HealthReport, journal []models.FoodJou
 	if err := db.Scopes(database.OwnedBy(uid)).Where("meal_date >= ? AND meal_date <= ?", report.From, report.To).Find(&confirmations).Error; err != nil {
 		return err
 	}
+	omissions, err := loadMealOmissions(uid, report.From, report.To, db)
+	if err != nil {
+		return err
+	}
+	omittedByDay := map[string][]models.HealthMealOmission{}
+	for _, row := range omissions {
+		omittedByDay[row.MealDate] = append(omittedByDay[row.MealDate], row)
+	}
 	confirmed := map[string]string{}
 	for _, c := range confirmations {
 		confirmed[c.MealDate] = c.Fingerprint
@@ -108,10 +122,33 @@ func enrichHealthReport(uid uint, report *HealthReport, journal []models.FoodJou
 	for i := range report.Days {
 		day := &report.Days[i]
 		js, rs := jByDay[day.Date], rByDay[day.Date]
-		day.Fingerprint = healthFingerprint(js, rs)
+		day.Fingerprint = healthFingerprint(js, rs, omittedByDay[day.Date]...)
+		day.Meals = []HealthMealState{}
+		for _, meal := range []string{"breakfast", "lunch", "dinner"} {
+			state := "unknown"
+			for _, row := range omittedByDay[day.Date] {
+				if row.MealType == meal {
+					state = "not_eaten"
+				}
+			}
+			for _, j := range js {
+				if j.MealType == meal {
+					state = "recorded"
+				}
+			}
+			for _, r := range rs {
+				if r.MealType == meal {
+					state = "recorded"
+				}
+			}
+			if state == "not_eaten" {
+				report.NotEatenMeals++
+			}
+			day.Meals = append(day.Meals, HealthMealState{MealType: meal, Status: state})
+		}
 		day.Evidence = []HealthEvidence{}
 		day.Status = "unknown"
-		if len(js)+len(rs) > 0 {
+		if len(js)+len(rs)+len(omittedByDay[day.Date]) > 0 {
 			day.Status = "partial"
 		}
 		if confirmed[day.Date] == day.Fingerprint && day.Status != "unknown" {
@@ -187,6 +224,9 @@ func ConfirmHealthDay(uid uint, date, fingerprint string, complete bool, dbs ...
 		return ErrInvalidDate
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
+		if err := lockHealthProfileUser(uid, tx); err != nil {
+			return err
+		}
 		if !complete {
 			return tx.Where("user_id = ? AND meal_date = ?", uid, date).Delete(&models.HealthDayConfirmation{}).Error
 		}
@@ -201,7 +241,11 @@ func ConfirmHealthDay(uid uint, date, fingerprint string, complete bool, dbs ...
 		if len(js)+len(rs) == 0 {
 			return errors.New("先记录当天吃过的食物，再确认完整")
 		}
-		if fingerprint != healthFingerprint(js, rs) {
+		omissions, err := loadMealOmissions(uid, date, date, tx)
+		if err != nil {
+			return err
+		}
+		if fingerprint != healthFingerprint(js, rs, omissions...) {
 			return errors.New("当天记录已变化，请刷新后确认")
 		}
 		c := models.HealthDayConfirmation{UserID: uid, MealDate: date, Fingerprint: fingerprint, ConfirmedAt: time.Now()}
@@ -258,7 +302,7 @@ func AcceptHealthPlan(uid uint, in HealthPlanInput, dbs ...*gorm.DB) (*models.He
 	if _, err := time.Parse("2006-01-02", in.MealDate); err != nil || in.MealDate < healthToday() || in.MealDate > healthNow().AddDate(0, 0, 6).Format("2006-01-02") {
 		return nil, errors.New("请选择今天起七天内的日期")
 	}
-	if in.MealType != "lunch" && in.MealType != "dinner" {
+	if !isMainMeal(in.MealType) {
 		return nil, ErrInvalidMealType
 	}
 	if in.PeriodDays != 7 && in.PeriodDays != 30 {
@@ -357,6 +401,7 @@ func applyHealthPlans(uid uint, plan *WeekPlan, db *gorm.DB) {
 	}
 	for i := range plan.Days {
 		day := &plan.Days[i]
+		day.Breakfast = slots[day.Date+":breakfast"]
 		if ds := slots[day.Date+":lunch"]; len(ds) > 0 {
 			day.Lunch = ds
 		}

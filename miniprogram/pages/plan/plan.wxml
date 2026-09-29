@@ -33,6 +33,12 @@
             <view wx:if="{{item.quick}}" class="quick-hint">点菜 ›</view>
           </view>
         </view>
+        <view wx:if="{{item.breakfast.length}}" class="meal-row">
+          <text class="meal-row__label c-primary">早餐</text>
+          <view class="meal-row__dishes">
+            <view wx:for="{{item.breakfast}}" wx:for-item="dish" wx:key="id" class="dish-chip dish-chip--lunch" hover-class="tap-active" hover-stop-propagation data-id="{{dish.id}}" catchtap="openDish">{{dish.name}}</view>
+          </view>
+        </view>
         <view wx:if="{{item.lunch.length}}" class="meal-row">
           <text class="meal-row__label c-primary">午餐</text>
           <view class="meal-row__dishes">
@@ -45,7 +51,7 @@
             <view wx:for="{{item.dinner}}" wx:for-item="dish" wx:key="id" class="dish-chip dish-chip--dinner" hover-class="tap-active" hover-stop-propagation data-id="{{dish.id}}" catchtap="openDish">{{dish.name}}</view>
           </view>
         </view>
-        <view wx:if="{{!item.lunch.length && !item.dinner.length}}" class="t-xs c-text3">暂无菜品</view>
+        <view wx:if="{{!item.breakfast.length && !item.lunch.length && !item.dinner.length}}" class="t-xs c-text3">暂无菜品</view>
       </view>
     </view>
     <view wx:if="{{!weekError && !weekLoading && days.length > 2}}" class="more-btn" hover-class="tap-active" bindtap="toggleAll">
@@ -159,6 +165,10 @@
 
 <sheet show="{{quickOpen}}" title="快速点菜 · {{quickDay ? (quickDay.tag || quickDay.dayName) : ''}}" subtitle="{{quickDay ? quickDay.short + ' ' + quickDay.dayName : ''}}" bind:close="closeQuick">
   <view class="quick" wx:if="{{quickDay}}">
+    <view wx:if="{{quickDay.breakfast.length}}" class="mb-24">
+      <view class="quick__label c-primary">早餐</view>
+      <view class="chips"><text wx:for="{{quickDay.breakfast}}" wx:key="id" class="dish-chip dish-chip--lunch">{{item.name}}</text></view>
+    </view>
     <view wx:if="{{quickDay.lunch.length}}" class="mb-24">
       <view class="quick__label c-primary">🍳 午餐</view>
       <view class="chips"><text wx:for="{{quickDay.lunch}}" wx:key="id" class="dish-chip dish-chip--lunch">{{item.name}}</text></view>

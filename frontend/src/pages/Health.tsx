@@ -1,7 +1,7 @@
 import RequestState from "@/components/RequestState"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Activity, ArrowRight, Plus, Trash2 } from "lucide-react"
 import toast from "react-hot-toast"
@@ -9,6 +9,7 @@ import { errorMessage, healthApi } from "@/api"
 import PageHeader from "@/components/PageHeader"
 import NutritionEntryFields from "@/components/NutritionEntryFields"
 import HealthProfilePanel from "@/components/HealthProfilePanel"
+import HealthMealDraftPanel from "@/components/HealthMealDraftPanel"
 import HealthReportPanel from "@/components/HealthReportPanel"
 import { healthDate } from "@/lib/health-date"
 import { getSessionEpoch, isCurrentSession } from "@/api/client"
@@ -34,7 +35,8 @@ export default function Health() {
   const userId = useAuthStore(state => state.user?.id)
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [view, setView] = useState<"journal" | "report">("journal")
+  const [params] = useSearchParams()
+  const [view, setView] = useState<"journal" | "report">(params.get("view") === "report" ? "report" : "journal")
   const [days, setDays] = useState<7 | 30>(7)
   const [form, setForm] = useState<FoodJournalInput>(empty)
   const [showForm, setShowForm] = useState(false)
@@ -42,8 +44,8 @@ export default function Health() {
   const [nutritionBusy, setNutritionBusy] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   function edit(entry: FoodJournalEntry, copy = false) { setEditId(copy ? null : entry.id); setForm({ ...entry, meal_date: copy ? today() : entry.meal_date, nutrition: copy ? null : entry.nutrition, nutrition_mode: copy ? "clear" : "keep", linked_record_id: copy ? null : entry.linked_record_id, event_key: copy ? "" : entry.event_key, request_key: crypto.randomUUID() }); setShowForm(true) }
-  const { data: journal = [], isLoading: journalLoading, error: journalError, refetch: reloadJournal } = useQuery({ queryKey: ["food-journal"], queryFn: () => healthApi.journal(), enabled: view === "journal" })
-  const { data: report, isLoading: reportLoading, error: reportError, refetch: reloadReport } = useQuery({ queryKey: ["health-report", days], queryFn: () => healthApi.report(days), enabled: view === "report" })
+  const { data: journal = [], isLoading: journalLoading, error: journalError, refetch: reloadJournal } = useQuery({ queryKey: ["food-journal", userId], queryFn: () => healthApi.journal(), enabled: view === "journal" })
+  const { data: report, isLoading: reportLoading, error: reportError, refetch: reloadReport } = useQuery({ queryKey: ["health-report", days, userId], queryFn: () => healthApi.report(days), enabled: view === "report" })
 
   async function save() {
     if (!form.dish_name.trim() || busy || nutritionBusy) return
@@ -88,6 +90,7 @@ export default function Health() {
       <HealthProfilePanel key={userId} />
 
       {view === "journal" ? <div>
+        <HealthMealDraftPanel key={userId} />
         <button onClick={() => { setEditId(null); setForm(empty()); setShowForm(true) }} className="mb-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-white"><Plus size={18} />记录一餐</button>
         {showForm && <form onSubmit={(e) => { e.preventDefault(); void save() }} className="mb-6 space-y-4 border-y border-border bg-card py-5">
           <div className="grid grid-cols-2 gap-3"><label className="text-xs font-semibold text-text2">日期<input type="date" required value={form.meal_date} max={today()} onChange={(e) => setForm({ ...form, meal_date: e.target.value })} className="mt-1 h-11 w-full rounded-lg border border-border bg-bg px-3 text-sm text-text" /></label><label className="text-xs font-semibold text-text2">餐次<select value={form.meal_type} onChange={(e) => setForm({ ...form, meal_type: e.target.value })} className="mt-1 h-11 w-full rounded-lg border border-border bg-bg px-3 text-sm text-text">{meals.map((meal) => <option key={meal.value} value={meal.value}>{meal.label}</option>)}</select></label></div>
@@ -104,7 +107,7 @@ export default function Health() {
         {journalError ? <RequestState error={journalError} onRetry={() => { void reloadJournal() }} compact /> : journalLoading ? <div className="skeleton h-24 rounded-lg" /> : journal.length === 0 ? <p className="py-8 text-center text-sm text-text3">还没有手动记录，今天吃了什么？</p> : <div className="divide-y divide-border border-y border-border">{journal.map((entry) => <div key={entry.id} className="flex gap-3 py-3"><div className="min-w-0 flex-1"><div className="text-xs text-text3">{entry.meal_date} · {meals.find((meal) => meal.value === entry.meal_type)?.label}</div><div className="mt-0.5 text-sm font-semibold">{entry.dish_name}</div><div className="mt-1 text-xs text-text2">{[entry.cuisine, ...entry.food_groups.map((value) => groups.find((group) => group.value === value)?.label || value)].filter(Boolean).join(" · ")}</div><p className="mt-1 text-xs text-text2">{entry.portion || "份量未记录"}</p><div className="flex flex-wrap gap-3"><button className="min-h-11 text-xs font-semibold text-primary" onClick={() => edit(entry)}>编辑</button><button className="min-h-11 text-xs font-semibold text-primary" onClick={() => edit(entry, true)}>今天也吃了</button></div>{entry.notes && <p className="mt-1 text-xs text-text3">{entry.notes}</p>}</div><button onClick={() => void remove(entry.id)} title="删除记录" aria-label={`删除${entry.dish_name}`} className="self-start p-2 text-text3"><Trash2 size={16} /></button></div>)}</div>}
       </div> : <div>
         <div className="mb-5 inline-flex rounded-lg border border-border bg-card p-1" role="group" aria-label="报告时间范围">{([7, 30] as const).map((value) => <button key={value} onClick={() => setDays(value)} className={`h-9 min-w-20 rounded-md px-3 text-xs font-semibold ${days === value ? "bg-primary text-white" : "text-text3"}`}>近 {value} 天</button>)}</div>
-        {reportError ? <RequestState error={reportError} onRetry={() => { void reloadReport() }} compact /> : reportLoading ? <div className="skeleton h-40 rounded-lg" /> : report && <HealthReportPanel report={report} onRecord={(date) => { setEditId(null); setForm({ ...empty(), meal_date: date }); setView("journal"); setShowForm(true) }} />}
+        {reportError ? <RequestState error={reportError} onRetry={() => { void reloadReport() }} compact /> : reportLoading ? <div className="skeleton h-40 rounded-lg" /> : report && <HealthReportPanel key={userId} report={report} onRecord={(date) => { setEditId(null); setForm({ ...empty(), meal_date: date }); setView("journal"); setShowForm(true) }} />}
       </div>}
     </main>
   </div>

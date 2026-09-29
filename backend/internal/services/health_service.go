@@ -138,6 +138,9 @@ func CreateFoodJournalEntry(uid uint, in FoodJournalInput, dbs ...*gorm.DB) (*mo
 		if err := validateJournalLinkAvailable(uid, 0, entry.LinkedRecordID, tx); err != nil {
 			return err
 		}
+		if err := clearMealOmission(tx, uid, entry.MealDate, entry.MealType); err != nil {
+			return err
+		}
 		if err := tx.Create(entry).Error; err != nil {
 			return err
 		}
@@ -204,15 +207,16 @@ type CuisineCount struct {
 }
 
 type HealthDay struct {
-	MealEventCount int              `json:"meal_event_count"`
-	ItemCount      int              `json:"item_count"`
-	Status         string           `json:"status"`
-	Fingerprint    string           `json:"fingerprint"`
-	Evidence       []HealthEvidence `json:"evidence"`
-	Date           string           `json:"date"`
-	MealCount      int              `json:"meal_count"`
-	Cuisines       []string         `json:"cuisines"`
-	FoodGroups     []string         `json:"food_groups"`
+	Meals          []HealthMealState `json:"meals"`
+	MealEventCount int               `json:"meal_event_count"`
+	ItemCount      int               `json:"item_count"`
+	Status         string            `json:"status"`
+	Fingerprint    string            `json:"fingerprint"`
+	Evidence       []HealthEvidence  `json:"evidence"`
+	Date           string            `json:"date"`
+	MealCount      int               `json:"meal_count"`
+	Cuisines       []string          `json:"cuisines"`
+	FoodGroups     []string          `json:"food_groups"`
 }
 
 type HealthRecommendation struct {
@@ -221,6 +225,7 @@ type HealthRecommendation struct {
 }
 
 type HealthReport struct {
+	NotEatenMeals     int                     `json:"not_eaten_meals"`
 	PortionCoverage   HealthPortionCoverage   `json:"portion_coverage"`
 	Comparison        *HealthPeriodComparison `json:"comparison,omitempty"`
 	Nutrients         []HealthNutrientMetric  `json:"nutrients"`
@@ -486,6 +491,9 @@ func UpdateFoodJournalEntry(uid, id uint, in FoodJournalInput, dbs ...*gorm.DB) 
 			}
 		}
 		next.ID, next.CreatedAt, next.RequestKey, next.RequestHash = old.ID, old.CreatedAt, old.RequestKey, old.RequestHash
+		if err := clearMealOmission(tx, uid, next.MealDate, next.MealType); err != nil {
+			return err
+		}
 		if err := tx.Save(next).Error; err != nil {
 			return err
 		}

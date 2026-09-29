@@ -16,6 +16,7 @@ import { launchConfetti } from "@/lib/confetti"
 import { gsap, motionDuration, scrollToElement, useGSAP } from "@/lib/gsap"
 import toast from "react-hot-toast"
 import { Home as HomeIcon, Settings, Sparkles } from "lucide-react"
+import HealthSummaryCard from "@/components/HealthSummaryCard"
 import ThemePicker from "@/components/ThemePicker"
 import { useAppearanceStore } from "@/store/useAppearanceStore"
 import { getDishImageUrl } from "@/lib/dish-image"
@@ -145,6 +146,7 @@ export default function Home() {
       toast.success("❤ 已记录！")
       launchConfetti(confettiRef.current)
       qc.invalidateQueries({ queryKey: ["records"] })
+      qc.invalidateQueries({ queryKey: ["health-report"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       // 采纳推荐 → 行为事件，供推荐分析使用
       void behaviorApi.log({
@@ -329,6 +331,8 @@ export default function Home() {
           <div className="text-sm text-text2 mb-1">{getGreeting()}</div>
           <div className="text-[26px] font-extrabold tracking-tight leading-tight">今天<em className="not-italic text-primary">想吃什么</em>？</div>
         </div>
+
+        <HealthSummaryCard />
 
         {/* 午/晚餐入口：点击真正触发推荐并同步到下方推荐卡 */}
         <div className="grid grid-cols-2 gap-3 mb-6">

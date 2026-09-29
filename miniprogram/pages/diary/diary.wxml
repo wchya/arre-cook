@@ -9,6 +9,7 @@
   </view>
 
   <health-profile bind:changed="profileChanged" />
+  <health-meal-draft wx:if="{{view === 'journal'}}" bind:saved="draftSaved" />
 
   <request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
   <!-- 饮食日记 -->
@@ -67,6 +68,13 @@
         <view wx:if="{{selectedDay}}">
           <view class="section-title">{{selectedDay.date}} · {{selectedDay.statusLabel}}</view>
           <view class="hint">{{selectedDay.meal_event_count}} 餐 · {{selectedDay.item_count}} 个食物项；原始来源 {{selectedDay.meal_count}} 条</view>
+          <view wx:if="{{selectedDay.meals.length}}" class="health-evidence">
+            <view wx:for="{{selectedDay.meals}}" wx:key="meal_type" class="health-controls">
+              <view>{{item.label}} · {{item.statusLabel}}</view>
+              <button wx:if="{{item.status !== 'recorded'}}" size="mini" disabled="{{actionBusy}}" data-meal="{{item.meal_type}}" bindtap="setMealStatus">{{item.status === 'not_eaten' ? '撤销未吃标记' : '标记这餐未吃'}}</button>
+            </view>
+            <view class="hint">未吃不计作进餐或零营养；补记该餐后自动清除标记。全天完整仍需核对食物、饮料和加餐。</view>
+          </view>
           <view wx:for="{{selectedDay.evidence}}" wx:key="key" class="health-evidence">
             <view>{{item.mealLabel}} · {{item.dish_name}}</view>
             <view class="hint">{{item.sourceLabel}} · {{item.portion || '份量未记录'}} {{item.linked_record_id ? '· 已关联同一食物' : ''}}</view>
@@ -132,7 +140,7 @@
       <view wx:if="{{!recs.length}}" class="card card-pad mb-24"><view class="section-title">给下一餐一个小安排</view><view class="hint">暂无符合当前筛选条件的菜谱，可以补充适合自己的私房菜。不会为了凑数放宽档案中的过敏与禁忌。</view></view>
       <view wx:if="{{recs.length}}" class="card mb-24">
         <view class="card-pad">
-          <view class="health-controls"><picker mode="date" value="{{planDate}}" start="{{today}}" end="{{planEnd}}" bindchange="onPlanDate"><view class="btn btn-ghost">{{planDate}}</view></picker><picker range="{{['午餐', '晚餐']}}" value="{{planMeal === 'lunch' ? 0 : 1}}" bindchange="onPlanMeal"><view class="btn btn-ghost">{{planMeal === 'lunch' ? '午餐' : '晚餐'}}</view></picker></view>
+          <view class="health-controls"><picker mode="date" value="{{planDate}}" start="{{today}}" end="{{planEnd}}" bindchange="onPlanDate"><view class="btn btn-ghost">{{planDate}}</view></picker><picker range="{{['午餐', '晚餐', '早餐']}}" value="{{planMeal === 'lunch' ? 0 : planMeal === 'dinner' ? 1 : 2}}" bindchange="onPlanMeal"><view class="btn btn-ghost">{{planMeal === 'lunch' ? '午餐' : planMeal === 'dinner' ? '晚餐' : '早餐'}}</view></picker></view>
           <view class="hint">加入后替换该餐随机推荐，食材同步到买菜清单。现有清单页展示今明两天；实际吃过后再记餐。</view>
         </view>
         <view class="section-title rec-head"><icon name="sparkles" size="32" stroke="2.3" color="pink-ink" /><text>换个口味试试</text></view>
@@ -143,7 +151,7 @@
         </view>
       </view>
 
-      <view wx:if="{{plans.length}}" class="card card-pad mb-24"><view class="section-title">已安排与复盘</view><view wx:for="{{plans}}" wx:key="id" class="health-evidence"><view>{{item.meal_date}} · {{item.mealLabel}} · {{item.dish_name}}</view><view class="hint">{{item.statusLabel}}{{item.available ? '' : ' · 菜谱不可用或与当前忌口冲突'}}</view><button size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="cancelPlan">撤销安排</button></view></view>
+      <view wx:if="{{plans.length}}" class="card card-pad mb-24"><view class="section-title">已安排与复盘</view><view wx:for="{{plans}}" wx:key="id" class="health-evidence"><view>{{item.meal_date}} · {{item.mealLabel}} · {{item.dish_name}}</view><view class="hint">{{item.statusLabel}}{{item.available ? '' : ' · 菜谱不可用或与当前忌口冲突'}}</view><button wx:if="{{item.status !== 'recorded' && item.available && item.meal_date <= today}}" size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="recordPlan">记为吃过</button><button size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="cancelPlan">撤销安排</button></view></view>
       <view class="card card-pad mb-24"><view class="section-title">统计口径与数据说明</view><view wx:for="{{report.method_notes}}" wx:key="*this" class="hint">{{item}}</view></view>
       <view class="btn btn-ghost btn-block" hover-class="tap-active" bindtap="goChat"><icon name="sparkles" size="30" stroke="2.4" color="text2" /><text>和 AI 助手聊聊饮食规划</text></view>
       <view class="disclaimer">报告用于整理你填写的饮食信息，不提供营养诊断或医疗建议。</view>

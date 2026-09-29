@@ -77,6 +77,8 @@ require("../../utils/theme").page({
     focusNotes: false,
   },
 
+  onLoad(options) { if (options && options.view === "report") this.setData({ view: "report", viewIndex: 1 }) },
+
   onShow() {
     if (!session.requireLogin("/pages/diary/diary")) return
     const identity = api.token()
@@ -88,6 +90,8 @@ require("../../utils/theme").page({
     this.setData({ today: healthDate(), planEnd: healthDate(6) })
     this.load(true)
   },
+
+  draftSaved() { this._journalLoaded = false; this._report7 = null; this._report30 = null; this.load(true) },
 
   profileChanged() {
     this._report7 = null; this._report30 = null
@@ -169,6 +173,7 @@ require("../../utils/theme").page({
 
   applyReport(report) {
     if (!report) { this.setData({ report: null }); return }
+    this._reportIdentity = api.token()
     const period = report.period_days || this.data.days
     const counts = report.cuisine_counts || []
     const cuisineMax = Math.max(1, ...counts.map((item) => item.count || 0))
@@ -191,7 +196,7 @@ require("../../utils/theme").page({
     }))
     this.setData({
       report: { ...report, period, insights: report.insights || [], plan_actions: report.plan_actions || [] },
-      reportDays: (report.days || []).map(d => ({ ...d, shortDate: d.date.slice(5), statusLabel: d.status === "complete" ? "已确认完整" : d.status === "partial" ? "待确认完整" : "未记录", evidence: (d.evidence || []).map(e => ({ ...e, key: e.source + e.id, mealLabel: (MEAL_MAP[e.meal_type] || {}).label, sourceLabel: e.source === "record" ? "菜谱用餐记录" : "饮食日记", duplicateId: (e.possible_duplicate_ids || [])[0] || 0 })) })),
+      reportDays: (report.days || []).map(d => ({ ...d, shortDate: d.date.slice(5), statusLabel: d.status === "complete" ? "已确认完整" : d.status === "partial" ? "待确认完整" : "未记录", meals: (d.meals || []).map(m => ({ ...m, label: (MEAL_MAP[m.meal_type] || {}).label, statusLabel: m.status === "not_eaten" ? "明确未吃" : m.status === "recorded" ? "已有实际记录" : "尚未记录" })), evidence: (d.evidence || []).map(e => ({ ...e, key: e.source + e.id, mealLabel: (MEAL_MAP[e.meal_type] || {}).label, sourceLabel: e.source === "record" ? "菜谱用餐记录" : "饮食日记", duplicateId: (e.possible_duplicate_ids || [])[0] || 0 })) })),
       nutritionMetrics: report.nutrients || [],
       comparisonExpanded: "",
       comparisonMetrics: ((report.comparison || {}).nutrients || []).map(n => ({ ...n, deltaText: n.delta == null ? "" : (n.delta > 0 ? "+" : "") + n.delta, datePairs: (n.current_dates || []).map((date, i) => ({ current: date, previous: n.previous_dates[i] })) })),
@@ -222,29 +227,47 @@ require("../../utils/theme").page({
   },
   chooseDay(e) { this.selectReportDay(e.currentTarget.dataset.date) },
   recordDay() { const date = this.data.selectedDay.date; this.openForm(); this.setData({ view: "journal", viewIndex: 0, formDate: date }); this.loadJournal(true) },
-  async reportAction(work, message) {
-    if (this.data.actionBusy) return
-    const identity = api.token()
+  async reportAction(work, message, identity = this._reportIdentity || this._identity || api.token()) {
+    if (this.data.actionBusy || identity !== api.token()) return
     this.setData({ actionBusy: true })
     try { await work(); if (identity !== api.token()) return; this._report7 = null; this._report30 = null; await this.loadReport(true); if (identity === api.token()) ui.toast(message, "success") }
-    catch (error) { if (identity === api.token()) ui.toast(error.message || "操作失败，请重试") }
+    catch (error) { if (identity === api.token()) { ui.toast(error.message || "操作失败，请重试"); if (error.status === 409) { this._report7 = null; this._report30 = null; await this.loadReport(true) } } }
     finally { if (identity === api.token()) this.setData({ actionBusy: false }) }
   },
   async confirmDay() {
     const day = this.data.selectedDay
+    const identity = this._reportIdentity
     if (!day || this.data.actionBusy) return
     if (day.status !== "complete" && !await ui.confirm({ title: "确认当天已记完整？", content: "请确认吃过的食物、饮料和加餐已记录。没有吃的餐次不需要补填。" })) return
-    this.reportAction(() => api.put(`/health/days/${day.date}/status`, { fingerprint: day.fingerprint, complete: day.status !== "complete" }), "记录状态已更新")
+    return this.reportAction(() => api.put(`/health/days/${day.date}/status`, { fingerprint: day.fingerprint, complete: day.status !== "complete" }), "记录状态已更新", identity)
+  },
+  async setMealStatus(e) {
+    const day = this.data.selectedDay
+    const meal = day && day.meals && day.meals.find(m => m.meal_type === e.currentTarget.dataset.meal)
+    if (!meal || meal.status === "recorded" || this.data.actionBusy) return
+    const identity = this._reportIdentity
+    const notEaten = meal.status !== "not_eaten"
+    if (notEaten && !await ui.confirm({ title: `确认${meal.label}没有吃？`, content: `${day.date}：若吃过但尚未记录，请使用补记。` })) return
+    if (identity !== api.token()) return
+    return this.reportAction(() => api.put(`/health/days/${day.date}/meals/${meal.meal_type}/status`, { fingerprint: day.fingerprint, not_eaten: notEaten }), "餐次状态已更新", identity)
   },
   async linkDuplicate(e) {
     const id = Number(e.currentTarget.dataset.id), record = Number(e.currentTarget.dataset.record)
+    const identity = this._reportIdentity
     if (!await ui.confirm({ title: "确认是同一次食用？", content: "关联后只计一个食物项，原始记录仍保留。" })) return
-    this.reportAction(async () => { const entry = await api.get(`/food-journal/${id}`); await api.put(`/food-journal/${id}`, { ...entry, linked_record_id: record }); this._journalLoaded = false }, "已关联同一食物")
+    return this.reportAction(async () => { const entry = await api.get(`/food-journal/${id}`); if (identity !== api.token()) return; await api.put(`/food-journal/${id}`, { ...entry, linked_record_id: record }); this._journalLoaded = false }, "已关联同一食物", identity)
   },
   toggleComparison(e) { const code = e.currentTarget.dataset.code; this.setData({ comparisonExpanded: this.data.comparisonExpanded === code ? "" : code }) },
   onPlanDate(e) { this.setData({ planDate: e.detail.value }) },
-  onPlanMeal(e) { this.setData({ planMeal: Number(e.detail.value) === 0 ? "lunch" : "dinner" }) },
+  onPlanMeal(e) { this.setData({ planMeal: ["lunch", "dinner", "breakfast"][Number(e.detail.value)] || "dinner" }) },
   acceptPlan(e) { this.reportAction(() => api.post("/health/plans", { dish_id: Number(e.currentTarget.dataset.id), meal_date: this.data.planDate, meal_type: this.data.planMeal, period_days: this.data.days }), "已加入菜单和买菜清单") },
+  async recordPlan(e) {
+    const plan = this.data.plans.find(p => p.id === Number(e.currentTarget.dataset.id))
+    if (!plan || !plan.available || plan.status === "recorded" || plan.meal_date > healthDate() || this.data.actionBusy) return
+    const identity = this._reportIdentity
+    if (!await ui.confirm({ title: "确认实际吃过？", content: `${plan.meal_date} ${plan.mealLabel} · ${plan.dish_name}` }) || identity !== api.token()) return
+    return this.reportAction(() => api.post("/records", { dish_id: plan.dish_id, meal_type: plan.meal_type, meal_date: plan.meal_date }), "已记录实际吃过", identity)
+  },
   cancelPlan(e) { this.reportAction(() => api.delete(`/health/plans/${e.currentTarget.dataset.id}`), "已撤销计划") },
   editEntry(e) {
     if (this.data.saving || this.data.labelSaving) return

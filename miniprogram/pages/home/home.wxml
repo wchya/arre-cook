@@ -28,6 +28,19 @@
 
       <view wx:if="{{error}}" class="notice notice-error mb-24"><icon name="circle-alert" size="30" color="red" /><text class="flex-1">{{error}}</text></view>
 
+      <view class="card card-pad mb-24 health-summary">
+        <view class="section-title">这一周，吃得有记录</view>
+        <view wx:if="{{healthSummaryError}}"><view class="hint">周报摘要暂时无法读取</view><button class="btn btn-ghost" bindtap="loadHealthSummary">重试</button></view>
+        <view wx:elif="{{healthSummaryLoading}}" class="hint">正在整理最近七天的记录…</view>
+        <block wx:elif="{{healthSummary}}">
+          <view class="hint">{{healthSummary.from}} — {{healthSummary.to}} · 北京时间</view>
+          <view class="health-summary__counts">{{healthSummary.logged_days}} 天有实际饮食记录 · {{healthSummary.complete_days}} 天确认完整</view>
+          <view class="hint">{{healthSummary.meal_event_count}} 餐 · {{healthSummary.item_count}} 个食物项<text wx:if="{{healthSummary.not_eaten_meals}}"> · {{healthSummary.not_eaten_meals}} 餐明确未吃</text></view>
+          <view class="hint">{{healthSummary.headline}}。未记录不代表没有吃。</view>
+        </block>
+        <button class="btn btn-ghost health-summary__link" bindtap="goHealthReport">查看周报 →</button>
+      </view>
+
       <!-- 午 / 晚餐入口 -->
       <view class="grid-2 meal-entries">
         <view class="meal-entry meal-entry--lunch {{recMeal === 'lunch' ? 'is-active' : ''}} {{pickingMeal ? 'is-busy' : ''}}" hover-class="tap-active" hover-stay-time="80" data-meal="lunch" bindtap="pickMeal">

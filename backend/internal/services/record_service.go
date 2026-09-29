@@ -14,7 +14,7 @@ import (
 var (
 	ErrDishNotFound    = errors.New("菜品不存在")
 	ErrRecordNotFound  = errors.New("记录不存在")
-	ErrInvalidMealType = errors.New("餐次只能是 lunch 或 dinner")
+	ErrInvalidMealType = errors.New("餐次只能是 breakfast、lunch 或 dinner")
 	ErrInvalidDate     = errors.New("日期格式应为 YYYY-MM-DD")
 	ErrDuplicateMeal   = errors.New("该菜品已在当日该餐次中记录过")
 )
@@ -76,7 +76,7 @@ func createMealRecordTx(tx *gorm.DB, uid uint, in MealInput) (*models.MealRecord
 	if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
 		return nil, dish, nil, err
 	}
-	if in.MealType != "lunch" && in.MealType != "dinner" {
+	if !isMainMeal(in.MealType) {
 		return nil, dish, nil, ErrInvalidMealType
 	}
 	date, err := normalizeMealDate(in.MealDate)
@@ -101,6 +101,9 @@ func createMealRecordTx(tx *gorm.DB, uid uint, in MealInput) (*models.MealRecord
 	}
 	record := &models.MealRecord{UserID: uid, DishID: dish.ID, DishName: dish.Name, MealType: in.MealType, MealDate: date,
 		Rating: clampInt(in.Rating, 0, 5), Remark: truncateRunes(strings.TrimSpace(in.Remark), 500), Mood: truncateRunes(strings.TrimSpace(in.Mood), 32), Photo: strings.TrimSpace(in.Photo)}
+	if err := clearMealOmission(tx, uid, date, in.MealType); err != nil {
+		return nil, dish, nil, err
+	}
 	if err := tx.Create(record).Error; err != nil {
 		return nil, dish, nil, err
 	}

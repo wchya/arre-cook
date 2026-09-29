@@ -1,0 +1,16 @@
+.draft { margin-bottom: 32rpx; padding: 28rpx; border: 1px solid var(--border); border-radius: 24rpx; background: var(--card); color: var(--text); }
+.draft-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; font-size: 28rpx; font-weight: 600; }
+.draft-body { margin-top: 20rpx; }
+button { min-height: 88rpx; margin: 12rpx 0; padding: 12rpx 20rpx; display: flex; align-items: center; justify-content: center; line-height: 1.4; font-size: 26rpx; border: 1px solid var(--border); border-radius: 18rpx; background: var(--bg); color: var(--text); }
+button[disabled] { opacity: .5; }
+button::after { border: 0; }
+.hint { font-size: 24rpx; line-height: 1.7; color: var(--text2); overflow-wrap: anywhere; }
+.label { margin: 20rpx 0 8rpx; font-size: 24rpx; font-weight: 600; }
+textarea, input, .field { box-sizing: border-box; width: 100%; border: 1px solid var(--border); border-radius: 16rpx; padding: 16rpx; background: var(--bg); color: var(--text); font-size: 28rpx; }
+input, .field { height: 88rpx; line-height: 54rpx; }
+textarea { min-height: 180rpx; }
+.actions { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
+.item { border-top: 1px solid var(--border); margin-top: 24rpx; padding-top: 20rpx; }
+.consent { display: block; padding: 20rpx 0; min-height: 88rpx; font-size: 26rpx; line-height: 1.7; }
+.message { margin-top: 20rpx; font-size: 26rpx; line-height: 1.7; }

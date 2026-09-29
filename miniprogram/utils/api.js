@@ -25,7 +25,7 @@ function expireSession(app) {
   wx.reLaunch({ url: "/pages/login/login?reason=expired" })
 }
 
-function request(method, path, data) {
+function request(method, path, data, options = {}) {
   const app = getApp()
   const isGet = method === "GET"
   // 登录接口不带旧令牌：密码错误返回 401 时不能被当成“登录过期”。
@@ -33,11 +33,11 @@ function request(method, path, data) {
   const url = `${app.globalData.apiBase}${path}${isGet ? queryString(data) : ""}`
 
   return new Promise((resolve, reject) => {
-    wx.request({
+    const task = wx.request({
       url,
       method,
       data: isGet ? undefined : (data || {}),
-      timeout: 20000,
+      timeout: options.timeout || 20000,
       header: {
         "content-type": "application/json",
         ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
@@ -65,6 +65,7 @@ function request(method, path, data) {
       },
       fail() { reject(new Error("网络连接失败，请稍后重试")) },
     })
+    if (options.onTask) options.onTask(task)
   })
 }
 
@@ -122,7 +123,7 @@ module.exports = {
   SESSION_KEY,
   token,
   get: (path, params) => request("GET", path, params),
-  post: (path, data) => request("POST", path, data),
+  post: (path, data, options) => request("POST", path, data, options),
   put: (path, data) => request("PUT", path, data),
   patch: (path, data) => request("PATCH", path, data),
   delete: (path, data) => request("DELETE", path, data),

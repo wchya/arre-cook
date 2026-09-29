@@ -82,6 +82,7 @@ require("../../utils/theme").page({
           short: day.date.slice(5),
           tag: day.date === today ? "今天" : day.date === tomorrow ? "明天" : "",
           quick: day.date === today || day.date === tomorrow,
+          breakfast: dishChips(day.breakfast),
           lunch: dishChips(day.lunch),
           dinner: dishChips(day.dinner),
         }))
@@ -140,6 +141,7 @@ require("../../utils/theme").page({
     const day = this.data.quickDay
     if (!day || this.data.recording) return
     const records = []
+    ;(day.breakfast || []).forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "breakfast", meal_date: day.date }))
     day.lunch.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "lunch", meal_date: day.date }))
     day.dinner.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "dinner", meal_date: day.date }))
     if (!records.length) return
@@ -216,7 +218,7 @@ require("../../utils/theme").page({
   mapMeals(meals) {
     return (meals || []).map((m) => ({
       key: `${m.meal_date}-${m.meal_type}-${m.dish_id}`,
-      label: `${fmt.relativeDate(m.meal_date)}${m.meal_type === "lunch" ? "午餐" : "晚餐"}`,
+      label: `${fmt.relativeDate(m.meal_date)}${m.meal_type === "breakfast" ? "早餐" : m.meal_type === "lunch" ? "午餐" : "晚餐"}`,
       dish: m.dish_name,
       by: m.added_by_name || "",
       lunch: m.meal_type === "lunch",

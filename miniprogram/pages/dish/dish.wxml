@@ -197,7 +197,7 @@
               <view class="flex items-center gap-12">
                 <text class="t-sm bold">{{item.date}}</text>
                 <text class="t-2xs c-text3">{{item.weekday}}</text>
-                <text class="chip chip-sm {{item.lunch ? 'chip-primary' : 'chip-mint'}}">{{item.lunch ? '午餐' : '晚餐'}}</text>
+                <text class="chip chip-sm {{item.lunch ? 'chip-primary' : 'chip-mint'}}">{{item.mealLabel}}</text>
               </view>
               <text wx:if="{{item.mood}}" class="tl-mood">{{item.mood}}</text>
             </view>

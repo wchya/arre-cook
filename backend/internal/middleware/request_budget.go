@@ -18,7 +18,7 @@ import (
 
 var apiSlots = make(chan struct{}, 16)
 
-// SSE answers hold a request for up to 90 seconds. They are already bounded by
+// AI extraction and SSE answers hold requests for up to 40/90 seconds, bounded by
 // the shared assistant lease (four site-wide), so keep them out of the pool
 // that every page load needs.
 var streamSlots = make(chan struct{}, 6)
@@ -55,12 +55,12 @@ func acquireSlot(ctx context.Context, slots chan struct{}) bool {
 	}
 }
 
-func isStreamPath(path string) bool {
-	return path == "/api/assistant/chat" || path == "/api/assistant/video-recipe"
+func isLongAIPath(path string) bool {
+	return path == "/api/assistant/chat" || path == "/api/assistant/video-recipe" || path == "/api/health/meal-drafts/parse"
 }
 
 // Admission precedes authentication and body allocation. Long-running AI calls
-// retain their own shorter sub-operation deadlines and a 90 second total budget.
+// retain their own shorter sub-operation deadlines and a 40/90 second total budget.
 func RequestBudget() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
@@ -77,7 +77,7 @@ func RequestBudget() gin.HandlerFunc {
 			return
 		}
 		slots := apiSlots
-		if isStreamPath(path) {
+		if isLongAIPath(path) {
 			slots = streamSlots
 		}
 		if !acquireSlot(c.Request.Context(), slots) {
@@ -95,6 +95,9 @@ func RequestBudget() gin.HandlerFunc {
 		timeout := 15 * time.Second
 		if strings.HasPrefix(path, "/api/assistant/") || strings.HasPrefix(path, "/api/agent/") || path == "/mcp" {
 			timeout = 90 * time.Second
+		}
+		if path == "/api/health/meal-drafts/parse" {
+			timeout = 40 * time.Second
 		}
 		if path == "/api/upload/image" || path == "/api/auth/email/code" {
 			timeout = 30 * time.Second

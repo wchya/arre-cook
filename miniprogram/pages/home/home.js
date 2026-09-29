@@ -26,6 +26,7 @@ function buildWheel(dishes) {
 
 require("../../utils/theme").page({
   data: {
+    healthSummary: null, healthSummaryLoading: true, healthSummaryError: false,
     greeting: fmt.greeting(),
     unread: 0,
 
@@ -70,6 +71,8 @@ require("../../utils/theme").page({
   },
 
   onShow() {
+    this._summaryHidden = false
+    if (this._summaryIdentity !== api.token()) { this._summaryIdentity = api.token(); this.setData({ healthSummary: null, healthSummaryLoading: true, healthSummaryError: false }) }
     session.syncTabBar(this, 0)
     if (!session.requireLogin()) return
     this.setData({ greeting: fmt.greeting() })
@@ -79,7 +82,10 @@ require("../../utils/theme").page({
     }
   },
 
+  onHide() { this._summaryHidden = true; this._summaryRequest = (this._summaryRequest || 0) + 1 },
+
   onUnload() {
+    this._summaryHidden = true; this._summaryRequest = (this._summaryRequest || 0) + 1
     if (this._offWheelTheme) this._offWheelTheme()
     clearTimeout(this._spinTimer)
     if (this._offTheme) this._offTheme()
@@ -135,7 +141,22 @@ require("../../utils/theme").page({
       const result = await api.get("/records", { date_from: today, date_to: today, pageSize: 50 })
       this._today = result.items || []
     } catch (_) { /* ignore */ }
+    await this.loadHealthSummary()
   },
+
+  async loadHealthSummary() {
+    if (this._summaryHidden || !api.token()) return
+    const identity = api.token()
+    const request = this._summaryRequest = (this._summaryRequest || 0) + 1
+    this.setData({ healthSummary: null, healthSummaryLoading: true, healthSummaryError: false })
+    try {
+      const result = await api.get("/health/summary")
+      if (identity === api.token() && request === this._summaryRequest && !this._summaryHidden) this.setData({ healthSummary: result, healthSummaryLoading: false })
+    } catch (_) {
+      if (identity === api.token() && request === this._summaryRequest && !this._summaryHidden) this.setData({ healthSummaryError: true, healthSummaryLoading: false })
+    }
+  },
+  goHealthReport() { wx.navigateTo({ url: "/pages/diary/diary?view=report" }) },
 
   async loadUnread() {
     try {

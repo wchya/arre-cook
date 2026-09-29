@@ -16,10 +16,11 @@ import (
 )
 
 type WeekDayPlan struct {
-	Date    string        `json:"date"`
-	DayName string        `json:"day_name"`
-	Lunch   []models.Dish `json:"lunch"`
-	Dinner  []models.Dish `json:"dinner"`
+	Breakfast []models.Dish `json:"breakfast"`
+	Date      string        `json:"date"`
+	DayName   string        `json:"day_name"`
+	Lunch     []models.Dish `json:"lunch"`
+	Dinner    []models.Dish `json:"dinner"`
 }
 
 type WeekPlan struct {
@@ -132,6 +133,12 @@ func withFavorites(uid uint, plan *WeekPlan, dbs ...*gorm.DB) *WeekPlan {
 	favs := FavoriteIDSet(uid, requestDB)
 	for i := range plan.Days {
 		d := &plan.Days[i]
+		if d.Breakfast == nil {
+			d.Breakfast = []models.Dish{}
+		}
+		for j := range d.Breakfast {
+			d.Breakfast[j].Favorite = favs[d.Breakfast[j].ID]
+		}
 		if d.Lunch == nil {
 			d.Lunch = []models.Dish{}
 		}

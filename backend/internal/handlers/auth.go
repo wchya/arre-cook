@@ -291,8 +291,8 @@ var userOwnedModels = []any{
 	&models.MealRecord{}, &models.Favorite{}, &models.DayRating{}, &models.ShoppingCheck{},
 	&models.HomeInventory{}, &models.BehaviorEvent{}, &models.AchievementEvent{}, &models.UserAchievement{},
 	&models.UserPreference{}, &models.UserSetting{}, &models.AgentToken{}, &models.AgentAuditLog{},
-	&models.AgentSuggestion{}, &models.Notification{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{}, &models.HealthDayConfirmation{}, &models.HealthPlanItem{}, &models.NutritionFood{},
-	&models.AssistantUsage{}, &models.HealthProfile{}, &models.HealthProfileVersion{},
+	&models.AgentSuggestion{}, &models.Notification{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{}, &models.HealthDayConfirmation{}, &models.HealthMealOmission{}, &models.HealthPlanItem{}, &models.NutritionFood{},
+	&models.AssistantUsage{}, &models.HealthProfile{}, &models.HealthProfileVersion{}, &models.HealthDraftUsage{}, &models.HealthJournalBatch{},
 }
 
 // DeleteMe DELETE /api/me —— 注销账号并删除全部个人数据（不可恢复）。
@@ -390,6 +390,9 @@ func ExportMe(c *gin.Context) {
 		sessions              []models.ChatSession
 		messages              []models.ChatMessage
 		journal               []models.FoodJournalEntry
+		healthOmissions       []models.HealthMealOmission
+		healthDraftUsage      []models.HealthDraftUsage
+		healthBatches         []models.HealthJournalBatch
 		healthDays            []models.HealthDayConfirmation
 		healthPlans           []models.HealthPlanItem
 		nutritionFoods        []models.NutritionFood
@@ -409,6 +412,16 @@ func ExportMe(c *gin.Context) {
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&healthDays)
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&healthPlans)
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&nutritionFoods)
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&healthOmissions).Error; err != nil {
+		utils.InternalError(c, "餐次状态导出失败")
+		return
+	}
+	for _, rows := range []any{&healthDraftUsage, &healthBatches} {
+		if err := database.DB.WithContext(c.Request.Context()).Scopes(own).Find(rows).Error; err != nil {
+			utils.InternalError(c, "文字记餐数据导出失败")
+			return
+		}
+	}
 	var healthProfile *models.HealthProfile
 	if err := database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		var err error
@@ -436,6 +449,9 @@ func ExportMe(c *gin.Context) {
 		"chat_messages":            messages,
 		"food_journal":             journal,
 		"health_day_confirmations": healthDays,
+		"health_meal_omissions":    healthOmissions,
+		"health_draft_usage":       healthDraftUsage,
+		"health_journal_batches":   healthBatches,
 		"health_plans":             healthPlans,
 		"nutrition_foods":          nutritionFoods,
 		"health_profile":           healthProfile,

@@ -22,3 +22,11 @@ type HealthPlanItem struct {
 	ReportTo   string    `json:"report_to" gorm:"size:10"`
 	CreatedAt  time.Time `json:"created_at"`
 }
+
+// HealthMealOmission records an explicit declaration, never a zero-nutrient food item.
+type HealthMealOmission struct {
+	UserID      uint      `json:"-" gorm:"primaryKey;autoIncrement:false"`
+	MealDate    string    `json:"meal_date" gorm:"primaryKey;size:10"`
+	MealType    string    `json:"meal_type" gorm:"primaryKey;size:16"`
+	ConfirmedAt time.Time `json:"confirmed_at"`
+}

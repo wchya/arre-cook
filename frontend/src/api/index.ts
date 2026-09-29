@@ -6,7 +6,7 @@ import type {
   FavoriteOverview, SmartPickRequest, SmartPickResult, TasteProfile, BehaviorEventInput, AuthOptions, LoginResult, User,
   Preferences, UserStats, AgentTokenList, AgentToken, AgentAuditLog, AgentSession, Suggestion, ChatSession, ChatMessage,
   ChatCard, AssistantStatus, AssistantQuota, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
-  FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport, HealthProfile, HealthProfileInput, NutritionFood, NutritionRecipeInput, NutritionCatalogFood,
+  FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport, HealthSummary, HealthDraftStatus, HealthMealDraftItem, HealthJournalBatchInput, HealthProfile, HealthProfileInput, NutritionFood, NutritionRecipeInput, NutritionCatalogFood,
   NotificationPage,
   DishVideoMeta,
 } from "@/types"
@@ -59,6 +59,11 @@ export const familyApi = {
 }
 
 export const healthApi = {
+  draftStatus: () => api<HealthDraftStatus>("GET", "/health/meal-drafts/status"),
+  parseDraft: (text: string, signal?: AbortSignal) => api<{ items: HealthMealDraftItem[] }>("POST", "/health/meal-drafts/parse", { text }, { signal, timeout: 45000 }),
+  confirmDraft: (input: HealthJournalBatchInput) => api<{ entry_ids: number[] }>("POST", "/health/meal-drafts/confirm", input),
+  summary: () => api<HealthSummary>("GET", "/health/summary"),
+  setMealStatus: (date: string, meal: string, fingerprint: string, notEaten: boolean) => api<null>("PUT", `/health/days/${date}/meals/${meal}/status`, { fingerprint, not_eaten: notEaten }),
   profile: () => api<HealthProfile>("GET", "/health/profile"),
   saveProfile: (input: HealthProfileInput) => api<HealthProfile>("PUT", "/health/profile", input),
   clearProfile: (version: number) => api<HealthProfile>("DELETE", `/health/profile?version=${version}`),

@@ -105,11 +105,12 @@ export class ApiError extends Error {
 }
 
 // 统一取后端 {code, message, data}，失败抛出带后端 message 的 ApiError
-export async function api<T>(method: string, url: string, data?: unknown): Promise<T> {
+export async function api<T>(method: string, url: string, data?: unknown, options?: { signal?: AbortSignal; timeout?: number }): Promise<T> {
   try {
     const res = await client.request<ApiResponse<T>>({
       method,
       url,
+      ...options,
       data: method === "GET" ? undefined : data,
       params: method === "GET" ? data : undefined,
     })

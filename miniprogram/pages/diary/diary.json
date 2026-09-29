@@ -9,6 +9,7 @@
     "sheet": "/components/sheet/index",
     "empty": "/components/empty/index",
     "dish-image": "/components/dish-image/index",
-    "health-profile": "/components/health-profile/index"
+    "health-profile": "/components/health-profile/index",
+    "health-meal-draft": "/components/health-meal-draft/index"
   }
 }

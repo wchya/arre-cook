@@ -242,6 +242,7 @@ require("../../utils/theme").page({
           date: fmt.relativeDate(record.meal_date),
           weekday: fmt.weekday(record.meal_date),
           lunch: record.meal_type === "lunch",
+          mealLabel: record.meal_type === "breakfast" ? "早餐" : record.meal_type === "lunch" ? "午餐" : "晚餐",
           mood: dishUtil.MOOD_EMOJI[record.mood] || "",
           stars: record.rating > 0 ? stars(record.rating) : [],
           homeMood: homeMood ? `${homeMood.emoji} ${homeMood.label}` : "",

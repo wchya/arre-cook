@@ -61,7 +61,7 @@ require("../../utils/theme").page({
     const records = (day.records || []).map((r) => ({
       dishId: r.dish_id,
       dishName: r.dish_name,
-      mealLabel: r.meal_type === "lunch" ? "午餐" : "晚餐",
+      mealLabel: r.meal_type === "breakfast" ? "早餐" : r.meal_type === "lunch" ? "午餐" : "晚餐",
       isLunch: r.meal_type === "lunch",
       moodEmoji: MOOD_EMOJI[r.mood] || "",
       moodLabel: MOOD_LABEL[r.mood] || "",

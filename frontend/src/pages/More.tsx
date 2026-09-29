@@ -38,6 +38,16 @@ function QuickRecordModal({ day, todayStr, tomorrowStr, onConfirm, onClose }: {
         <div className="w-10 h-1 rounded-full bg-border2 mx-auto mb-4" />
         <div className="text-lg font-bold mb-1">快速点菜 · {dateLabel}</div>
         <div className="text-xs text-text2 mb-4">{day.date.slice(5)} {day.day_name}</div>
+        {(day.breakfast || []).length > 0 && (
+          <div className="mb-3">
+            <div className="text-xs font-semibold text-primary mb-1.5">早餐</div>
+            <div className="flex flex-wrap gap-1.5">
+              {(day.breakfast || []).map((d) => (
+                <span key={d.id} className="px-2.5 py-1 rounded-[8px] text-xs bg-primary-light text-primary font-medium">{d.name}</span>
+              ))}
+            </div>
+          </div>
+        )}
         {day.lunch.length > 0 && (
           <div className="mb-3">
             <div className="text-xs font-semibold text-primary mb-1.5">🍳 午餐</div>
@@ -89,6 +99,22 @@ function WeekDayCard({ day, todayStr, tomorrowStr, navigate, onCardClick }: {
         <div className="text-[11px] text-text2">{day.date.slice(5)}</div>
       </div>
       <div className="flex flex-col gap-1.5">
+        {(day.breakfast || []).length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-primary font-semibold w-8 shrink-0">早餐</span>
+            <div className="flex flex-wrap gap-1.5">
+              {(day.breakfast || []).map((dish) => (
+                <button
+                  key={dish.id}
+                  onClick={(e) => { e.stopPropagation(); navigate(`/dishes/${dish.id}`) }}
+                  className="min-h-11 px-2.5 py-1 rounded-[8px] text-xs bg-primary-light text-primary font-medium cursor-pointer active:scale-95 transition-all"
+                >
+                  {dish.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {day.lunch.length > 0 && (
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-primary font-semibold w-8 shrink-0">午餐</span>
@@ -121,7 +147,7 @@ function WeekDayCard({ day, todayStr, tomorrowStr, navigate, onCardClick }: {
             </div>
           </div>
         )}
-        {day.lunch.length === 0 && day.dinner.length === 0 && (
+        {!day.breakfast?.length && day.lunch.length === 0 && day.dinner.length === 0 && (
           <div className="text-xs text-text3 py-1">暂无菜品</div>
         )}
       </div>
@@ -158,6 +184,7 @@ export default function More() {
     mutationFn: (data: Partial<MealRecord>[]) => recordsApi.batchCreate(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["records"] })
+      qc.invalidateQueries({ queryKey: ["health-report"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       qc.refetchQueries({ queryKey: ["shopping-list"] })
       toast.success("❤ 已记录！")
@@ -219,6 +246,7 @@ export default function More() {
 
   function handleConfirmRecord(day: WeekDayPlan) {
     const data: Partial<MealRecord>[] = []
+    ;(day.breakfast || []).forEach((d) => data.push({ dish_id: d.id, dish_name: d.name, meal_type: "breakfast", meal_date: day.date }))
     day.lunch.forEach((d) => data.push({ dish_id: d.id, dish_name: d.name, meal_type: "lunch", meal_date: day.date }))
     day.dinner.forEach((d) => data.push({ dish_id: d.id, dish_name: d.name, meal_type: "dinner", meal_date: day.date }))
     if (data.length > 0) recordMut.mutate(data)

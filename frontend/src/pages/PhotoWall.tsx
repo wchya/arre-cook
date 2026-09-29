@@ -108,7 +108,7 @@ function MemoryDay({ day, onOpen }: { day: PhotoWallDay; onOpen: (photos: string
                 className="flex items-center gap-2 cursor-pointer active:opacity-70 transition-opacity"
               >
                 <span className={`w-[6px] h-[6px] rounded-full flex-shrink-0 ${r.meal_type === "lunch" ? "bg-primary" : "bg-mint"}`} />
-                <span className="text-[12px] text-text3 w-7 flex-shrink-0">{r.meal_type === "lunch" ? "午餐" : "晚餐"}</span>
+                <span className="text-[12px] text-text3 w-7 flex-shrink-0">{r.meal_type === "breakfast" ? "早餐" : r.meal_type === "lunch" ? "午餐" : "晚餐"}</span>
                 <span className="text-[13px] font-medium text-text truncate">{r.dish_name}</span>
                 {r.mood && (
                   <span className="ml-auto flex items-center gap-1 flex-shrink-0">

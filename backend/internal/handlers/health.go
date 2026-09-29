@@ -153,3 +153,37 @@ func GetFoodJournalEntry(c *gin.Context) {
 	}
 	utils.Success(c, entry)
 }
+
+func SetHealthMealStatus(c *gin.Context) {
+	var in struct {
+		NotEaten    *bool  `json:"not_eaten"`
+		Fingerprint string `json:"fingerprint"`
+	}
+	if c.ShouldBindJSON(&in) != nil || in.NotEaten == nil || in.Fingerprint == "" {
+		utils.BadRequest(c, "请核对餐次状态后重新提交")
+		return
+	}
+	err := services.SetHealthMealOmission(uid(c), c.Param("date"), c.Param("meal"), in.Fingerprint, *in.NotEaten, database.DB.WithContext(c.Request.Context()))
+	if errors.Is(err, services.ErrHealthDayChanged) {
+		utils.Error(c, 409, 40900, err.Error())
+		return
+	}
+	if errors.Is(err, services.ErrInvalidDate) || errors.Is(err, services.ErrInvalidMealType) {
+		utils.BadRequest(c, "请选择今天或过去一年的早、午、晚餐")
+		return
+	}
+	if err != nil {
+		utils.InternalError(c, "餐次状态保存失败，请稍后重试")
+		return
+	}
+	utils.SuccessMsg(c, "餐次状态已更新")
+}
+
+func GetHealthSummary(c *gin.Context) {
+	summary, err := services.BuildHealthSummary(uid(c), database.DB.WithContext(c.Request.Context()))
+	if err != nil {
+		utils.InternalError(c, "周报摘要暂时无法读取")
+		return
+	}
+	utils.Success(c, summary)
+}

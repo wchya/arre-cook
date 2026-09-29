@@ -18,7 +18,7 @@ function setup() {
  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/diary/diary.js'), 'utf8'), { Page: d => { definition = d }, require: name => deps[name], wx: { stopPullDownRefresh() {} }, Date, Math })
  const page = { data: structuredClone(definition.data), setData(patch, done) { Object.assign(this.data, patch); done?.() } }
  for (const [key, value] of Object.entries(definition)) if (typeof value === 'function') page[key] = value.bind(page)
- return { page, api, calls, messages, switchUser: () => { identity = 'bob' } }
+ return { page, api, calls, messages, ui: deps['../../utils/ui'], switchUser: () => { identity = 'bob' } }
 }
 
 const report = { from: '2026-09-22', to: '2026-09-28', period_days: 7, logged_days: 1, complete_days: 0, meal_event_count: 1, item_count: 1, days: [{ date: '2026-09-28', status: 'partial', fingerprint: 'abc', item_count: 1, meal_count: 2, meal_event_count: 1, evidence: [{ source: 'journal', id: 7, meal_type: 'lunch', dish_name: '鸡蛋', possible_duplicate_ids: [3] }] }], plans: [], recommendations: [] }
@@ -156,7 +156,7 @@ test('Web comparison renders zero deltas and suppresses insufficient sample resu
  const front = createRequire(path.resolve(__dirname, '../../frontend/package.json'))
  const ts = front('typescript'), React = front('react'), { renderToStaticMarkup } = front('react-dom/server')
  const mod = { exports: {} }
- const stubs = { 'react-router-dom': { useNavigate: () => () => {} }, '@tanstack/react-query': { useQueryClient: () => ({}) }, 'react-hot-toast': {}, '@/api': {}, '@/api/client': {}, '@/lib/health-date': { healthDate: () => '2026-09-28' } }
+ const stubs = { 'react-router-dom': { useNavigate: () => () => {} }, '@tanstack/react-query': { useQueryClient: () => ({}) }, 'react-hot-toast': {}, '@/api': {}, '@/api/client': { getSessionEpoch: () => 1 }, '@/lib/health-date': { healthDate: () => '2026-09-28' } }
  const code = ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/HealthReportPanel.tsx'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText
  new Function('require', 'module', 'exports', code)(name => stubs[name] || front(name), mod, mod.exports)
  const data = { ...report, days: [], food_group_days: {}, insights: [], plan_actions: [], method_notes: [], nutrients: [], comparison: { from: '2026-09-15', to: '2026-09-21', nutrients: [{ code: 'fat_g', label: '脂肪', unit: 'g', status: 'available', delta: 0, current_average: 0, previous_average: 0, matched_days: 4, required_days: 4, current_dates: ['2026-09-28'], previous_dates: ['2026-09-21'], reason: '配对日期说明' }] } }
@@ -342,5 +342,99 @@ test('Web standard serving switches inputs, marks estimate and clears stale quan
   await React.act(async () => root.unmount())
   dom.window.close()
   for (const key of Object.keys(previous)) { if (previous[key] === undefined) delete global[key]; else global[key] = previous[key] }
+ }
+})
+
+const mealEvent = meal => ({ currentTarget: { dataset: { meal } } })
+const planEvent = { currentTarget: { dataset: { id: 42 } } }
+function omissionReport() {
+ return { ...report, days: [{ ...report.days[0], meals: [{ meal_type: 'breakfast', status: 'unknown' }, { meal_type: 'lunch', status: 'recorded' }] }], plans: [{ id: 42, dish_id: 8, dish_name: '鸡蛋', meal_type: 'breakfast', meal_date: '2026-09-28', available: true, status: 'planned' }] }
+}
+
+test('mini omission confirms exact day fingerprint, supports undo and blocks recorded meals', async () => {
+ const { page, calls, ui } = setup()
+ page.applyReport(omissionReport()); page.loadReport = async () => {}
+ ui.confirm = async () => false
+ await page.setMealStatus(mealEvent('breakfast')); assert.equal(calls.length, 0)
+ ui.confirm = async () => true
+ await page.setMealStatus(mealEvent('breakfast'))
+ assert.equal(calls[0][1], '/health/days/2026-09-28/meals/breakfast/status')
+ assert.deepEqual(JSON.parse(JSON.stringify(calls[0][2])), { fingerprint: 'abc', not_eaten: true })
+ page.data.selectedDay.meals[0].status = 'not_eaten'
+ ui.confirm = async () => { throw new Error('undo needs no confirmation') }
+ await page.setMealStatus(mealEvent('breakfast')); assert.equal(calls[1][2].not_eaten, false)
+ await page.setMealStatus(mealEvent('lunch')); assert.equal(calls.length, 2)
+})
+
+test('mini stale meal status refreshes current evidence for retry', async () => {
+ const { page, api, messages } = setup()
+ page.applyReport(omissionReport())
+ let refresh = 0
+ page.loadReport = async force => { assert.equal(force, true); refresh++ }
+ api.put = async () => { const error = new Error('记录已变化'); error.status = 409; throw error }
+ await page.setMealStatus(mealEvent('breakfast'))
+ assert.equal(refresh, 1); assert.equal(page.data.actionBusy, false); assert.equal(messages[0], '记录已变化')
+})
+
+test('mini blocks old-account report writes before and during confirmation', async () => {
+ for (const duringModal of [false, true]) {
+  for (const action of ['setMealStatus', 'recordPlan', 'confirmDay']) {
+   const { page, calls, switchUser, ui } = setup()
+   page.applyReport(omissionReport()); page.loadReport = async () => {}
+   if (duringModal) ui.confirm = async () => { switchUser(); page.applyReport(omissionReport()); return true }
+   else switchUser()
+   await page[action](action === 'setMealStatus' ? mealEvent('breakfast') : planEvent)
+   assert.equal(calls.length, 0, `${action} transferred old data to another account`)
+  }
+ }
+})
+
+test('mini breakfast adoption stays planned until separate actual-consumption confirmation', async () => {
+ const { page, calls, ui } = setup()
+ page.applyReport(omissionReport()); page.loadReport = async () => {}
+ page.onLoad({ view: 'report' }); assert.equal(page.data.viewIndex, 1)
+ page.onPlanMeal({ detail: { value: 2 } }); page.acceptPlan({ currentTarget: { dataset: { id: 8 } } })
+ await new Promise(resolve => setImmediate(resolve))
+ assert.equal(calls[0][1], '/health/plans'); assert.equal(calls[0][2].meal_type, 'breakfast')
+ ui.confirm = async () => false
+ await page.recordPlan(planEvent); assert.equal(calls.length, 1)
+ ui.confirm = async () => true
+ await page.recordPlan(planEvent)
+ assert.equal(calls[1][1], '/records'); assert.equal(calls[1][2].meal_type, 'breakfast')
+ page.data.plans[0].meal_date = '2099-01-01'; await page.recordPlan(planEvent); assert.equal(calls.length, 2)
+})
+
+function setupHome() {
+ let definition, identity = 'alice'
+ const calls = [], navigations = []
+ const api = { token: () => identity, get: async url => { calls.push(url); return { item_count: 1 } } }
+ const deps = { '../../utils/api': api, '../../utils/session': { syncTabBar() {}, requireLogin: () => true }, '../../utils/ui': {}, '../../utils/dish': {}, '../../utils/format': { greeting: () => '', dateKey: () => '2026-09-28' } }
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/home/home.js'), 'utf8'), { Page: d => { definition = d }, require: name => deps[name], wx: { navigateTo: args => navigations.push(args.url) }, clearTimeout, Date, Math })
+ const page = { data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch) } }
+ for (const [key, value] of Object.entries(definition)) if (typeof value === 'function') page[key] = value.bind(page)
+ return { page, api, calls, navigations, switchUser: () => { identity = 'bob' } }
+}
+
+test('mini homepage summary retries failures and opens report directly', async () => {
+ const { page, api, navigations } = setupHome()
+ api.get = async () => { throw new Error('offline') }
+ await page.loadHealthSummary(); assert.equal(page.data.healthSummaryError, true); assert.equal(page.data.healthSummaryLoading, false)
+ api.get = async () => ({ item_count: 2 })
+ await page.loadHealthSummary(); assert.equal(page.data.healthSummary.item_count, 2); assert.equal(page.data.healthSummaryError, false)
+ page.goHealthReport(); assert.equal(navigations[0], '/pages/diary/diary?view=report')
+})
+
+test('mini homepage suppresses stale summaries after newer request, account switch or hiding', async () => {
+ for (const action of ['newer', 'account', 'hide', 'unload']) {
+  const { page, api, switchUser } = setupHome()
+  let finish
+  api.get = async () => new Promise(resolve => { finish = resolve })
+  const old = page.loadHealthSummary()
+  if (action === 'newer') { api.get = async () => ({ item_count: 2 }); await page.loadHealthSummary() }
+  if (action === 'account') { switchUser(); page.onShow() }
+  if (action === 'hide') page.onHide()
+  if (action === 'unload') page.onUnload()
+  finish({ item_count: 99 }); await old
+  assert.equal(page.data.healthSummary?.item_count, action === 'newer' ? 2 : undefined)
  }
 })

@@ -209,7 +209,7 @@ func init() {
 		Schema: object(map[string]any{
 			"date_from": str("开始日期 YYYY-MM-DD"),
 			"date_to":   str("结束日期 YYYY-MM-DD"),
-			"meal_type": str("餐次", "lunch", "dinner"),
+			"meal_type": str("餐次", "breakfast", "lunch", "dinner"),
 			"dish_id":   integer("只看某道菜", 0, 1<<31-1),
 			"limit":     integer("条数，默认 50", 1, 500),
 		}),
@@ -259,12 +259,12 @@ func init() {
 	register(&Tool{
 		Name:        "log_meal",
 		Title:       "记一餐",
-		Description: "把一道菜记入用户某天的午餐或晚餐（同时生成买菜清单）。仅在用户明确说“就吃这个/帮我记上/记一下”时调用。meal_date 可用 YYYY-MM-DD、today、tomorrow。",
+		Description: "把一道菜记入用户某天的早餐、午餐或晚餐（同时生成买菜清单）。仅在用户明确说“就吃这个/帮我记上/记一下”时调用。meal_date 可用 YYYY-MM-DD、today、tomorrow。",
 		Scope:       auth.ScopeRecordsWrite,
 		Write:       true,
 		Schema: object(map[string]any{
 			"dish_id":   integer("菜品 ID", 1, 1<<31-1),
-			"meal_type": str("餐次", "lunch", "dinner"),
+			"meal_type": str("餐次", "breakfast", "lunch", "dinner"),
 			"meal_date": str("日期，默认 today"),
 			"mood":      str("评价（吃完后才填）", "yum", "ok", "no"),
 			"remark":    str("备注"),
@@ -613,7 +613,7 @@ func compactPlan(plan *services.WeekPlan) any {
 		return out
 	}
 	for _, d := range plan.Days {
-		days = append(days, map[string]any{"date": d.Date, "day": d.DayName, "lunch": names(d.Lunch), "dinner": names(d.Dinner)})
+		days = append(days, map[string]any{"date": d.Date, "day": d.DayName, "breakfast": names(d.Breakfast), "lunch": names(d.Lunch), "dinner": names(d.Dinner)})
 	}
 	return map[string]any{"days": days}
 }

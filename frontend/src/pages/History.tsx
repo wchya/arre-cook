@@ -85,6 +85,7 @@ export default function History() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["records"] })
+      qc.invalidateQueries({ queryKey: ["health-report"] })
       qc.invalidateQueries({ queryKey: ["stats"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       toast.success("已删除")
@@ -99,6 +100,7 @@ export default function History() {
     mutationFn: ({ id, data }: { id: number; data: Partial<MealRecord> }) => recordsApi.update(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["records"] })
+      qc.invalidateQueries({ queryKey: ["health-report"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       toast.success("评价已保存")
       setRatingRecord(null)
@@ -446,7 +448,7 @@ export default function History() {
                     </span>
                     <div className="flex-1 min-w-0" onClick={() => navigate(`/dishes/${r.dish_id}`)}>
                       <div className="text-sm font-semibold mb-px">{r.dish_name}</div>
-                      <div className="text-[11px] text-text2">{r.meal_type === "lunch" ? "午餐" : "晚餐"}</div>
+                      <div className="text-[11px] text-text2">{r.meal_type === "breakfast" ? "早餐" : r.meal_type === "lunch" ? "午餐" : "晚餐"}</div>
                     </div>
                     {r.mood ? (
                       <div onClick={(e) => { e.stopPropagation(); openRating(r) }} className="flex-shrink-0 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform">
@@ -525,7 +527,7 @@ export default function History() {
                 </span>
                 <div className="flex-1 min-w-0" onClick={() => navigate(`/dishes/${r.dish_id}`)}>
                   <div className="text-sm font-semibold mb-px">{r.dish_name}</div>
-                  <div className="text-xs text-text2">{r.meal_date} · {r.meal_type === "lunch" ? "午餐" : "晚餐"}</div>
+                  <div className="text-xs text-text2">{r.meal_date} · {r.meal_type === "breakfast" ? "早餐" : r.meal_type === "lunch" ? "午餐" : "晚餐"}</div>
                 </div>
                 {r.mood ? (
                   <div onClick={(e) => { e.stopPropagation(); openRating(r) }} className="flex-shrink-0 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform">
