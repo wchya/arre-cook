@@ -73,6 +73,9 @@ func CreateMealRecord(uid uint, in MealInput, source, actor string, dbs ...*gorm
 // Core facts commit together; callers run notifications only after commit.
 func createMealRecordTx(tx *gorm.DB, uid uint, in MealInput) (*models.MealRecord, models.Dish, []nameAmount, error) {
 	var dish models.Dish
+	if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
+		return nil, dish, nil, err
+	}
 	if in.MealType != "lunch" && in.MealType != "dinner" {
 		return nil, dish, nil, ErrInvalidMealType
 	}
@@ -146,8 +149,18 @@ func DeleteMealRecord(uid uint, id any, dbs ...*gorm.DB) (*models.MealRecord, er
 		return nil, ErrRecordNotFound
 	}
 	if err := requestDB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
+			return err
+		}
 		if err := tx.Delete(&record).Error; err != nil {
 			return err
+		}
+		var plans int64
+		if err := tx.Model(&models.HealthPlanItem{}).Where("user_id = ? AND dish_id = ? AND meal_type = ? AND meal_date = ?", uid, record.DishID, record.MealType, record.MealDate).Count(&plans).Error; err != nil {
+			return err
+		}
+		if plans > 0 {
+			return nil
 		}
 		return tx.Scopes(database.OwnedBy(uid)).Where("dish_id = ? AND meal_type = ? AND meal_date = ?", record.DishID, record.MealType, record.MealDate).Delete(&models.ShoppingCheck{}).Error
 	}); err != nil {
@@ -165,6 +178,13 @@ type nameAmount struct {
 // addShoppingItems 把这一餐的食材与调料写入个人买菜清单，返回写入的条目。
 func addShoppingItems(tx *gorm.DB, uid uint, dish models.Dish, mealType, mealDate string) ([]nameAmount, error) {
 	entries := dishShoppingEntries(dish)
+	var existing int64
+	if err := tx.Model(&models.ShoppingCheck{}).Where("user_id = ? AND dish_id = ? AND meal_type = ? AND meal_date = ?", uid, dish.ID, mealType, mealDate).Count(&existing).Error; err != nil {
+		return nil, err
+	}
+	if existing > 0 {
+		return entries, nil
+	}
 	items := make([]models.ShoppingCheck, 0, len(entries))
 	for _, it := range entries {
 		items = append(items, models.ShoppingCheck{

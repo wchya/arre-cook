@@ -77,7 +77,10 @@ func GetCachedWeekPlan(uid uint, dbs ...*gorm.DB) *WeekPlan {
 func RegenerateWeekPlan(uid uint, dbs ...*gorm.DB) *WeekPlan {
 	requestDB := database.Handle(dbs...)
 
-	plan, _ := GenerateWeekPlan(uid, requestDB)
+	plan, err := GenerateWeekPlan(uid, requestDB)
+	if err != nil {
+		return &WeekPlan{Days: []WeekDayPlan{}}
+	}
 	saveWeekPlanCache(uid, plan, requestDB)
 	return withFavorites(uid, plan, requestDB)
 }
@@ -125,6 +128,7 @@ func withFavorites(uid uint, plan *WeekPlan, dbs ...*gorm.DB) *WeekPlan {
 	if plan == nil {
 		return &WeekPlan{Days: []WeekDayPlan{}}
 	}
+	applyHealthPlans(uid, plan, requestDB)
 	favs := FavoriteIDSet(uid, requestDB)
 	for i := range plan.Days {
 		d := &plan.Days[i]
@@ -147,8 +151,10 @@ func withFavorites(uid uint, plan *WeekPlan, dbs ...*gorm.DB) *WeekPlan {
 func GenerateWeekPlan(uid uint, dbs ...*gorm.DB) (*WeekPlan, error) {
 	requestDB := database.Handle(dbs...)
 
-	prefs := GetPreferences(uid, requestDB)
-	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
+	blocked, err := loadDietaryExclusions(uid, requestDB)
+	if err != nil {
+		return nil, err
+	}
 	var dishes []models.Dish
 	for _, d := range menuCandidates(uid, nil, requestDB) {
 		if !containsAny(dishSearchText(d), blocked) {
@@ -803,8 +809,10 @@ func hydrateWeekPlan(uid uint, plan *WeekPlan, dbs ...*gorm.DB) bool {
 		}
 	}
 	current := map[uint]models.Dish{}
-	prefs := GetPreferences(uid, requestDB)
-	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
+	blocked, err := loadDietaryExclusions(uid, requestDB)
+	if err != nil {
+		return false
+	}
 	for _, d := range menuCandidates(uid, ids, requestDB) {
 		if !containsAny(dishSearchText(d), blocked) {
 			current[d.ID] = d

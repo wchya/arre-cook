@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 
 // 统一的卡片阴影：三页此前重复手写这段长类名，集中到此处便于统一调整
-export const cardShadow = "shadow-[0_1px_3px_rgba(0,0,0,.04),0_4px_12px_rgba(0,0,0,.04)]"
+export const cardShadow = "app-card"
 
 interface CardProps {
   children: ReactNode

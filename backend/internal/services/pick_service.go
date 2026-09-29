@@ -48,8 +48,10 @@ func PickTomorrowDishes(uid uint, opts TomorrowPickOptions, dbs ...*gorm.DB) ([]
 	}
 	query.Find(&all)
 
-	prefs := GetPreferences(uid, requestDB)
-	blocked := append(append([]string{}, prefs.Allergies...), prefs.AvoidIngredients...)
+	blocked, err := loadDietaryExclusions(uid, requestDB)
+	if err != nil {
+		return nil, err
+	}
 	dishes := make([]models.Dish, 0, len(all))
 	for _, d := range all {
 		if !containsAny(dishSearchText(d), blocked) {

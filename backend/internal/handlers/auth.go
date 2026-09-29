@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"ninimenu/internal/auth"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
@@ -186,7 +187,10 @@ func UpdateMe(c *gin.Context) {
 		u.Avatar = a
 	}
 	if len(updates) > 0 {
-		database.DB.WithContext(c.Request.Context()).Model(&models.User{}).Where("id = ?", u.ID).Updates(updates)
+		if err := database.DB.WithContext(c.Request.Context()).Model(&models.User{}).Where("id = ?", u.ID).Updates(updates).Error; err != nil {
+			utils.InternalError(c, "保存失败，请稍后重试")
+			return
+		}
 	}
 	utils.Success(c, toUserView(u))
 }
@@ -217,31 +221,69 @@ func ChangePassword(c *gin.Context) {
 	}
 	// Compare the credentials observed by authentication. A concurrent password
 	// change, revocation or disable must never be overwritten by this request.
-	result := database.DB.WithContext(c.Request.Context()).Model(&models.User{}).
-		Where("id = ? AND token_version = ? AND password_hash = ? AND disabled = ?", u.ID, u.TokenVersion, u.PasswordHash, false).
-		Updates(map[string]any{"password_hash": hash, "token_version": gorm.Expr("token_version + 1")})
-	if result.Error != nil {
-		utils.InternalError(c, "设置密码失败，请稍后重试")
+	// Personal agent tokens are revoked in the same transaction: a password change
+	// is how users evict someone who had access, and a PAT would outlive it.
+	var revoked int64
+	err = database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.User{}).
+			Where("id = ? AND token_version = ? AND password_hash = ? AND disabled = ?", u.ID, u.TokenVersion, u.PasswordHash, false).
+			Updates(map[string]any{"password_hash": hash, "token_version": gorm.Expr("token_version + 1")})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return errCredentialChanged
+		}
+		n, err := revokeAgentTokens(tx, u.ID)
+		revoked = n
+		return err
+	})
+	if errors.Is(err, errCredentialChanged) {
+		utils.Error(c, 409, 40900, "账号状态已变化，请重新登录后操作")
 		return
 	}
-	if result.RowsAffected != 1 {
-		utils.Error(c, 409, 40900, "账号状态已变化，请重新登录后操作")
+	if err != nil {
+		utils.InternalError(c, "设置密码失败，请稍后重试")
 		return
 	}
 	u.PasswordHash = hash
 	u.TokenVersion++
-	issueLogin(c, u, nil)
+	issueLogin(c, u, gin.H{"revoked_agent_tokens": revoked})
 }
 
-// LogoutAll POST /api/me/logout-all —— 让所有设备上的登录态失效（智能体令牌不受影响，需单独撤销）。
+var errCredentialChanged = errors.New("credential changed")
+
+// revokeAgentTokens 撤销用户全部仍有效的个人访问令牌，返回撤销数量。
+func revokeAgentTokens(tx *gorm.DB, uid uint) (int64, error) {
+	result := tx.Model(&models.AgentToken{}).Where("user_id = ? AND revoked_at IS NULL", uid).Update("revoked_at", time.Now())
+	return result.RowsAffected, result.Error
+}
+
+// LogoutAll POST /api/me/logout-all —— 让所有设备上的登录态与个人 Agent 令牌同时失效。
 func LogoutAll(c *gin.Context) {
 	u := auth.CurrentUser(c)
-	result := database.DB.WithContext(c.Request.Context()).Model(&models.User{}).Where("id = ?", u.ID).UpdateColumn("token_version", gorm.Expr("token_version + 1"))
-	if result.Error != nil || result.RowsAffected != 1 {
+	var revoked int64
+	err := database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.User{}).Where("id = ?", u.ID).UpdateColumn("token_version", gorm.Expr("token_version + 1"))
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return errCredentialChanged
+		}
+		n, err := revokeAgentTokens(tx, u.ID)
+		revoked = n
+		return err
+	})
+	if err != nil {
 		utils.InternalError(c, "退出失败，请稍后重试")
 		return
 	}
-	utils.SuccessMsg(c, "已退出所有设备")
+	msg := "已退出所有设备"
+	if revoked > 0 {
+		msg = fmt.Sprintf("已退出所有设备，并撤销 %d 个 AI 连接令牌", revoked)
+	}
+	utils.Success(c, gin.H{"revoked_agent_tokens": revoked, "message": msg})
 }
 
 // userOwnedTables 注销账号时需要清理的个人数据表。
@@ -249,8 +291,8 @@ var userOwnedModels = []any{
 	&models.MealRecord{}, &models.Favorite{}, &models.DayRating{}, &models.ShoppingCheck{},
 	&models.HomeInventory{}, &models.BehaviorEvent{}, &models.AchievementEvent{}, &models.UserAchievement{},
 	&models.UserPreference{}, &models.UserSetting{}, &models.AgentToken{}, &models.AgentAuditLog{},
-	&models.AgentSuggestion{}, &models.Notification{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{},
-	&models.AssistantUsage{},
+	&models.AgentSuggestion{}, &models.Notification{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{}, &models.HealthDayConfirmation{}, &models.HealthPlanItem{}, &models.NutritionFood{},
+	&models.AssistantUsage{}, &models.HealthProfile{}, &models.HealthProfileVersion{},
 }
 
 // DeleteMe DELETE /api/me —— 注销账号并删除全部个人数据（不可恢复）。
@@ -339,16 +381,20 @@ func ExportMe(c *gin.Context) {
 	uid := auth.UID(c)
 	own := database.OwnedBy(uid)
 	var (
-		records       []models.MealRecord
-		favorites     []models.Favorite
-		ratings       []models.DayRating
-		events        []models.BehaviorEvent
-		dishes        []models.Dish
-		suggestions   []models.AgentSuggestion
-		sessions      []models.ChatSession
-		messages      []models.ChatMessage
-		journal       []models.FoodJournalEntry
-		notifications []models.Notification
+		records               []models.MealRecord
+		favorites             []models.Favorite
+		ratings               []models.DayRating
+		events                []models.BehaviorEvent
+		dishes                []models.Dish
+		suggestions           []models.AgentSuggestion
+		sessions              []models.ChatSession
+		messages              []models.ChatMessage
+		journal               []models.FoodJournalEntry
+		healthDays            []models.HealthDayConfirmation
+		healthPlans           []models.HealthPlanItem
+		nutritionFoods        []models.NutritionFood
+		healthProfileVersions []models.HealthProfileVersion
+		notifications         []models.Notification
 	)
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("meal_date ASC").Find(&records)
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&favorites)
@@ -360,21 +406,41 @@ func ExportMe(c *gin.Context) {
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("id ASC").Find(&messages)
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("meal_date ASC").Find(&journal)
 	database.DB.WithContext(c.Request.Context()).Scopes(own).Order("created_at ASC").Find(&notifications)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&healthDays)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&healthPlans)
+	database.DB.WithContext(c.Request.Context()).Scopes(own).Find(&nutritionFoods)
+	var healthProfile *models.HealthProfile
+	if err := database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		var err error
+		healthProfile, err = services.LoadHealthProfile(uid, tx)
+		if err != nil {
+			return err
+		}
+		return tx.Scopes(own).Order("version ASC").Find(&healthProfileVersions).Error
+	}); err != nil {
+		utils.InternalError(c, "健康档案导出失败")
+		return
+	}
 	c.Header("Content-Disposition", `attachment; filename="ninimenu-export.json"`)
 	utils.Success(c, gin.H{
-		"exported_at":     time.Now().Format(time.RFC3339),
-		"user":            toUserView(auth.CurrentUser(c)),
-		"preferences":     services.GetPreferences(uid, database.DB.WithContext(c.Request.Context())),
-		"meal_records":    records,
-		"favorites":       favorites,
-		"day_ratings":     ratings,
-		"behavior_events": events,
-		"my_dishes":       dishes,
-		"suggestions":     suggestions,
-		"chat_sessions":   sessions,
-		"chat_messages":   messages,
-		"food_journal":    journal,
-		"notifications":   notifications,
+		"exported_at":              time.Now().Format(time.RFC3339),
+		"user":                     toUserView(auth.CurrentUser(c)),
+		"preferences":              services.GetPreferences(uid, database.DB.WithContext(c.Request.Context())),
+		"meal_records":             records,
+		"favorites":                favorites,
+		"day_ratings":              ratings,
+		"behavior_events":          events,
+		"my_dishes":                dishes,
+		"suggestions":              suggestions,
+		"chat_sessions":            sessions,
+		"chat_messages":            messages,
+		"food_journal":             journal,
+		"health_day_confirmations": healthDays,
+		"health_plans":             healthPlans,
+		"nutrition_foods":          nutritionFoods,
+		"health_profile":           healthProfile,
+		"health_profile_versions":  healthProfileVersions,
+		"notifications":            notifications,
 	})
 }
 

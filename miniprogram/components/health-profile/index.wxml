@@ -1,0 +1,24 @@
+<view class="profile">
+  <view class="head"><view><view class="title">我的饮食档案</view><view class="hint">自愿填写，跳过也能记录和看报告</view></view><button bindtap="toggle" disabled="{{busy}}">{{open ? '收起' : '查看与填写'}}</button></view>
+  <view wx:if="{{open}}" class="body">
+    <view class="hint">仅本人可查看，不与家庭或 AI 共享。过敏与禁忌用于个人推荐和报告计划的食材筛选，仍需核对配料；家庭菜单需单独确认。目标用于记录你的意愿，暂不计算每日摄入目标。</view>
+    <view wx:if="{{loading}}" class="hint">正在加载档案…</view>
+    <view wx:elif="{{loadError}}"><view class="hint">{{loadError}}</view><button bindtap="loadProfile">重新加载</button></view>
+    <block wx:elif="{{profile}}">
+      <view class="field-label">我想关注</view><picker range="{{goalLabels}}" value="{{goalIndex}}" bindchange="onGoal" disabled="{{busy}}"><view class="field">{{goalLabels[goalIndex]}}</view></picker>
+      <view class="field-label">平常怎么吃</view><picker range="{{patternLabels}}" value="{{patternIndex}}" bindchange="onPattern" disabled="{{busy}}"><view class="field">{{patternLabels[patternIndex]}}</view></picker>
+      <view class="field-label">过敏食材</view><textarea class="field text-area" value="{{allergies}}" bindinput="onAllergies" disabled="{{busy}}" maxlength="820" placeholder="例如花生、虾；不清楚可留空" />
+      <view class="field-label">生活方式或宗教禁忌食材</view><textarea class="field text-area" value="{{exclusions}}" bindinput="onExclusions" disabled="{{busy}}" maxlength="820" placeholder="填写具体食材，例如猪肉、牛肉" />
+      <view class="hint">每类最多20项，每项最多40字，用逗号或顿号分隔。仅仅不喜欢的口味请在「我的 → 饮食偏好」设置；已有偏好仍共同生效。留空表示未提供，不代表已确认没有过敏。</view>
+      <checkbox-group bindchange="onConsent"><label class="consent"><checkbox value="confirmed" checked="{{confirmed}}" disabled="{{busy}}" /><text>我已核对，愿意保存并用于个人推荐筛选</text></label></checkbox-group>
+      <button class="primary" disabled="{{busy || !confirmed}}" loading="{{busy}}" bindtap="saveProfile">{{busy ? '保存中…' : '确认保存档案'}}</button>
+      <block wx:if="{{profile.active}}">
+        <view wx:if="{{erase}}" class="erase"><view class="hint">清除本档案及所有历史版本？保存的过敏与禁忌将不再参与筛选；饮食记录和原有偏好保留。</view><button disabled="{{busy}}" bindtap="clearProfile">确认清除档案及历史</button><button disabled="{{busy}}" bindtap="cancelErase">保留档案</button></view>
+        <button wx:else class="clear" disabled="{{busy}}" bindtap="showErase">清除档案及历史</button>
+      </block>
+    </block>
+    <view wx:if="{{failure}}" class="feedback">{{failure}}</view>
+    <button wx:if="{{conflict}}" bindtap="loadProfile">放弃本次编辑，载入最新档案</button>
+    <view wx:if="{{message}}" class="feedback">{{message}}</view>
+  </view>
+</view>

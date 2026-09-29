@@ -13,6 +13,7 @@ import (
 	"ninimenu/internal/models"
 	"ninimenu/internal/services"
 	"ninimenu/internal/utils"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -156,11 +157,17 @@ func GetAssistantMessages(c *gin.Context) {
 		}
 		return
 	}
+	// Show the newest messages (the ones the model also remembers), oldest first.
 	var rows []models.ChatMessage
-	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("session_id = ?", s.ID).Order("id ASC").Limit(200).Find(&rows).Error; err != nil {
+	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("session_id = ?", s.ID).Order("id DESC").Limit(assistantHistoryLimit + 1).Find(&rows).Error; err != nil {
 		utils.InternalError(c, "对话加载失败，请重试")
 		return
 	}
+	hasMore := len(rows) > assistantHistoryLimit
+	if hasMore {
+		rows = rows[:assistantHistoryLimit]
+	}
+	slices.Reverse(rows)
 	out := make([]chatMessageView, 0, len(rows))
 	for _, r := range rows {
 		cards := json.RawMessage(r.Cards)
@@ -169,8 +176,10 @@ func GetAssistantMessages(c *gin.Context) {
 		}
 		out = append(out, chatMessageView{ChatMessage: r, CardsJSON: cards})
 	}
-	utils.Success(c, gin.H{"session": s, "messages": out})
+	utils.Success(c, gin.H{"session": s, "messages": out, "has_more": hasMore})
 }
+
+const assistantHistoryLimit = 200
 
 func DeleteAssistantSession(c *gin.Context) {
 	var s models.ChatSession

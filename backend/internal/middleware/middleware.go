@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"gorm.io/gorm"
 	"log"
+	"net"
 	"net/http"
 	"ninimenu/internal/auth"
 	"ninimenu/internal/config"
@@ -197,12 +198,18 @@ func itoa(n uint) string {
 	return strconv.FormatUint(uint64(n), 10)
 }
 
-// ---------- 限流：固定窗口计数，进程内即可满足单实例部署 ----------
+// ---------- 限流：固定窗口计数（每进程）；需要跨副本的额度另走 database.ReserveWindow ----------
+
+// limiterCapacity bounds memory. Beyond it new keys are admitted untracked:
+// refusing them would let anyone with many addresses lock every new visitor out,
+// while global admission (apiSlots) and the shared DB windows still apply.
+const limiterCapacity = 10000
 
 type windowLimiter struct {
-	mu      sync.Mutex
-	window  time.Duration
-	buckets map[string]*bucket
+	mu        sync.Mutex
+	window    time.Duration
+	buckets   map[string]*bucket
+	lastSweep time.Time
 }
 
 type bucket struct {
@@ -215,16 +222,20 @@ func newWindowLimiter(window time.Duration) *windowLimiter {
 	go func() {
 		for range time.Tick(5 * time.Minute) {
 			l.mu.Lock()
-			now := time.Now()
-			for k, b := range l.buckets {
-				if now.Sub(b.start) > l.window {
-					delete(l.buckets, k)
-				}
-			}
+			l.sweep(time.Now())
 			l.mu.Unlock()
 		}
 	}()
 	return l
+}
+
+func (l *windowLimiter) sweep(now time.Time) {
+	l.lastSweep = now
+	for k, b := range l.buckets {
+		if now.Sub(b.start) > l.window {
+			delete(l.buckets, k)
+		}
+	}
 }
 
 func (l *windowLimiter) Allow(key string, limit int) bool {
@@ -238,22 +249,22 @@ func (l *windowLimiter) AllowN(key string, limit, units int) bool {
 	if limit <= 0 {
 		return true
 	}
+	if units > limit {
+		return false
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
 	b := l.buckets[key]
-	if units > limit {
-		return false
-	}
 	if b == nil || now.Sub(b.start) > l.window {
-		if b == nil && len(l.buckets) >= 10000 {
-			for k, v := range l.buckets {
-				if now.Sub(v.start) > l.window {
-					delete(l.buckets, k)
-				}
+		if b == nil && len(l.buckets) >= limiterCapacity {
+			// Sweep at most once per second so a flood of new keys cannot turn
+			// every request into a full scan under the lock.
+			if now.Sub(l.lastSweep) >= time.Second {
+				l.sweep(now)
 			}
-			if len(l.buckets) >= 10000 {
-				return false
+			if len(l.buckets) >= limiterCapacity {
+				return true
 			}
 		}
 		l.buckets[key] = &bucket{start: now, count: units}
@@ -266,6 +277,18 @@ func (l *windowLimiter) AllowN(key string, limit, units int) bool {
 	return true
 }
 
+// clientKey 限流用的客户端标识：IPv6 按 /64 归并，避免单个用户网段轮换地址绕过或挤爆限流表。
+func clientKey(c *gin.Context) string {
+	ip := net.ParseIP(c.ClientIP())
+	if ip == nil {
+		return c.ClientIP()
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4.String()
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
+}
+
 var (
 	agentLimiter = newWindowLimiter(time.Minute)
 	authLimiter  = newWindowLimiter(10 * time.Minute)
@@ -275,7 +298,8 @@ var (
 // AuthRateLimit 登录/注册按 IP 限流，防暴力破解。
 func AuthRateLimit(limit int) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !authLimiter.Allow("auth:"+c.ClientIP(), limit) || !database.ReserveWindow(database.DB.WithContext(c.Request.Context()), "auth:"+c.ClientIP(), 10*time.Minute, limit, 1) {
+		key := "auth:" + clientKey(c)
+		if !authLimiter.Allow(key, limit) || !database.ReserveWindow(database.DB.WithContext(c.Request.Context()), key, 10*time.Minute, limit, 1) {
 			c.Header("Retry-After", "600")
 			utils.Error(c, http.StatusTooManyRequests, 42900, "尝试次数过多，请 10 分钟后再试")
 			c.Abort()

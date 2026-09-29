@@ -3,6 +3,8 @@ package routes_test
 import (
 	"fmt"
 	"net/http"
+	"ninimenu/internal/database"
+	"ninimenu/internal/models"
 	"ninimenu/internal/services"
 	"ninimenu/internal/testutil"
 	"strings"
@@ -189,4 +191,51 @@ func TestAgentPrivateRecipeManagement(t *testing.T) {
 	must(t, status, response, http.StatusOK)
 	status, response = call(t, "GET", fmt.Sprintf("/api/dishes/%d", created.ID), aliceLogin, nil)
 	must(t, status, response, http.StatusNotFound)
+}
+
+func TestHealthReportMutationRoutesAndIsolation(t *testing.T) {
+	aliceUser, alice, _ := testutil.NewUser("health-v2-routes@qq.com")
+	_, bob, _ := testutil.NewUser("health-v2-stranger@qq.com")
+	date := services.Today()
+	status, response := call(t, "POST", "/api/food-journal", alice, map[string]any{"meal_date": date, "meal_type": "lunch", "dish_name": "米饭", "portion": "半碗", "request_key": "route-request"})
+	must(t, status, response, http.StatusOK)
+	entry := decode[struct {
+		ID uint `json:"id"`
+	}](t, response.Data)
+	path := fmt.Sprintf("/api/food-journal/%d", entry.ID)
+	status, response = call(t, "GET", path, bob, nil)
+	must(t, status, response, http.StatusNotFound)
+	status, response = call(t, "PUT", path, bob, map[string]any{"meal_date": date, "meal_type": "lunch", "dish_name": "越权"})
+	must(t, status, response, http.StatusNotFound)
+	status, response = call(t, "PUT", path, alice, map[string]any{"meal_date": date, "meal_type": "lunch", "dish_name": "米饭", "portion": "一碗"})
+	must(t, status, response, http.StatusOK)
+	status, response = call(t, "GET", "/api/health-report?days=7", alice, nil)
+	must(t, status, response, http.StatusOK)
+	report := decode[struct {
+		Days []services.HealthDay `json:"days"`
+	}](t, response.Data)
+	day := report.Days[len(report.Days)-1]
+	status, response = call(t, "PUT", "/api/health/days/"+date+"/status", alice, map[string]any{"complete": true, "fingerprint": day.Fingerprint})
+	must(t, status, response, http.StatusOK)
+	status, response = call(t, "PUT", "/api/health/days/"+date+"/status", bob, map[string]any{"complete": true, "fingerprint": day.Fingerprint})
+	must(t, status, response, http.StatusBadRequest)
+	status, response = call(t, "GET", "/api/me/export", alice, nil)
+	must(t, status, response, http.StatusOK)
+	exported := decode[map[string]any](t, response.Data)
+	if exported["health_day_confirmations"] == nil || exported["health_plans"] == nil {
+		t.Fatal("health data missing from export")
+	}
+	status, response = call(t, "DELETE", "/api/health/plans/0", alice, nil)
+	must(t, status, response, http.StatusBadRequest)
+	status, response = call(t, "POST", "/api/health/plans", alice, map[string]any{"dish_id": 1, "meal_date": date, "meal_type": "invalid", "period_days": 7})
+	must(t, status, response, http.StatusBadRequest)
+	status, response = call(t, "DELETE", "/api/me", alice, map[string]any{"confirm": "注销"})
+	must(t, status, response, http.StatusOK)
+	for _, model := range []any{&models.HealthDayConfirmation{}, &models.HealthPlanItem{}, &models.FoodJournalEntry{}} {
+		var count int64
+		if err := database.DB.Model(model).Where("user_id = ?", aliceUser.ID).Count(&count).Error; err != nil || count != 0 {
+			t.Fatalf("account cleanup: %d %v", count, err)
+		}
+	}
+
 }

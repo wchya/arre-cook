@@ -114,7 +114,103 @@ export interface FamilyShoppingItem {
   added_by: number
 }
 
+export interface NutrientValues {
+  energy_kcal: number | null
+  protein_g: number | null
+  carbohydrate_g: number | null
+  fat_g: number | null
+  fiber_g: number | null
+  sodium_mg: number | null
+}
+export interface NutritionRecipe {
+  yield_g: number
+  method: string
+  ingredients: NutritionSnapshot[]
+  total: NutrientValues
+}
+export interface NutritionRecipeInput {
+  name: string
+  source_reference: string
+  version: number
+  yield_g: number
+  method: string
+  ingredients: { food_id: number; food_version: number; amount: number; unit: string; food_state: string }[]
+}
+export interface CatalogProvenance {
+  dataset: string
+  version: string
+  record_id: string
+  url: string
+  license: string
+  reviewed_by: string
+  reviewed_at: string
+}
+export interface CatalogPortion {
+  key: string
+  label: string
+  amount: number
+  reference: string
+}
+export interface NutritionCatalogFood {
+  portions?: CatalogPortion[]
+  id: number
+  name: string
+  aliases: string[]
+  basis_unit: string
+  food_state: string
+  edible_basis: string
+  nutrients: NutrientValues
+  provenance: CatalogProvenance
+}
+export interface NutritionFood {
+  portions?: CatalogPortion[]
+  catalog_id?: number
+  catalog?: CatalogProvenance
+
+  recipe?: NutritionRecipe
+
+  id: number
+  name: string
+  basis_unit: "g" | "ml"
+  food_state: string
+  source: string
+  source_reference: string
+  nutrients: NutrientValues
+  version: number
+}
+export interface NutritionSnapshot {
+  standard_portion?: CatalogPortion & { count: number }
+  catalog?: CatalogProvenance
+  recipe?: NutritionRecipe
+  food_id: number
+  food_version: number
+  food_name: string
+  amount: number
+  unit: string
+  food_state: string
+  portion_source: string
+  source_reference: string
+  consumed: NutrientValues
+  per_100: NutrientValues
+  calculation_version: string
+}
+export interface HealthNutrientMetric {
+  code: keyof NutrientValues
+  label: string
+  unit: string
+  known_total: number | null
+  daily_average: number | null
+  covered_items: number
+  total_items: number
+  complete_days: number
+  required_days: number
+  status: string
+}
 export interface FoodJournalEntry {
+  nutrition?: NutritionSnapshot | null
+  portion?: string
+  event_key?: string
+  linked_record_id?: number | null
   id: number
   meal_date: string
   meal_type: string
@@ -125,9 +221,98 @@ export interface FoodJournalEntry {
   created_at: string
 }
 
-export type FoodJournalInput = Omit<FoodJournalEntry, "id" | "created_at">
+export type FoodJournalInput = Omit<FoodJournalEntry, "id" | "created_at"> & {
+ request_key?: string
+ nutrition_mode?: "" | "keep" | "replace" | "clear"
+ nutrition_food_id?: number
+ nutrition_portion_key?: string
+ nutrition_portion_count?: number
+ nutrition_amount?: number
+ nutrition_unit?: string
+ food_state?: string
+ portion_source?: string
+}
 
+export interface HealthEvidence {
+  nutrition?: NutritionSnapshot | null
+  source: "journal" | "record"
+  id: number
+  meal_type: string
+  dish_name: string
+  portion: string
+  food_groups: string[]
+  linked_record_id: number | null
+  possible_duplicate_ids: number[]
+}
+export interface HealthDay {
+  date: string
+  meal_count: number
+  meal_event_count: number
+  item_count: number
+  status: "unknown" | "partial" | "complete"
+  fingerprint: string
+  evidence: HealthEvidence[]
+  cuisines: string[]
+  food_groups: string[]
+}
+export interface HealthPlan {
+  id: number
+  dish_id: number
+  dish_name: string
+  meal_date: string
+  meal_type: string
+  status: "planned" | "recorded" | "unconfirmed"
+  available: boolean
+}
+export interface HealthProfile {
+  version: number
+  active: boolean
+  goal: string
+  eating_pattern: string
+  allergies: string[]
+  dietary_exclusions: string[]
+  confirmed_at: string | null
+}
+export interface HealthProfileInput {
+  version: number
+  confirmed: boolean
+  goal: string
+  eating_pattern: string
+  allergies: string[]
+  dietary_exclusions: string[]
+}
 export interface HealthReport {
+  comparison?: {
+    from: string
+    to: string
+    rule_version: string
+    method: string
+    nutrients: {
+      code: string
+      label: string
+      unit: string
+      status: string
+      reason: string
+      required_days: number
+      matched_days: number
+      current_dates: string[]
+      previous_dates: string[]
+      current_average: number | null
+      previous_average: number | null
+      delta: number | null
+    }[]
+  }
+  nutrients: HealthNutrientMetric[]
+  rule_version: string
+  timezone: string
+  meal_event_count: number
+  item_count: number
+  complete_days: number
+  portion_coverage?: { measured_items: number; standard_items: number; estimated_items: number; text_only_items: number; unknown_items: number }
+  portion_known_items: number
+  nutrition_status: string
+  method_notes: string[]
+  plans: HealthPlan[]
   period_days: number
   from: string
   to: string
@@ -135,7 +320,7 @@ export interface HealthReport {
   meal_count: number
   cuisine_counts: { name: string; count: number }[]
   food_group_days: Record<string, number>
-  days: { date: string; meal_count: number; cuisines: string[]; food_groups: string[] }[]
+  days: HealthDay[]
   insights: string[]
   plan_actions: string[]
   recommendations: { dish: Dish; reason: string }[]

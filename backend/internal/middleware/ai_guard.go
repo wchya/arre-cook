@@ -31,7 +31,7 @@ func AIIngress() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		if !aiIngressLimiter.Allow("ai-ingress:"+c.ClientIP(), 240) {
+		if !aiIngressLimiter.Allow("ai-ingress:"+clientKey(c), 240) {
 			c.Header("Retry-After", "60")
 			utils.Error(c, http.StatusTooManyRequests, 42900, "请求过于频繁，请稍后再试")
 			c.Abort()

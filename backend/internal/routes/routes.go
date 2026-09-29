@@ -87,8 +87,24 @@ func Setup(r *gin.Engine) {
 		app.DELETE("/family/dish-requests/:id", handlers.CancelDishRequest)
 		app.GET("/food-journal", handlers.GetFoodJournal)
 		app.POST("/food-journal", handlers.CreateFoodJournal)
+		app.PUT("/food-journal/:id", handlers.UpdateFoodJournal)
+		app.GET("/food-journal/:id", handlers.GetFoodJournalEntry)
+		app.PUT("/health/days/:date/status", handlers.ConfirmHealthDay)
+		app.POST("/health/plans", handlers.AcceptHealthPlan)
+		app.DELETE("/health/plans/:id", handlers.CancelHealthPlan)
 		app.DELETE("/food-journal/:id", handlers.DeleteFoodJournal)
 		app.GET("/health-report", handlers.GetHealthReport)
+		app.GET("/health/profile", handlers.GetHealthProfile)
+		app.PUT("/health/profile", handlers.PutHealthProfile)
+		app.DELETE("/health/profile", handlers.DeleteHealthProfile)
+		app.GET("/health/foods", handlers.ListNutritionFoods)
+		app.GET("/health/catalog", handlers.SearchNutritionCatalog)
+		app.POST("/health/catalog/:id/adopt", handlers.AdoptNutritionCatalog)
+		app.POST("/health/foods", handlers.CreateNutritionFood)
+		app.POST("/health/recipes", handlers.CreateNutritionRecipe)
+		app.PUT("/health/recipes/:id", handlers.UpdateNutritionRecipe)
+		app.PUT("/health/foods/:id", handlers.UpdateNutritionFood)
+		app.DELETE("/health/foods/:id", handlers.DeleteNutritionFood)
 
 		// AI 连接：个人访问令牌、嵌入会话、审计日志
 		app.GET("/me/agent-tokens", handlers.ListMyAgentTokens)
@@ -247,7 +263,7 @@ func healthz(c *gin.Context) {
 		status, code = "DOWN", http.StatusServiceUnavailable
 	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(code, gin.H{"status": status, "storage": storage.Backend(), "version": config.C.AppVersion, "time": time.Now().Format(time.RFC3339)})
+	c.JSON(code, gin.H{"status": status, "storage": storage.Backend(), "version": config.C.AppVersion, "busy_rejections": mw.BusyRejections(), "time": time.Now().Format(time.RFC3339)})
 }
 
 // spaHandler 前端构建产物：带 hash 的资源强缓存，index.html 不缓存，其余路径回落到 index.html。

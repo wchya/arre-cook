@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { dishesApi, pickApi, recordsApi } from "@/api"
 import type { Dish, DishIngredient, MealRecord } from "@/types"
 import { asArray } from "@/lib/utils"
+import { useDebouncedValue } from "@/lib/use-debounced-value"
 import { launchConfetti } from "@/lib/confetti"
 import DishImage from "@/components/DishImage"
 import PageHeader from "@/components/PageHeader"
@@ -494,29 +495,46 @@ function DishPickerModal({
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("全部")
   const meta = mealMeta[meal]
-  const { data, isLoading } = useQuery({
+  // The first page supplies the category chips; filtering runs on the server so
+  // recipes beyond the first 100 remain searchable.
+  const { data: browse } = useQuery({
     queryKey: ["dishes", "tomorrow-picker", meal],
     queryFn: () => dishesApi.list({ enabled: "true", meal_type: meal, pageSize: "100", sort: "sort_order", order: "asc" }),
   })
+  const keyword = useDebouncedValue(search.trim(), 300)
+  const filtering = keyword !== "" || category !== "全部"
+  const { data: searched, isLoading: searchLoading } = useQuery({
+    queryKey: ["dishes", "tomorrow-picker", meal, keyword, category],
+    queryFn: () => dishesApi.list({
+      enabled: "true", meal_type: meal, pageSize: "100", sort: "sort_order", order: "asc",
+      ...(keyword ? { search: keyword } : {}),
+      ...(category !== "全部" ? { category } : {}),
+    }),
+    enabled: filtering,
+  })
+  const isLoading = filtering ? searchLoading : !browse
+  const data = filtering ? searched : browse
   const dishes = useMemo(() => data?.items || [], [data])
   const candidates = useMemo(() => dishes.filter((d) => matchesMeal(d, meal)), [dishes, meal])
 
   const categories = useMemo(() => {
     const set = new Set<string>()
-    candidates.forEach((dish) => {
-      if (dish.category) set.add(dish.category)
+    ;(browse?.items || []).forEach((dish) => {
+      if (dish.category && matchesMeal(dish, meal)) set.add(dish.category)
     })
+    if (category !== "全部") set.add(category)
     return ["全部", ...Array.from(set)]
-  }, [candidates])
+  }, [browse, meal, category])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return candidates.filter((dish) => {
       if (category !== "全部" && dish.category !== category) return false
-      if (q && !dishSearchText(dish).includes(q)) return false
+      // Keeps results in step while the debounced request is still in flight.
+      if (q && !dishSearchText(dish).includes(q) && q !== keyword.toLowerCase()) return false
       return true
     })
-  }, [candidates, category, search])
+  }, [candidates, category, search, keyword])
 
   return (
     <div className="fixed inset-0 z-[220] flex items-end justify-center" onClick={onClose}>

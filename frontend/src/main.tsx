@@ -2,6 +2,10 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import "./index.css"
 import App from "./App"
+import { initializeAppearance } from "./store/useAppearanceStore"
+
+const disposeAppearance = initializeAppearance()
+if (import.meta.hot) import.meta.hot.dispose(disposeAppearance)
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

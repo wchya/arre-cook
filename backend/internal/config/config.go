@@ -181,13 +181,25 @@ func Load() {
 	}
 
 	if C.IsProduction() {
-		if C.JWTSecret == defaultJWTSecret || len(C.JWTSecret) < 16 {
-			log.Println("[安全警告] JWT_SECRET 使用了默认值或过短，生产环境请设置 32 位以上随机字符串")
+		// The signing key also salts email codes and family invites; a public value is a full takeover.
+		if C.JWTSecret == defaultJWTSecret || len(C.JWTSecret) < 16 || IsPlaceholderSecret(C.JWTSecret) {
+			log.Fatal("[安全] 生产环境 JWT_SECRET 为默认值、占位值或过短，请设置 32 位以上随机字符串后再启动")
 		}
-		if C.AdminPassword == "nini123" {
-			log.Println("[安全警告] ADMIN_PASSWORD 仍是默认值 nini123，请尽快修改（仅在首次创建管理员时生效，之后请在 App 内改密）")
+		if len(C.JWTSecret) < 32 {
+			log.Println("[安全警告] JWT_SECRET 短于 32 位，建议更换为更长的随机字符串")
 		}
 	}
+}
+
+// IsPlaceholderSecret reports values copied verbatim from .env.example or the built-in defaults.
+func IsPlaceholderSecret(v string) bool {
+	v = strings.ToLower(strings.TrimSpace(v))
+	return strings.HasPrefix(v, "replace-with") || strings.HasPrefix(v, "changeme") || v == "nini123"
+}
+
+// WeakBootstrapPassword 首次创建管理员时拒绝默认、占位或过短的密码（生产环境）。
+func (c Config) WeakBootstrapPassword() bool {
+	return c.IsProduction() && (IsPlaceholderSecret(c.AdminPassword) || len(c.AdminPassword) < 12)
 }
 
 func mysqlDSNFromEnv() string {

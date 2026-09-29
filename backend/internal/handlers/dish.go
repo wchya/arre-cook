@@ -11,6 +11,7 @@ import (
 	"ninimenu/internal/video"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -424,7 +425,10 @@ func BatchToggleDishes(c *gin.Context) {
 		return
 	}
 	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
-		database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Where("id IN ?", ids).Update("enabled", req.Enabled)
+		if err := database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Where("id IN ?", ids).Update("enabled", req.Enabled).Error; err != nil {
+			utils.InternalError(c, "批量操作失败，请稍后重试")
+			return
+		}
 	}
 	utils.SuccessMsg(c, "批量操作成功")
 }
@@ -471,8 +475,17 @@ func BatchUpdateCategory(c *gin.Context) {
 		utils.BadRequest(c, "请选择菜品并指定分类")
 		return
 	}
+	// Same rule as single-dish edits: the category feeds filter chips and counts.
+	req.Category = strings.TrimSpace(req.Category)
+	if n := utf8.RuneCountInString(req.Category); n < 1 || n > 40 {
+		utils.BadRequest(c, "分类请填写 1-40 个字")
+		return
+	}
 	if ids := editableIDs(c, req.IDs); len(ids) > 0 {
-		database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Where("id IN ?", ids).Update("category", req.Category)
+		if err := database.DB.WithContext(c.Request.Context()).Model(&models.Dish{}).Where("id IN ?", ids).Update("category", req.Category).Error; err != nil {
+			utils.InternalError(c, "批量修改分类失败，请稍后重试")
+			return
+		}
 	}
 	utils.SuccessMsg(c, "批量修改分类成功")
 }

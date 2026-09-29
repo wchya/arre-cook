@@ -124,12 +124,12 @@ Page({
 
   async logoutAll() {
     if (this.data.logoutAllBusy) return
-    const ok = await ui.confirm({ title: "退出所有设备？", content: "所有设备上的登录都会失效，你需要重新登录。", confirmText: "退出", danger: true })
+    const ok = await ui.confirm({ title: "退出所有设备？", content: "所有设备上的登录与 AI 连接令牌都会失效，你需要重新登录，AI 连接需重新创建令牌。", confirmText: "退出", danger: true })
     if (!ok) return
     this.setData({ logoutAllBusy: true })
     try {
-      await api.post("/me/logout-all")
-      ui.toast("已退出所有设备", "success")
+      const result = await api.post("/me/logout-all")
+      ui.toast((result && result.message) || "已退出所有设备", "success")
       setTimeout(() => session.logout("logout"), 600)
     } catch (error) {
       ui.toast(error.message || "操作失败")

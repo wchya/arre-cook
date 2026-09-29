@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,10 +17,47 @@ import (
 )
 
 var apiSlots = make(chan struct{}, 16)
+
+// SSE answers hold a request for up to 90 seconds. They are already bounded by
+// the shared assistant lease (four site-wide), so keep them out of the pool
+// that every page load needs.
+var streamSlots = make(chan struct{}, 6)
 var passwordSlots = make(chan struct{}, 2)
 var largeReadSlots = make(chan struct{}, 2)
 var apiLimiter = newWindowLimiter(time.Minute)
 var passwordLimiter = newWindowLimiter(time.Minute)
+
+// busyRejections counts admission refusals so /healthz can expose saturation.
+var busyRejections atomic.Int64
+
+// BusyRejections 自进程启动以来因并发预算已满而拒绝的请求数。
+func BusyRejections() int64 { return busyRejections.Load() }
+
+// admissionWait absorbs short bursts (a page firing several requests at once)
+// instead of failing them the instant every slot is taken.
+const admissionWait = 300 * time.Millisecond
+
+func acquireSlot(ctx context.Context, slots chan struct{}) bool {
+	select {
+	case slots <- struct{}{}:
+		return true
+	default:
+	}
+	timer := time.NewTimer(admissionWait)
+	defer timer.Stop()
+	select {
+	case slots <- struct{}{}:
+		return true
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return false
+	}
+}
+
+func isStreamPath(path string) bool {
+	return path == "/api/assistant/chat" || path == "/api/assistant/video-recipe"
+}
 
 // Admission precedes authentication and body allocation. Long-running AI calls
 // retain their own shorter sub-operation deadlines and a 90 second total budget.
@@ -34,25 +72,25 @@ func RequestBudget() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		if !apiLimiter.Allow(c.ClientIP(), 360) {
+		if !apiLimiter.Allow(clientKey(c), 360) {
 			rejectBusy(c)
 			return
 		}
-		select {
-		case apiSlots <- struct{}{}:
-			defer func() { <-apiSlots }()
-		default:
-			rejectBusy(c)
+		slots := apiSlots
+		if isStreamPath(path) {
+			slots = streamSlots
+		}
+		if !acquireSlot(c.Request.Context(), slots) {
+			rejectSaturated(c)
 			return
 		}
+		defer func() { <-slots }()
 		if c.Request.Method == http.MethodGet && (strings.HasSuffix(path, "/export") || path == "/api/dishes" || path == "/api/agent/dishes") {
-			select {
-			case largeReadSlots <- struct{}{}:
-				defer func() { <-largeReadSlots }()
-			default:
-				rejectBusy(c)
+			if !acquireSlot(c.Request.Context(), largeReadSlots) {
+				rejectSaturated(c)
 				return
 			}
+			defer func() { <-largeReadSlots }()
 		}
 		timeout := 15 * time.Second
 		if strings.HasPrefix(path, "/api/assistant/") || strings.HasPrefix(path, "/api/agent/") || path == "/mcp" {
@@ -103,9 +141,17 @@ func rejectBusy(c *gin.Context) {
 	c.Abort()
 }
 
+// rejectSaturated is server capacity, not client behaviour: say so, and retry soon.
+func rejectSaturated(c *gin.Context) {
+	busyRejections.Add(1)
+	c.Header("Retry-After", "3")
+	utils.Error(c, 429, 42900, "服务繁忙，请稍后重试")
+	c.Abort()
+}
+
 func PasswordBudget() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		key := "ip:" + c.ClientIP()
+		key := "ip:" + clientKey(c)
 		if auth.UID(c) != 0 {
 			key = "user:" + itoa(auth.UID(c))
 		}

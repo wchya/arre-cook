@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
 	"ninimenu/internal/llm"
@@ -111,7 +112,12 @@ func UnlockAchievement(c *gin.Context) {
 		utils.SuccessMsg(c, "已解锁")
 		return
 	}
-	database.DB.WithContext(c.Request.Context()).Create(&models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()})
+	unlock := models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()}
+	// A concurrent unlock hitting the unique index is still an unlocked achievement.
+	if err := database.DB.WithContext(c.Request.Context()).Clauses(clause.OnConflict{DoNothing: true}).Create(&unlock).Error; err != nil {
+		utils.InternalError(c, "解锁失败，请稍后重试")
+		return
+	}
 	utils.SuccessMsg(c, "解锁成功")
 }
 
@@ -127,11 +133,18 @@ func ToggleAchievement(c *gin.Context) {
 	}
 	var ua models.UserAchievement
 	if err := database.DB.WithContext(c.Request.Context()).Scopes(database.OwnedBy(uid(c))).Where("achievement_id = ?", achievement.ID).First(&ua).Error; err == nil {
-		database.DB.WithContext(c.Request.Context()).Delete(&ua)
+		if err := database.DB.WithContext(c.Request.Context()).Delete(&ua).Error; err != nil {
+			utils.InternalError(c, "操作失败，请稍后重试")
+			return
+		}
 		utils.SuccessMsg(c, "已关闭")
 		return
 	}
-	database.DB.WithContext(c.Request.Context()).Create(&models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()})
+	unlock := models.UserAchievement{UserID: uid(c), AchievementID: achievement.ID, UnlockedAt: time.Now()}
+	if err := database.DB.WithContext(c.Request.Context()).Clauses(clause.OnConflict{DoNothing: true}).Create(&unlock).Error; err != nil {
+		utils.InternalError(c, "操作失败，请稍后重试")
+		return
+	}
 	utils.SuccessMsg(c, "已激活")
 }
 

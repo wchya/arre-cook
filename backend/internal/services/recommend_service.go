@@ -126,10 +126,17 @@ func RecommendDishes(uid uint, req RecommendRequest, dbs ...*gorm.DB) (*Recommen
 	}
 
 	exclude := cleanList(req.ExcludeIngredients)
-	var hardExclude []string
+	hardExclude, err := healthProfileExclusions(uid, requestDB)
+	if err != nil {
+		return nil, err
+	}
 	if !req.IgnorePreferences {
-		hardExclude = prefs.Allergies
+		hardExclude = append(hardExclude, prefs.Allergies...)
 		exclude = append(exclude, prefs.AvoidIngredients...)
+	}
+	// Report actions must satisfy the same restrictions as plan acceptance.
+	if req.Source == "health_report" {
+		hardExclude = append(hardExclude, prefs.AvoidIngredients...)
 	}
 	maxCook := req.MaxCookTime
 

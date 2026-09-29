@@ -6,7 +6,7 @@ import type {
   FavoriteOverview, SmartPickRequest, SmartPickResult, TasteProfile, BehaviorEventInput, AuthOptions, LoginResult, User,
   Preferences, UserStats, AgentTokenList, AgentToken, AgentAuditLog, AgentSession, Suggestion, ChatSession, ChatMessage,
   ChatCard, AssistantStatus, AssistantQuota, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
-  FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport,
+  FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport, HealthProfile, HealthProfileInput, NutritionFood, NutritionRecipeInput, NutritionCatalogFood,
   NotificationPage,
   DishVideoMeta,
 } from "@/types"
@@ -59,6 +59,20 @@ export const familyApi = {
 }
 
 export const healthApi = {
+  profile: () => api<HealthProfile>("GET", "/health/profile"),
+  saveProfile: (input: HealthProfileInput) => api<HealthProfile>("PUT", "/health/profile", input),
+  clearProfile: (version: number) => api<HealthProfile>("DELETE", `/health/profile?version=${version}`),
+  catalog: (q: string, state: string) => api<NutritionCatalogFood[]>("GET", `/health/catalog?q=${encodeURIComponent(q)}&state=${encodeURIComponent(state)}`),
+  adoptCatalog: (id: number) => api<NutritionFood>("POST", `/health/catalog/${id}/adopt`),
+  foods: () => api<NutritionFood[]>("GET", "/health/foods"),
+  saveFood: (input: Omit<NutritionFood, "id" | "source">, id?: number) => api<NutritionFood>(id ? "PUT" : "POST", id ? `/health/foods/${id}` : "/health/foods", input),
+  saveRecipe: (input: NutritionRecipeInput, id?: number) => api<NutritionFood>(id ? "PUT" : "POST", id ? `/health/recipes/${id}` : "/health/recipes", input),
+  deleteFood: (id: number) => api<null>("DELETE", `/health/foods/${id}`),
+  entry: (id: number) => api<FoodJournalEntry>("GET", `/food-journal/${id}`),
+  update: (id: number, input: FoodJournalInput) => api<FoodJournalEntry>("PUT", `/food-journal/${id}`, input),
+  confirmDay: (date: string, fingerprint: string, complete: boolean) => api<null>("PUT", `/health/days/${date}/status`, { fingerprint, complete }),
+  plan: (dishId: number, mealDate: string, mealType: string, periodDays: number) => api<unknown>("POST", "/health/plans", { dish_id: dishId, meal_date: mealDate, meal_type: mealType, period_days: periodDays }),
+  cancelPlan: (id: number) => api<null>("DELETE", `/health/plans/${id}`),
   journal: (from?: string, to?: string) => api<FoodJournalEntry[]>("GET", "/food-journal", { from: from || "", to: to || "" }),
   record: (input: FoodJournalInput) => api<FoodJournalEntry>("POST", "/food-journal", input),
   remove: (id: number) => api<null>("DELETE", `/food-journal/${id}`),

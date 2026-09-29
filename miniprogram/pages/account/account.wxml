@@ -34,7 +34,7 @@
         </view>
         <view class="row" hover-class="tap-bg" bindtap="logoutAll">
           <view class="row-icon tone-muted"><icon name="log-out" size="34" stroke="2.3" color="text2" /></view>
-          <view class="row-main"><view class="row-title">退出所有设备</view><view class="row-desc">让其他设备登录失效，当前设备也会退出</view></view>
+          <view class="row-main"><view class="row-title">退出所有设备</view><view class="row-desc">让其他设备登录与 AI 连接令牌失效，当前设备也会退出</view></view>
           <view wx:if="{{logoutAllBusy}}" class="spinner"></view>
           <icon wx:else name="chevron-right" size="32" stroke="2" color="text4" />
         </view>

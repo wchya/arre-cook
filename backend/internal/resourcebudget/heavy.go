@@ -6,20 +6,42 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 )
 
 var slot = make(chan struct{}, 1)
 var ErrBusy = errors.New("heavy task capacity exhausted")
 
 func Acquire(ctx context.Context) (func(), error) {
+	return AcquireWait(ctx, 0)
+}
+
+// AcquireWait queues for up to wait before giving up, so short image decodes
+// can line up behind each other (or a bounded ASR job) instead of failing.
+func AcquireWait(ctx context.Context, wait time.Duration) (func(), error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	release := func() func() {
+		var once sync.Once
+		return func() { once.Do(func() { <-slot }) }
+	}
 	select {
 	case slot <- struct{}{}:
-		var once sync.Once
-		return func() { once.Do(func() { <-slot }) }, nil
+		return release(), nil
 	default:
+	}
+	if wait <= 0 {
+		return nil, ErrBusy
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case slot <- struct{}{}:
+		return release(), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-timer.C:
 		return nil, ErrBusy
 	}
 }

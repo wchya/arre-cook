@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/useAuthStore"
 import { useAppInfoStore } from "@/store/useAppInfoStore"
 import { asString } from "@/lib/utils"
 import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
+import ThemePicker from "@/components/ThemePicker"
 import toast from "react-hot-toast"
 import {
   Bell, Bot, Camera, ChevronRight, Heart, Images, Inbox, LayoutDashboard, LogOut, NotebookPen, Plug, Salad, Shield,
@@ -130,7 +131,7 @@ export default function Me() {
             {user.avatar ? (
               <img src={user.avatar} alt="" className="h-[68px] w-[68px] rounded-[24px] object-cover shadow-[0_10px_24px_rgba(232,115,74,.25)] ring-4 ring-white/70" />
             ) : (
-              <span className="flex h-[68px] w-[68px] items-center justify-center rounded-[24px] bg-gradient-to-br from-[#F59A6B] to-primary text-[28px] font-black text-white shadow-[0_10px_24px_rgba(232,115,74,.3)] ring-4 ring-white/70">
+              <span className="flex h-[68px] w-[68px] items-center justify-center rounded-[24px] bg-primary text-[28px] font-black text-white ring-4 ring-card/70">
                 {(user.nickname || "我").slice(0, 1).toUpperCase()}
               </span>
             )}
@@ -186,6 +187,7 @@ export default function Me() {
         </Group>
 
         <Group title="偏好设置">
+          <ThemePicker variant="row" />
           <Row icon={Sparkles} tone="bg-bg text-text2" title="推荐去重" desc={`近 ${repeatDays} 天吃过的菜不优先推荐`} onClick={() => setRepeatSheet(true)} right={<span className="text-[13px] font-semibold text-text3">{repeatDays} 天 ›</span>} />
           <Row icon={Bot} tone="bg-bg text-text2" title="语音播报" desc="做菜时朗读步骤" onClick={() => settingsMut.mutate({ voice_enabled: voiceOn ? "0" : "1" })} right={<Switch on={voiceOn} />} />
         </Group>

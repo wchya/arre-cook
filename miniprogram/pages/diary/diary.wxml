@@ -7,6 +7,8 @@
     <view class="segmented-item {{view === 'report' ? 'is-active' : ''}}" data-view="report" bindtap="switchView"><icon name="chart-pie" size="28" stroke="2.4" color="{{view === 'report' ? 'text' : 'text3'}}" /><text>健康报告</text></view>
   </view>
 
+  <health-profile bind:changed="profileChanged" />
+
   <request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
   <!-- 饮食日记 -->
   <block wx:if="{{view === 'journal' && !loadError}}">
@@ -29,6 +31,7 @@
                 <text wx:if="{{entry.cuisine}}" class="chip chip-sm chip-ghost">{{entry.cuisine}}</text>
                 <text wx:for="{{entry.groups}}" wx:for-item="g" wx:key="*this" class="chip chip-sm chip-mint">{{g}}</text>
               </view>
+              <view class="hint">{{entry.portion}}</view><view class="health-controls"><button size="mini" data-id="{{entry.id}}" bindtap="editEntry">编辑</button><button size="mini" data-id="{{entry.id}}" data-copy="{{true}}" bindtap="editEntry">今天也吃了</button></view>
               <view wx:if="{{entry.notes}}" class="entry__notes">{{entry.notes}}</view>
             </view>
             <view class="entry__del" hover-class="tap-active" data-id="{{entry.id}}" bindtap="removeEntry"><icon name="trash-2" size="30" stroke="2.2" color="text4" /></view>
@@ -52,7 +55,28 @@
     <block wx:elif="{{report}}">
       <view class="grid-2 mb-24">
         <view class="stat-card"><view class="stat-value c-primary">{{report.logged_days}}<text class="stat-unit">/ {{report.period}} 天</text></view><view class="stat-label">有记录的日子</view></view>
-        <view class="stat-card"><view class="stat-value c-mint">{{report.meal_count}}</view><view class="stat-label">饮食记录条目</view></view>
+        <view class="stat-card"><view class="stat-value c-mint">{{report.complete_days}}</view><view class="stat-label">确认完整的日子</view></view>
+      </view>
+
+      <view class="card card-pad mb-24">
+        <view class="section-title">先看记录，再看饮食</view>
+        <view class="hint">{{report.meal_event_count}} 餐 · {{report.item_count}} 个食物项 · 北京时间</view>
+        <view wx:if="{{report.portion_coverage}}" class="health-evidence"><view>食用量的依据</view><view class="hint">称量 / 量取 {{report.portion_coverage.measured_items}} 项 · 标准份量估算 {{report.portion_coverage.standard_items}} 项 · 其他估算 {{report.portion_coverage.estimated_items}} 项</view><view class="hint">仅文字份量 {{report.portion_coverage.text_only_items}} 项 · 份量未知 {{report.portion_coverage.unknown_items}} 项</view><view class="hint">按去重食物项统计；文字份量不会自动换算，称量也不代表营养值经过核验。</view></view>
+        <view class="health-calendar"><button wx:for="{{reportDays}}" wx:key="date" class="health-day {{selectedDay.date === item.date ? 'is-selected' : ''}}" data-date="{{item.date}}" bindtap="chooseDay"><view>{{item.shortDate}}</view><view class="health-day-label">{{item.statusLabel}}</view></button></view>
+        <view wx:if="{{selectedDay}}">
+          <view class="section-title">{{selectedDay.date}} · {{selectedDay.statusLabel}}</view>
+          <view class="hint">{{selectedDay.meal_event_count}} 餐 · {{selectedDay.item_count}} 个食物项；原始来源 {{selectedDay.meal_count}} 条</view>
+          <view wx:for="{{selectedDay.evidence}}" wx:key="key" class="health-evidence">
+            <view>{{item.mealLabel}} · {{item.dish_name}}</view>
+            <view class="hint">{{item.sourceLabel}} · {{item.portion || '份量未记录'}} {{item.linked_record_id ? '· 已关联同一食物' : ''}}</view>
+            <view wx:if="{{item.nutrition}}" class="hint">营养来源：{{item.nutrition.source_reference}} · {{item.nutrition.amount}} {{item.nutrition.unit}} · {{item.nutrition.portion_source === 'measured' ? '称量/量取' : '估计份量'}} · 来源 v{{item.nutrition.food_version}}</view>
+            <view wx:if="{{item.nutrition.standard_portion}}" class="hint">标准份量估算：{{item.nutrition.standard_portion.count}} × {{item.nutrition.standard_portion.label}}（每份{{item.nutrition.standard_portion.amount}}{{item.nutrition.unit}}）；依据：{{item.nutrition.standard_portion.reference}}。</view>
+            <view wx:if="{{item.nutrition.catalog}}" class="hint">标准食物：{{item.nutrition.catalog.dataset}} · {{item.nutrition.catalog.version}} · {{item.nutrition.catalog.record_id}}；按可食部分。核验：{{item.nutrition.catalog.reviewed_by}}（{{item.nutrition.catalog.reviewed_at}}）；许可：{{item.nutrition.catalog.license}}。<text selectable="{{true}}">{{item.nutrition.catalog.url}}</text></view>
+            <view wx:if="{{item.nutrition.recipe}}" class="hint">混合配方成品 {{item.nutrition.recipe.yield_g}} g，按均匀混合分摊估算。<view wx:for="{{item.nutrition.recipe.ingredients}}" wx:for-item="ingredient" wx:key="food_id">{{ingredient.food_name}} · {{ingredient.amount}} {{ingredient.unit}} · 来源 v{{ingredient.food_version}} · {{ingredient.source_reference}}<view wx:if="{{ingredient.catalog}}">标准食物：{{ingredient.catalog.dataset}} · {{ingredient.catalog.version}} · {{ingredient.catalog.record_id}}；按可食部分。核验：{{ingredient.catalog.reviewed_by}}（{{ingredient.catalog.reviewed_at}}）；许可：{{ingredient.catalog.license}}。<text selectable="{{true}}">{{ingredient.catalog.url}}</text></view></view></view>
+            <button wx:if="{{item.duplicateId}}" size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" data-record="{{item.duplicateId}}" bindtap="linkDuplicate">与菜谱记录相同？确认关联</button>
+          </view>
+          <view class="health-controls"><button size="mini" bindtap="recordDay">补记这一天</button><button wx:if="{{selectedDay.item_count}}" size="mini" disabled="{{actionBusy}}" bindtap="confirmDay">{{selectedDay.status === 'complete' ? '改为未确认' : '确认当天已记完整'}}</button></view>
+        </view>
       </view>
 
       <view wx:if="{{report.insights.length}}" class="card card-pad mb-24">
@@ -79,21 +103,47 @@
         <view class="hint">仅统计手动标注的日子，未标注不代表没吃。</view>
       </view>
 
+      <view class="card card-pad mb-24"><view class="section-title">有来源的营养记录</view><view class="hint">由个人标签、已选标准食物和食用量计算，标签未经平台核验，可能包含份量估计。未知不算零，不判断摄入是否达标。</view>
+        <view wx:for="{{nutritionMetrics}}" wx:key="code" class="health-evidence"><view>{{item.label}} · {{item.known_total === null ? '未记录' : '已知部分合计 ' + item.known_total + ' ' + item.unit}}</view><view class="hint">覆盖 {{item.covered_items}}/{{item.total_items}} 个食物项。{{item.daily_average === null ? '完整且数据齐全的日子 ' + item.complete_days + '/' + item.required_days + '，暂不显示日均值。' : item.complete_days + ' 个完整日的均值：' + item.daily_average + ' ' + item.unit + '/天。'}}</view></view>
+        <view class="hint">日均值要求本期至少 4/7 的天数记录完整且该营养素齐全，这是记录覆盖规则。</view>
+      </view>
+      <view wx:if="{{report.comparison}}" class="card card-pad mb-24">
+        <view class="section-title">和上一周期比一比</view>
+        <view class="hint">本期 {{report.from}} — {{report.to}}
+上期 {{report.comparison.from}} — {{report.comparison.to}}</view>
+        <view class="hint">按相同星期几匹配完整且营养齐全的日子。可能包含份量估计，升降不表示健康改善或恶化。</view>
+        <view wx:for="{{comparisonMetrics}}" wx:key="code" class="health-evidence">
+          <view>{{item.label}} · 已匹配 {{item.matched_days}}/{{item.required_days}} 对日期</view>
+          <view wx:if="{{item.status === 'available'}}" class="hint">上期配对日均 {{item.previous_average}} {{item.unit}}/天
+本期配对日均 {{item.current_average}} {{item.unit}}/天
+差值 {{item.deltaText}} {{item.unit}}/天</view>
+          <view class="hint">{{item.reason}}</view>
+          <button wx:if="{{item.matched_days > 0}}" class="btn btn-soft btn-sm mt-16" data-code="{{item.code}}" bindtap="toggleComparison">{{comparisonExpanded === item.code ? "收起配对日期" : "查看配对日期（上期 → 本期）"}}</button>
+          <view wx:if="{{comparisonExpanded === item.code}}" wx:for="{{item.datePairs}}" wx:for-item="pair" wx:key="current" class="hint">{{pair.previous}} → {{pair.current}}</view>
+        </view>
+      </view>
       <view wx:if="{{report.plan_actions.length}}" class="card card-pad mb-24">
         <view class="section-title mb-16"><icon name="target" size="32" stroke="2.3" color="yellow-dark" /><text>接下来这样安排</text></view>
         <view wx:for="{{report.plan_actions}}" wx:key="*this" class="action"><text class="action__idx">{{index + 1}}</text><text class="action__text">{{item}}</text></view>
         <view class="btn btn-soft btn-sm mt-16" hover-class="tap-active" bindtap="goPlan"><icon name="calendar-days" size="28" stroke="2.4" color="primary" /><text>安排一周菜单</text></view>
       </view>
 
+      <view wx:if="{{!recs.length}}" class="card card-pad mb-24"><view class="section-title">给下一餐一个小安排</view><view class="hint">暂无符合当前筛选条件的菜谱，可以补充适合自己的私房菜。不会为了凑数放宽档案中的过敏与禁忌。</view></view>
       <view wx:if="{{recs.length}}" class="card mb-24">
+        <view class="card-pad">
+          <view class="health-controls"><picker mode="date" value="{{planDate}}" start="{{today}}" end="{{planEnd}}" bindchange="onPlanDate"><view class="btn btn-ghost">{{planDate}}</view></picker><picker range="{{['午餐', '晚餐']}}" value="{{planMeal === 'lunch' ? 0 : 1}}" bindchange="onPlanMeal"><view class="btn btn-ghost">{{planMeal === 'lunch' ? '午餐' : '晚餐'}}</view></picker></view>
+          <view class="hint">加入后替换该餐随机推荐，食材同步到买菜清单。现有清单页展示今明两天；实际吃过后再记餐。</view>
+        </view>
         <view class="section-title rec-head"><icon name="sparkles" size="32" stroke="2.3" color="pink-ink" /><text>换个口味试试</text></view>
         <view wx:for="{{recs}}" wx:key="id" class="rec" hover-class="tap-bg" data-id="{{item.id}}" bindtap="goDish">
           <view class="rec__thumb"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="40" /></view>
           <view class="flex-1"><view class="rec__name truncate">{{item.name}}</view><view class="rec__reason">{{item.reason}}</view></view>
-          <icon name="chevron-right" size="30" color="text4" />
+          <button size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" catchtap="acceptPlan">安排</button>
         </view>
       </view>
 
+      <view wx:if="{{plans.length}}" class="card card-pad mb-24"><view class="section-title">已安排与复盘</view><view wx:for="{{plans}}" wx:key="id" class="health-evidence"><view>{{item.meal_date}} · {{item.mealLabel}} · {{item.dish_name}}</view><view class="hint">{{item.statusLabel}}{{item.available ? '' : ' · 菜谱不可用或与当前忌口冲突'}}</view><button size="mini" disabled="{{actionBusy}}" data-id="{{item.id}}" bindtap="cancelPlan">撤销安排</button></view></view>
+      <view class="card card-pad mb-24"><view class="section-title">统计口径与数据说明</view><view wx:for="{{report.method_notes}}" wx:key="*this" class="hint">{{item}}</view></view>
       <view class="btn btn-ghost btn-block" hover-class="tap-active" bindtap="goChat"><icon name="sparkles" size="30" stroke="2.4" color="text2" /><text>和 AI 助手聊聊饮食规划</text></view>
       <view class="disclaimer">报告用于整理你填写的饮食信息，不提供营养诊断或医疗建议。</view>
     </block>
@@ -124,6 +174,8 @@
       <view class="field {{focusDish ? 'is-focus' : ''}}"><input adjust-position="{{false}}" class="field-input" value="{{formDish}}" maxlength="100" placeholder="例如：番茄鸡蛋面" placeholder-class="placeholder" data-k="Dish" bindinput="onDishInput" bindfocus="focusOn" bindblur="focusOff" /></view>
     </view>
     <view class="form-block">
+      <text class="field-label">我吃了多少（可选）</text><view class="field"><input class="field-input" value="{{formPortion}}" maxlength="100" placeholder="半碗、2 个、约 150 克；不知道可留空" bindinput="onPortionInput" /></view>
+    </view><view class="form-block">
       <text class="field-label">菜系 <text class="field-opt">可选</text></text>
       <view class="field {{focusCuisine ? 'is-focus' : ''}}"><input adjust-position="{{false}}" class="field-input" value="{{formCuisine}}" maxlength="40" placeholder="自己填写或从下方选择" placeholder-class="placeholder" data-k="Cuisine" bindinput="onCuisineInput" bindfocus="focusOn" bindblur="focusOff" /></view>
       <scroll-view scroll-x class="cuisine-scroll" show-scrollbar="{{false}}" enhanced>
@@ -131,6 +183,67 @@
           <view wx:for="{{cuisines}}" wx:key="*this" class="chip chip-sm {{formCuisine === item ? 'chip-primary' : 'chip-ghost'}}" hover-class="tap-active" data-value="{{item}}" bindtap="chooseCuisine">{{item}}</view>
         </view>
       </scroll-view>
+    </view>
+    <view class="form-block">
+      <text class="field-label">营养标签、配方与食用量（可选）</text>
+      <view class="hint">只填写包装标明的数值，没有标签可跳过。标签为个人转录，未经平台核验；食物状态和单位须一致，不自动做生熟换算。</view>
+      <view wx:if="{{formNutritionSnapshot && formNutritionMode !== 'replace' && formNutritionMode !== 'clear'}}" class="hint">保留历史快照：{{formNutritionSnapshot.food_name}} · {{formNutritionSnapshot.amount}} {{formNutritionSnapshot.unit}} · 来源 v{{formNutritionSnapshot.food_version}}</view>
+      <picker disabled="{{labelOpen || recipeOpen || catalogOpen || labelSaving}}" range="{{nutritionChoices}}" value="{{nutritionIndex}}" bindchange="selectNutritionFood"><view class="field">{{nutritionChoices[nutritionIndex]}}</view></picker>
+      <block wx:if="{{formNutritionFood && formNutritionMode === 'replace'}}">
+        <view class="hint">来源：{{formNutritionFood.source_reference}}</view>
+        <view wx:if="{{formNutritionFood.portions.length}}" class="health-controls"><button size="mini" bindtap="chooseStandardPortion">直接填写克重 / 毫升</button><button wx:for="{{formNutritionFood.portions}}" wx:key="key" size="mini" data-key="{{item.key}}" bindtap="chooseStandardPortion">{{item.label}}（约{{item.amount}}{{formNutritionFood.basis_unit}}）</button></view>
+        <block wx:if="{{formStandardPortion}}"><view class="hint">每{{formStandardPortion.label}}约{{formStandardPortion.amount}}{{formNutritionFood.basis_unit}}可食部分。依据：{{formStandardPortion.reference}}。按标准份量估算，实际大小可能不同。</view><view class="field"><input class="field-input" type="digit" value="{{formPortionCount}}" placeholder="吃了几份（可填0.5）" bindinput="onStandardPortionCount" /></view></block>
+        <view wx:else class="field"><input class="field-input" type="digit" value="{{formNutritionAmount}}" placeholder="个人实际食用量（{{formNutritionFood.basis_unit}}）" bindinput="onNutritionAmount" /></view>
+        <picker disabled="{{!!formNutritionFood.recipe || !!formStandardPortion}}" range="{{['称量 / 量取', '估计份量']}}" value="{{formPortionSource === 'measured' ? 0 : 1}}" bindchange="onPortionSource"><view class="field">{{formPortionSource === 'measured' ? '称量 / 量取' : '估计份量'}}</view></picker>
+        <button wx:if="{{!formNutritionFood.recipe && !formNutritionFood.catalog}}" size="mini" data-edit="{{true}}" bindtap="openLabel">修正标签</button>
+        <block wx:if="{{formNutritionFood.recipe}}"><view class="hint">整份成品 {{formNutritionFood.recipe.yield_g}} g，按均匀混合分摊估算。</view><view wx:for="{{formNutritionFood.recipe.ingredients}}" wx:key="food_id" class="hint">{{item.food_name}} · {{item.amount}} {{item.unit}} · 标签 v{{item.food_version}}</view><button size="mini" data-edit="{{true}}" bindtap="openRecipe">修正配方</button></block>
+      </block>
+      <view wx:if="{{formNutritionFood.catalog && formNutritionMode === 'replace'}}" class="hint">按可食部分称量。{{formNutritionFood.catalog.dataset}} · {{formNutritionFood.catalog.version}} · {{formNutritionFood.catalog.record_id}}
+核验：{{formNutritionFood.catalog.reviewed_by}}（{{formNutritionFood.catalog.reviewed_at}}）
+许可：{{formNutritionFood.catalog.license}}。目录更新不会替换此副本。<button size="mini" disabled="{{labelSaving}}" bindtap="deleteCatalogFood">从我的食物移除</button></view>
+      <view class="health-controls"><button size="mini" bindtap="openLabel">录入包装标签</button><button size="mini" bindtap="openRecipe">新建混合配方</button><button size="mini" bindtap="openCatalog">查找标准食物</button><button size="mini" bindtap="clearNutrition">清除本条营养快照</button></view>
+      <view wx:if="{{catalogOpen}}" class="health-evidence">
+        <text class="field-label">查找有来源的标准食物</text>
+        <view class="hint">按可食部分每100克/毫升计量，不能用于带皮、带骨重量。核验不代表医学认证。</view>
+        <view class="field"><input class="field-input" maxlength="100" value="{{catalogQuery}}" placeholder="食物名称或别名" bindinput="onCatalogQuery" /></view>
+        <picker range="{{catalogStateLabels}}" value="{{catalogStateIndex}}" bindchange="onCatalogState"><view class="field">{{catalogStateLabels[catalogStateIndex]}}</view></picker>
+        <view class="health-controls"><button size="mini" disabled="{{labelSaving}}" bindtap="searchCatalog">搜索</button><button size="mini" disabled="{{labelSaving}}" bindtap="closeCatalog">返回录入</button></view>
+        <view wx:if="{{catalogLoading}}" class="hint">正在查询目录…</view>
+        <button wx:elif="{{catalogError}}" size="mini" bindtap="searchCatalog">目录加载失败，重试</button>
+        <view wx:elif="{{!catalogResults.length}}" class="hint">没有匹配且已核验的食物。可调整搜索，或返回录入包装标签；未配置目录时仍可普通记餐。</view>
+        <block wx:else><view wx:for="{{catalogResults}}" wx:key="id" class="health-evidence"><view>{{item.name}} · {{item.stateLabel}} · 每100{{item.basis_unit}}可食部分</view><view class="hint">来源：{{item.provenance.dataset}} · {{item.provenance.version}} · {{item.provenance.record_id}}
+许可：{{item.provenance.license}}
+核验：{{item.provenance.reviewed_by}} · {{item.provenance.reviewed_at}}</view><text selectable="{{true}}" class="hint">{{item.provenance.url}}</text><button size="mini" disabled="{{labelSaving}}" data-id="{{item.id}}" bindtap="adoptCatalog">添加到我的食物并选择</button></view></block>
+        <view wx:if="{{catalogResults.length === 50}}" class="hint">最多显示50项，请细化搜索词。</view>
+      </view>
+      <view wx:if="{{recipeOpen}}" class="health-evidence">
+        <text class="field-label">无需加热的混合配方</text>
+        <view class="hint">先录入所有原料的标签或标准食物。仅适用于无需加热、没有弃汤或沥水、全部原料与调料保留的均匀混合食品。修正将采用当前标签版本，历史记录不变。</view>
+        <view class="field"><input disabled="{{labelSaving}}" class="field-input" maxlength="100" value="{{recipeName}}" placeholder="配方名称" data-key="recipeName" bindinput="onRecipeField" /></view>
+        <view class="field"><input disabled="{{labelSaving}}" class="field-input" maxlength="500" value="{{recipeSource}}" placeholder="来源与制作说明" data-key="recipeSource" bindinput="onRecipeField" /></view>
+        <view wx:for="{{recipeRows}}" wx:key="rowKey" class="health-evidence">
+          <text class="field-label">原料 {{index + 1}}</text>
+          <picker disabled="{{labelSaving}}" range="{{recipeChoices}}" value="{{item.index}}" data-row="{{index}}" bindchange="onRecipeFood"><view class="field">{{recipeChoices[item.index]}}</view></picker>
+          <view class="field"><input disabled="{{labelSaving}}" class="field-input" type="digit" value="{{item.amount}}" placeholder="加入量（{{item.unit || '先选标签'}}）" data-row="{{index}}" bindinput="onRecipeAmount" /></view>
+          <button size="mini" disabled="{{labelSaving || recipeRows.length <= 2}}" data-row="{{index}}" bindtap="removeRecipeRow">移除原料</button>
+        </view>
+        <button size="mini" disabled="{{labelSaving || recipeRows.length >= 20}}" bindtap="addRecipeRow">添加原料</button>
+        <view class="field"><input disabled="{{labelSaving}}" class="field-input" type="digit" value="{{recipeYield}}" placeholder="混合后整份成品重量（克）" data-key="recipeYield" bindinput="onRecipeField" /></view>
+        <checkbox-group bindchange="onRecipeConfirm"><label class="hint"><checkbox disabled="{{labelSaving}}" value="confirmed" checked="{{recipeConfirmed}}" />我已列出全部原料，无需加热且没有弃去固体或液体，接受按均匀混合估算。</label></checkbox-group>
+        <view class="hint">某原料缺少营养值时，配方该项仍为未知。保存后再填写自己吃的成品克重。</view>
+        <view class="health-controls"><button size="mini" disabled="{{labelSaving || !recipeConfirmed}}" bindtap="saveRecipe">{{labelSaving ? '保存中…' : '保存配方'}}</button><button size="mini" disabled="{{labelSaving}}" bindtap="closeRecipe">取消</button><button wx:if="{{recipeId}}" size="mini" disabled="{{labelSaving}}" bindtap="deleteRecipe">删除配方</button></view>
+      </view>
+      <view wx:if="{{labelOpen}}" class="health-evidence">
+        <text class="field-label">我的包装标签</text>
+        <view class="field"><input class="field-input" maxlength="100" value="{{labelName}}" placeholder="食物名称" bindinput="onLabelName" /></view>
+        <view class="field"><input class="field-input" maxlength="500" value="{{labelSource}}" placeholder="来源：品牌、包装规格、标签日期" bindinput="onLabelSource" /></view>
+        <picker range="{{['每 100 克', '每 100 毫升']}}" value="{{labelUnit === 'g' ? 0 : 1}}" bindchange="onLabelUnit"><view class="field">{{labelUnit === 'g' ? '每 100 克' : '每 100 毫升'}}</view></picker>
+        <picker range="{{foodStateLabels}}" value="{{labelStateIndex}}" bindchange="onLabelState"><view class="field">{{foodStateLabels[labelStateIndex]}}</view></picker>
+        <view class="hint">包装若写“每份”，先根据净含量换算为每 100 克/毫升，不能确认则留空。</view>
+        <picker range="{{['能量单位 kcal', '能量单位 kJ']}}" value="{{labelEnergyUnit === 'kcal' ? 0 : 1}}" bindchange="onLabelEnergyUnit"><view class="field">能量单位 {{labelEnergyUnit}}</view></picker>
+        <view wx:for="{{labelFields}}" wx:key="key"><text class="field-label">{{item.label}}（{{item.key === 'energy_kcal' ? labelEnergyUnit : item.unit}}）</text><view class="field"><input class="field-input" type="digit" value="{{item.value}}" placeholder="未知留空" data-key="{{item.key}}" bindinput="onLabelNutrient" /></view></view>
+        <view class="health-controls"><button size="mini" disabled="{{labelSaving}}" bindtap="saveLabel">{{labelSaving ? '保存中…' : '保存标签'}}</button><button size="mini" disabled="{{labelSaving}}" bindtap="closeLabel">取消</button><button wx:if="{{labelId}}" size="mini" disabled="{{labelSaving}}" bindtap="deleteLabel">删除标签</button></view>
+      </view>
     </view>
     <view class="form-block">
       <text class="field-label">食物类别 <text class="field-opt">可选 · 可多选</text></text>
@@ -143,8 +256,9 @@
       <textarea adjust-position="{{false}}" class="field-textarea {{focusNotes ? 'is-focus' : ''}}" value="{{formNotes}}" maxlength="500" placeholder="口感、心情、和谁一起吃…" placeholder-class="placeholder" data-k="Notes" bindinput="onNotesInput" bindfocus="focusOn" bindblur="focusOff" auto-height />
     </view>
   </view>
+  <view wx:if="{{formLinked}}" class="hint">已关联菜谱记录 <button size="mini" bindtap="unlinkRecord">解除关联</button></view>
   <view slot="footer" class="sheet-foot">
     <view class="btn btn-ghost flex-1" hover-class="tap-active" bindtap="closeForm">取消</view>
-    <view class="btn btn-primary flex-1 {{formDish && !saving ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveEntry"><view wx:if="{{saving}}" class="spinner"></view><text wx:else>保存记录</text></view>
+    <view class="btn btn-primary flex-1 {{formDish && !saving && !labelSaving && !labelOpen && !recipeOpen && !catalogOpen ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="saveEntry"><view wx:if="{{saving}}" class="spinner"></view><text wx:else>保存记录</text></view>
   </view>
 </sheet>

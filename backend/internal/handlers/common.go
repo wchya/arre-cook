@@ -15,8 +15,12 @@ func pageParams(c *gin.Context, def int) (int, int) {
 	if page < 1 {
 		page = 1
 	}
-	if pageSize < 1 || pageSize > 100 {
+	if pageSize < 1 {
 		pageSize = def
+	}
+	// Clamp rather than fall back: a caller asking for 200 must still get a full page.
+	if pageSize > 100 {
+		pageSize = 100
 	}
 	return page, pageSize
 }

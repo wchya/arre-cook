@@ -1,10 +1,14 @@
 package services
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"gorm.io/gorm"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -17,25 +21,39 @@ var allowedFoodGroups = map[string]bool{
 }
 
 type FoodJournalInput struct {
-	MealDate   string   `json:"meal_date"`
-	MealType   string   `json:"meal_type"`
-	DishName   string   `json:"dish_name"`
-	Cuisine    string   `json:"cuisine"`
-	FoodGroups []string `json:"food_groups"`
-	Notes      string   `json:"notes"`
+	NutritionPortionKey   string   `json:"nutrition_portion_key,omitempty"`
+	NutritionPortionCount *float64 `json:"nutrition_portion_count,omitempty"`
+	NutritionMode         string   `json:"nutrition_mode"`
+	NutritionFoodID       uint     `json:"nutrition_food_id"`
+	NutritionAmount       *float64 `json:"nutrition_amount"`
+	NutritionUnit         string   `json:"nutrition_unit"`
+	FoodState             string   `json:"food_state"`
+	PortionSource         string   `json:"portion_source"`
+	MealDate              string   `json:"meal_date"`
+	MealType              string   `json:"meal_type"`
+	DishName              string   `json:"dish_name"`
+	Cuisine               string   `json:"cuisine"`
+	FoodGroups            []string `json:"food_groups"`
+	Notes                 string   `json:"notes"`
+	Portion               string   `json:"portion"`
+	EventKey              string   `json:"event_key"`
+	LinkedRecordID        *uint    `json:"linked_record_id"`
+	RequestKey            string   `json:"request_key"`
 }
 
-func CreateFoodJournalEntry(uid uint, in FoodJournalInput, dbs ...*gorm.DB) (*models.FoodJournalEntry, error) {
-	requestDB := database.Handle(dbs...)
+func prepareFoodJournal(uid uint, in FoodJournalInput, requestDB *gorm.DB) (*models.FoodJournalEntry, error) {
 
+	if in.MealDate == "" {
+		in.MealDate = healthToday()
+	}
 	date, err := normalizeMealDate(in.MealDate)
 	if err != nil {
 		return nil, err
 	}
 	parsed, _ := time.Parse("2006-01-02", date)
-	today, _ := time.Parse("2006-01-02", Today())
-	if parsed.Before(today.AddDate(0, 0, -365)) || parsed.After(today.AddDate(0, 0, 1)) {
-		return nil, errors.New("只能记录最近一年的饮食")
+	today, _ := time.Parse("2006-01-02", healthToday())
+	if parsed.Before(today.AddDate(0, 0, -365)) || parsed.After(today) {
+		return nil, errors.New("只能记录今天及最近一年的实际饮食")
 	}
 	if in.MealType != "breakfast" && in.MealType != "lunch" && in.MealType != "dinner" && in.MealType != "snack" {
 		return nil, errors.New("请选择早餐、午餐、晚餐或加餐")
@@ -58,14 +76,89 @@ func CreateFoodJournalEntry(uid uint, in FoodJournalInput, dbs ...*gorm.DB) (*mo
 			seen[group] = true
 		}
 	}
-	entry := &models.FoodJournalEntry{
-		UserID: uid, MealDate: date, MealType: in.MealType, DishName: name,
-		Cuisine: strings.TrimSpace(in.Cuisine), FoodGroups: groups, Notes: strings.TrimSpace(in.Notes),
+	if len([]rune(in.Portion)) > 100 || !validHealthKey(in.EventKey) || !validHealthKey(in.RequestKey) {
+		return nil, errors.New("份量或记录标识无效")
 	}
-	if err := requestDB.Create(entry).Error; err != nil {
+	if in.LinkedRecordID != nil {
+		var linked models.MealRecord
+		if *in.LinkedRecordID == 0 || requestDB.Scopes(database.OwnedBy(uid)).First(&linked, *in.LinkedRecordID).Error != nil || linked.MealDate != date || linked.MealType != in.MealType {
+			return nil, errors.New("只能关联本人同日同餐次的菜谱用餐记录")
+		}
+	}
+	snapshot, err := buildNutritionSnapshot(uid, in, requestDB)
+	if err != nil {
 		return nil, err
 	}
+	entry := &models.FoodJournalEntry{
+		UserID: uid, MealDate: date, MealType: in.MealType, DishName: name, Nutrition: snapshot,
+		Cuisine: strings.TrimSpace(in.Cuisine), FoodGroups: groups, Notes: strings.TrimSpace(in.Notes),
+		Portion: strings.TrimSpace(in.Portion), EventKey: in.EventKey, LinkedRecordID: in.LinkedRecordID,
+	}
+	if in.RequestKey != "" {
+		entry.RequestKey = &in.RequestKey
+		entry.RequestHash = foodJournalRequestHash(in)
+	}
 	return entry, nil
+}
+
+func foodJournalRequestHash(in FoodJournalInput) string {
+	if in.MealDate == "" {
+		in.MealDate = healthToday()
+	}
+	raw, _ := json.Marshal(in)
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
+}
+
+func CreateFoodJournalEntry(uid uint, in FoodJournalInput, dbs ...*gorm.DB) (*models.FoodJournalEntry, error) {
+	var out *models.FoodJournalEntry
+	err := database.Handle(dbs...).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
+			return err
+		}
+		// Replay a committed request before resolving labels/recipes, which may have been deleted.
+		if in.RequestKey != "" && validHealthKey(in.RequestKey) {
+			var existing models.FoodJournalEntry
+			err := tx.Where("user_id = ? AND request_key = ?", uid, in.RequestKey).First(&existing).Error
+			if err == nil {
+				if existing.RequestHash != foodJournalRequestHash(in) {
+					return errors.New("重试标识已用于另一条记录，请重新打开记餐表单")
+				}
+				out = &existing
+				return nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+		entry, err := prepareFoodJournal(uid, in, tx)
+		if err != nil {
+			return err
+		}
+		if err := validateJournalLinkAvailable(uid, 0, entry.LinkedRecordID, tx); err != nil {
+			return err
+		}
+		if err := tx.Create(entry).Error; err != nil {
+			return err
+		}
+		out = entry
+		return nil
+	})
+	return out, err
+}
+
+func validateJournalLinkAvailable(uid, id uint, linked *uint, db *gorm.DB) error {
+	if linked == nil {
+		return nil
+	}
+	var count int64
+	if err := db.Model(&models.FoodJournalEntry{}).Where("user_id = ? AND linked_record_id = ? AND id <> ?", uid, *linked, id).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return errors.New("这条菜谱记录已被另一条日记关联")
+	}
+	return nil
 }
 
 func ListFoodJournal(uid uint, from, to string, dbs ...*gorm.DB) ([]models.FoodJournalEntry, error) {
@@ -90,16 +183,19 @@ func ListFoodJournal(uid uint, from, to string, dbs ...*gorm.DB) ([]models.FoodJ
 }
 
 func DeleteFoodJournalEntry(uid, id uint, dbs ...*gorm.DB) error {
-	requestDB := database.Handle(dbs...)
-
-	res := requestDB.Scopes(database.OwnedBy(uid)).Where("id = ?", id).Delete(&models.FoodJournalEntry{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return ErrFoodEntryNotFound
-	}
-	return nil
+	return database.Handle(dbs...).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
+			return err
+		}
+		res := tx.Scopes(database.OwnedBy(uid)).Where("id = ?", id).Delete(&models.FoodJournalEntry{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrFoodEntryNotFound
+		}
+		return nil
+	})
 }
 
 type CuisineCount struct {
@@ -108,10 +204,15 @@ type CuisineCount struct {
 }
 
 type HealthDay struct {
-	Date       string   `json:"date"`
-	MealCount  int      `json:"meal_count"`
-	Cuisines   []string `json:"cuisines"`
-	FoodGroups []string `json:"food_groups"`
+	MealEventCount int              `json:"meal_event_count"`
+	ItemCount      int              `json:"item_count"`
+	Status         string           `json:"status"`
+	Fingerprint    string           `json:"fingerprint"`
+	Evidence       []HealthEvidence `json:"evidence"`
+	Date           string           `json:"date"`
+	MealCount      int              `json:"meal_count"`
+	Cuisines       []string         `json:"cuisines"`
+	FoodGroups     []string         `json:"food_groups"`
 }
 
 type HealthRecommendation struct {
@@ -120,26 +221,59 @@ type HealthRecommendation struct {
 }
 
 type HealthReport struct {
-	PeriodDays      int                    `json:"period_days"`
-	From            string                 `json:"from"`
-	To              string                 `json:"to"`
-	LoggedDays      int                    `json:"logged_days"`
-	MealCount       int                    `json:"meal_count"`
-	CuisineCounts   []CuisineCount         `json:"cuisine_counts"`
-	FoodGroupDays   map[string]int         `json:"food_group_days"`
-	Days            []HealthDay            `json:"days"`
-	Insights        []string               `json:"insights"`
-	PlanActions     []string               `json:"plan_actions"`
-	Recommendations []HealthRecommendation `json:"recommendations"`
+	PortionCoverage   HealthPortionCoverage   `json:"portion_coverage"`
+	Comparison        *HealthPeriodComparison `json:"comparison,omitempty"`
+	Nutrients         []HealthNutrientMetric  `json:"nutrients"`
+	RuleVersion       string                  `json:"rule_version"`
+	Timezone          string                  `json:"timezone"`
+	MealEventCount    int                     `json:"meal_event_count"`
+	ItemCount         int                     `json:"item_count"`
+	CompleteDays      int                     `json:"complete_days"`
+	PortionKnownItems int                     `json:"portion_known_items"`
+	NutritionStatus   string                  `json:"nutrition_status"`
+	MethodNotes       []string                `json:"method_notes"`
+	Plans             []HealthPlanView        `json:"plans"`
+	PeriodDays        int                     `json:"period_days"`
+	From              string                  `json:"from"`
+	To                string                  `json:"to"`
+	LoggedDays        int                     `json:"logged_days"`
+	MealCount         int                     `json:"meal_count"`
+	CuisineCounts     []CuisineCount          `json:"cuisine_counts"`
+	FoodGroupDays     map[string]int          `json:"food_group_days"`
+	Days              []HealthDay             `json:"days"`
+	Insights          []string                `json:"insights"`
+	PlanActions       []string                `json:"plan_actions"`
+	Recommendations   []HealthRecommendation  `json:"recommendations"`
 }
 
 func BuildHealthReport(uid uint, period int, dbs ...*gorm.DB) (*HealthReport, error) {
-	requestDB := database.Handle(dbs...)
+	var report *HealthReport
+	now := healthNow()
+	if period != 30 {
+		period = 7
+	}
+	err := database.Handle(dbs...).Transaction(func(tx *gorm.DB) error {
+		var err error
+		report, err = buildHealthReportWindow(uid, period, now, true, tx)
+		if err != nil {
+			return err
+		}
+		previous, err := buildHealthReportWindow(uid, period, now.AddDate(0, 0, -period), false, tx)
+		if err != nil {
+			return err
+		}
+		report.Comparison = compareHealthPeriods(report, previous)
+		report.MethodNotes = append(report.MethodNotes, report.Comparison.Method)
+		return nil
+	})
+	return report, err
+}
+
+func buildHealthReportWindow(uid uint, period int, now time.Time, includeActions bool, requestDB *gorm.DB) (*HealthReport, error) {
 
 	if period != 30 {
 		period = 7
 	}
-	now := time.Now()
 	from := now.AddDate(0, 0, 1-period).Format("2006-01-02")
 	to := now.Format("2006-01-02")
 	report := &HealthReport{
@@ -147,7 +281,8 @@ func BuildHealthReport(uid uint, period int, dbs ...*gorm.DB) (*HealthReport, er
 		FoodGroupDays: map[string]int{}, Days: []HealthDay{}, Insights: []string{}, PlanActions: []string{},
 		Recommendations: []HealthRecommendation{},
 	}
-	journal, err := ListFoodJournal(uid, from, to, requestDB)
+	journal := []models.FoodJournalEntry{}
+	err := requestDB.Scopes(database.OwnedBy(uid)).Where("meal_date >= ? AND meal_date <= ?", from, to).Order("id ASC").Find(&journal).Error
 	if err != nil {
 		return nil, err
 	}
@@ -259,6 +394,16 @@ func BuildHealthReport(uid uint, period int, dbs ...*gorm.DB) (*HealthReport, er
 	if len(report.PlanActions) == 0 {
 		report.PlanActions = append(report.PlanActions, "继续记录实际吃的食物，按你的偏好调整下一周菜单。")
 	}
+	if err := enrichHealthReport(uid, report, journal, records, requestDB); err != nil {
+		return nil, err
+	}
+	if !includeActions {
+		return report, nil
+	}
+	report.Plans, err = ListHealthPlans(uid, report.From, now.AddDate(0, 0, 6).Format("2006-01-02"), requestDB)
+	if err != nil {
+		return nil, err
+	}
 	recommended, err := RecommendDishes(uid, RecommendRequest{Count: 8, Source: "health_report"}, requestDB)
 	if err != nil {
 		return nil, err
@@ -278,8 +423,15 @@ func BuildHealthReport(uid uint, period int, dbs ...*gorm.DB) (*HealthReport, er
 			ordered = append(ordered, i)
 		}
 	}
+	blocked, err := loadDietaryExclusions(uid, requestDB)
+	if err != nil {
+		return nil, err
+	}
 	for _, index := range ordered {
 		item := recommended.Items[index]
+		if containsAny(dishSearchText(item.Dish), blocked) {
+			continue
+		}
 		reason := "结合你的偏好和近期记录，换一道菜试试"
 		if item.Dish.Category != "" && item.Dish.Category != mostCommon {
 			reason = "最近较少记录「" + item.Dish.Category + "」，可以换换口味"
@@ -304,4 +456,41 @@ func itoa(v int) string {
 		v /= 10
 	}
 	return string(buf[i:])
+}
+
+var healthKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+func validHealthKey(key string) bool { return key == "" || healthKeyPattern.MatchString(key) }
+
+func UpdateFoodJournalEntry(uid, id uint, in FoodJournalInput, dbs ...*gorm.DB) (*models.FoodJournalEntry, error) {
+	var out *models.FoodJournalEntry
+	err := database.Handle(dbs...).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
+			return err
+		}
+		var old models.FoodJournalEntry
+		if err := tx.Scopes(database.OwnedBy(uid)).First(&old, id).Error; err != nil {
+			return ErrFoodEntryNotFound
+		}
+		in.RequestKey = ""
+		next, err := prepareFoodJournal(uid, in, tx)
+		if err != nil {
+			return err
+		}
+		if err := validateJournalLinkAvailable(uid, id, next.LinkedRecordID, tx); err != nil {
+			return err
+		}
+		if in.NutritionMode == "" || in.NutritionMode == "keep" {
+			if next.DishName == old.DishName && next.Portion == old.Portion {
+				next.Nutrition = old.Nutrition
+			}
+		}
+		next.ID, next.CreatedAt, next.RequestKey, next.RequestHash = old.ID, old.CreatedAt, old.RequestKey, old.RequestHash
+		if err := tx.Save(next).Error; err != nil {
+			return err
+		}
+		out = next
+		return nil
+	})
+	return out, err
 }

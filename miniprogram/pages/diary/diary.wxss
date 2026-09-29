@@ -68,3 +68,11 @@
 .cuisine-row { display: inline-flex; gap: 12rpx; padding-bottom: 4rpx; }
 .cuisine-row .chip { flex-shrink: 0; }
 .sheet-foot { display: flex; gap: 20rpx; padding: 20rpx 40rpx calc(28rpx + env(safe-area-inset-bottom)); }
+
+.health-calendar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12rpx; margin: 28rpx 0; }
+.health-day { width: 100%; min-height: 112rpx; margin: 0; padding: 12rpx 0; background: var(--bg); color: var(--text); font-size: 24rpx; line-height: 1.7; border: 2rpx solid var(--border); }
+.health-day.is-selected { border-color: var(--primary); background: var(--primary-light); }
+.health-day-label { font-size: 18rpx; color: var(--text2); }
+.health-evidence { padding: 24rpx 0; border-bottom: 1px solid var(--border); font-size: 26rpx; line-height: 1.6; }
+.health-controls { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
+.health-controls button, .health-evidence button, .rec button { min-height: 88rpx; margin: 0; background: var(--bg); color: var(--text); }

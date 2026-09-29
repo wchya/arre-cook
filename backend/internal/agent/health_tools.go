@@ -78,7 +78,7 @@ func init() {
 	})
 	register(&Tool{
 		Name: "get_health_report", Title: "饮食报告与推荐",
-		Description: "根据当前用户实际记录的饮食生成近 7 或 30 天报告，包含记录天数、菜系分布、用户标注的食物类别、温和的规划提示和符合过敏原限制的菜谱推荐。没有记录的信息不能推断为没有吃，也不提供热量或诊断。",
+		Description: "根据当前用户实际记录生成近 7 或 30 天饮食报告。营养只计算有标签和份量的记录；周期比较须满足相同星期几的完整日配对门槛。没有记录不能推断为没有吃，营养差值不表示健康改善或恶化，不提供诊断。",
 		Scopes:      []string{auth.ScopeRecordsRead, auth.ScopeProfileRead, auth.ScopeDishesRead},
 		Schema:      object(map[string]any{"days": integer("报告窗口，只能为 7 或 30，默认 7", 7, 30)}),
 		Handler: func(ctx *Ctx, args json.RawMessage) (any, error) {
@@ -107,10 +107,13 @@ func init() {
 			return map[string]any{
 				"period_days": report.PeriodDays, "from": report.From, "to": report.To,
 				"logged_days": report.LoggedDays, "meal_count": report.MealCount,
+				"meal_event_count": report.MealEventCount, "item_count": report.ItemCount, "complete_days": report.CompleteDays,
+				"rule_version": report.RuleVersion, "nutrition_status": report.NutritionStatus, "nutrients": report.Nutrients,
+				"comparison":     report.Comparison,
 				"cuisine_counts": report.CuisineCounts, "food_group_days": report.FoodGroupDays,
 				"insights": report.Insights, "plan_actions": report.PlanActions,
 				"recommendations": recommendations,
-				"note":            "仅根据实际记录整理；未记录不等于未吃。不推断热量或诊断。",
+				"note":            "仅根据实际记录和本人录入的标签整理；未记录不等于未吃。营养可能包含份量估计，不提供诊断或达标判断。",
 			}, nil
 		},
 	})

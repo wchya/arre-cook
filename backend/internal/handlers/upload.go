@@ -46,6 +46,10 @@ var (
 	errInvalidUpload   = errors.New("expected one image file")
 )
 
+// heavyUploadWait lets a decode queue behind another decode or the tail of an
+// ASR job, within the upload's 30 second request budget, instead of failing at once.
+const heavyUploadWait = 20 * time.Second
+
 // Admit before reading multipart data, so queued uploads do not retain image
 // buffers. Both the queue and wait are bounded; clients can retry a busy upload.
 func acquireImageUpload(ctx context.Context) error {
@@ -141,13 +145,6 @@ func UploadImage(c *gin.Context) {
 		return
 	}
 	defer func() { <-imageUploadSlot }()
-	release, err := resourcebudget.Acquire(c.Request.Context())
-	if err != nil {
-		c.Header("Retry-After", "5")
-		utils.Error(c, 429, 42900, "正在处理图片或视频，请稍后重试")
-		return
-	}
-	defer release()
 	data, err := readUploadImage(c.Writer, c.Request, config.C.MaxUploadSize)
 	if err != nil {
 		var bodyLimit *http.MaxBytesError
@@ -175,7 +172,19 @@ func UploadImage(c *gin.Context) {
 	}
 	baseName := fmt.Sprintf("%d-%s", now.UnixMilli(), suffix)
 	body, contentType, name := data, sniffed, baseName+ext
-	if compressed, err := imgproc.CompressJPEG(data, config.C.CompressMaxDim, config.C.JpegQuality); err == nil {
+	// Only decoding needs the shared memory reservation; reading the body and the
+	// storage write do not, so a slow client or bucket cannot block ASR or others.
+	release, err := resourcebudget.AcquireWait(c.Request.Context(), heavyUploadWait)
+	if err != nil {
+		if c.Request.Context().Err() == nil {
+			c.Header("Retry-After", "5")
+			utils.Error(c, 429, 42900, "图片处理繁忙，请稍后重试")
+		}
+		return
+	}
+	compressed, err := imgproc.CompressJPEG(data, config.C.CompressMaxDim, config.C.JpegQuality)
+	release()
+	if err == nil {
 		body, contentType, name = compressed, "image/jpeg", baseName+".jpg"
 	} else if errors.Is(err, imgproc.ErrImageTooLarge) {
 		utils.BadRequest(c, "图片分辨率过高，请缩小到2400万像素以内、单边不超过16384像素后重试")

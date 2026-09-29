@@ -16,6 +16,9 @@ import { launchConfetti } from "@/lib/confetti"
 import { gsap, motionDuration, scrollToElement, useGSAP } from "@/lib/gsap"
 import toast from "react-hot-toast"
 import { Home as HomeIcon, Settings, Sparkles } from "lucide-react"
+import ThemePicker from "@/components/ThemePicker"
+import { useAppearanceStore } from "@/store/useAppearanceStore"
+import { getDishImageUrl } from "@/lib/dish-image"
 
 const moods = [
   { key: "happy", emoji: "😊", label: "开心" },
@@ -45,6 +48,9 @@ export default function Home() {
   const todayKey = dateKey()
   const isAdmin = useAuthStore((s) => s.user?.role === "admin")
   const appName = useAppInfoStore((s) => s.appName)
+  const palette = useAppearanceStore((s) => s.palette)
+  const displayMode = useAppearanceStore((s) => s.mode)
+  const systemDark = useAppearanceStore((s) => s.systemDark)
 
   const { data: dishesData, error: loadError, refetch: retryLoad } = useQuery({
     queryKey: ["dishes", "enabled"],
@@ -171,7 +177,8 @@ export default function Home() {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     const cx = 106, cy = 106, r = 105
-    const colors = ["#E8734A", "#6EC6B8", "#F5D76E", "#F4A8A0", "#8B5CF6", "#F0E6FF"]
+    const style = getComputedStyle(document.documentElement)
+    const colors = ["--color-primary-light", "--color-inset", "--color-card"].map((token) => style.getPropertyValue(token).trim())
     const n = wheelDishes.length
     const angle = (2 * Math.PI) / n
     ctx.clearRect(0, 0, 212, 212)
@@ -185,7 +192,7 @@ export default function Home() {
       ctx.save()
       ctx.translate(cx, cy)
       ctx.rotate(i * angle + angle / 2 - Math.PI / 2)
-      ctx.fillStyle = "#fff"
+      ctx.fillStyle = style.getPropertyValue("--color-text").trim()
       ctx.font = "bold 11px -apple-system, sans-serif"
       ctx.textAlign = "center"
       ctx.fillText(wheelDishes[i].name, r * 0.6, 4)
@@ -195,7 +202,7 @@ export default function Home() {
 
   useEffect(() => {
     drawWheel()
-  }, [drawWheel])
+  }, [drawWheel, palette, displayMode, systemDark])
 
   useGSAP(() => {
     gsap.set(wheelRef.current, { rotation: wheelDegRef.current, transformOrigin: "50% 50%" })
@@ -307,15 +314,18 @@ export default function Home() {
         subtitle="今天也好好吃饭"
         icon={HomeIcon}
         actions={
+          <>
+           <ThemePicker />
            <HeaderIconButton onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/me/preferences")} aria-label={isAdmin ? "管理设置" : "饮食偏好"}>
             <Settings size={18} strokeWidth={2.3} />
           </HeaderIconButton>
+          </>
         }
       />
 
-      <div className="px-5 py-4 max-w-[640px] mx-auto">
+      <div className="home-content px-5 max-w-[640px] mx-auto">
         {loadError && <RequestState error={loadError} onRetry={() => { void retryLoad() }} compact />}
-        <div className="mb-5">
+        <div className="home-greeting">
           <div className="text-sm text-text2 mb-1">{getGreeting()}</div>
           <div className="text-[26px] font-extrabold tracking-tight leading-tight">今天<em className="not-italic text-primary">想吃什么</em>？</div>
         </div>
@@ -325,7 +335,8 @@ export default function Home() {
           <button
             onClick={() => pickMealMut.mutate("lunch")}
             disabled={pickMealMut.isPending}
-            className={`relative p-5 rounded-2xl overflow-hidden transition-all active:scale-97 bg-primary-light border-[1.5px] min-h-[100px] text-left disabled:opacity-60 ${recMeal === "lunch" ? "border-primary" : "border-primary/12"}`}
+            aria-pressed={recMeal === "lunch"}
+            className="meal-entry relative p-5 overflow-hidden transition-all active:scale-97 border-[1.5px] text-left disabled:opacity-60"
           >
             <span className="text-[28px] block mb-2">🍳</span>
             <div className="text-[15px] font-bold mb-0.5">中午吃点好的</div>
@@ -334,7 +345,8 @@ export default function Home() {
           <button
             onClick={() => pickMealMut.mutate("dinner")}
             disabled={pickMealMut.isPending}
-            className={`relative p-5 rounded-2xl overflow-hidden transition-all active:scale-97 bg-mint-light border-[1.5px] min-h-[100px] text-left disabled:opacity-60 ${recMeal === "dinner" ? "border-mint" : "border-mint/12"}`}
+            aria-pressed={recMeal === "dinner"}
+            className="meal-entry relative p-5 overflow-hidden transition-all active:scale-97 border-[1.5px] text-left disabled:opacity-60"
           >
             <span className="text-[28px] block mb-2">🍲</span>
             <div className="text-[15px] font-bold mb-0.5">晚上吃点温暖的</div>
@@ -344,57 +356,43 @@ export default function Home() {
 
         {/* 今日推荐卡：提到首屏，紧随入口 */}
         {currentRec && (
-          <>
-            <SectionHeader
-              title="✨ 今日推荐"
-              action={
-                <button onClick={() => void changeRecommend()} disabled={changing} className="text-sm font-semibold text-text2 hover:text-primary hover:bg-primary-light px-3 py-1.5 rounded-full transition-all disabled:opacity-50">
+          <section ref={recCardRef} className="home-recommendation" aria-label="今日推荐">
+            <div className="home-recommendation__heading">
+              <div><h2>今日推荐</h2><p>{recMeal === "lunch" ? "给午餐多一点期待" : recMeal === "dinner" ? "为晚餐留一点温暖" : "把今天的好心情，放进这一餐"}</p></div>
+                <button onClick={() => void changeRecommend()} disabled={changing} className="shrink-0 min-h-11 text-sm font-semibold text-primary bg-primary-light px-3 py-1.5 rounded-full transition-all disabled:opacity-50">
                   {changing ? "挑选中..." : "🔄 换一个"}
                 </button>
-              }
-            />
-            <div ref={recCardRef} onClick={() => navigate(`/dishes/${currentRec.id}`)} className={`bg-card rounded-2xl overflow-hidden ${cardShadow} mb-2 cursor-pointer border border-border transition-all active:scale-98 animate-fadeUp`}>
-              <div className="relative h-[200px] bg-gradient-to-br from-primary-light to-pink-light">
+            </div>
+              {getDishImageUrl(currentRec) && <button type="button" onClick={() => navigate(`/dishes/${currentRec.id}`)} aria-label={`查看${currentRec.name}做法`} className="home-recommendation__image">
                 <DishImage dish={currentRec} className="w-full h-full" emojiSize="text-[64px]" />
-                <span className="absolute top-3 left-3 border border-glass-border glass-strong px-3 py-1 rounded-full text-xs font-semibold text-primary z-[1]">
-                  {currentItem ? "🧠 按你的口味" : "🔥 推荐"}
-                </span>
-                <div className="absolute top-3 right-3 flex gap-1.5">
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "lunch" ? "bg-primary text-white" : "bg-card/90 text-primary"}`}>🍳 午餐</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${recMeal === "dinner" ? "bg-mint text-white" : "bg-card/90 text-mint"}`}>🍲 晚餐</span>
-                </div>
-              </div>
-              <div className="p-4">
-                <div className="text-xl font-bold mb-1">{currentRec.name}</div>
-                <div className="flex gap-2 flex-wrap mb-3">
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-primary-light text-primary">{currentRec.category}</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-mint-light text-mint">{currentRec.cook_time}分钟</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-primary-light text-primary">{diffLabel(currentRec.difficulty)}</span>
-                  {currentRec.taste && <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-pink-light text-pink">{currentRec.taste}</span>}
+              </button>}
+              <div className="recipe-ticket">
+                <div className="recipe-ticket__eyebrow">{currentItem ? "为你挑选 · 按你的口味推荐" : "今日好味 · 一起好好吃饭"}</div>
+                <button type="button" onClick={() => navigate(`/dishes/${currentRec.id}`)} className="recipe-ticket__title">{currentRec.name}</button>
+                <div className="recipe-ticket__meta">
+                  <span>{currentRec.category}</span><span>{currentRec.cook_time} 分钟</span><span>{diffLabel(currentRec.difficulty)}</span>
+                  {currentRec.taste && <span>{currentRec.taste}</span>}
                 </div>
                 {currentItem && currentItem.reasons.length > 0 && (
-                  <div className="flex gap-1.5 flex-wrap mb-3">
+                  <div className="flex gap-1.5 flex-wrap mt-3">
                     {currentItem.reasons.map((reason) => (
                       <span key={reason} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-light text-yellow-dark border border-yellow/30">💡 {reason}</span>
                     ))}
                   </div>
                 )}
-                <div className="flex gap-2.5">
-                  <button onClick={(e) => { e.stopPropagation(); handlePickMeal("lunch") }} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-5 rounded-full text-sm font-semibold bg-primary text-white transition-all active:scale-96 hover:bg-primary-dark">🍳 中午吃这个</button>
-                  <button onClick={(e) => { e.stopPropagation(); handlePickMeal("dinner") }} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-5 rounded-full text-sm font-semibold bg-mint text-white transition-all active:scale-96">🍲 晚上吃这个</button>
-                </div>
               </div>
+            <div className="recommend-actions">
+              <button type="button" disabled={recordMut.isPending} onClick={() => handlePickMeal("lunch")} className="recommend-actions__primary transition-transform active:scale-96">🍳 中午吃这个</button>
+              <button type="button" disabled={recordMut.isPending} onClick={() => handlePickMeal("dinner")} className="recommend-actions__secondary transition-transform active:scale-96">🍲 晚上吃这个</button>
             </div>
             {recItems.length > 1 && currentItem && (
-              <div className="text-center text-[11px] text-text3 mb-2">第 {recIdx + 1} / {recItems.length} 道 · 换一个会从下一道开始</div>
+              <div className="text-center text-[11px] text-text3 mt-4">第 {recIdx + 1} / {recItems.length} 道 · 换一个会从下一道开始</div>
             )}
             {/* 今日推荐语 */}
-            {recQuote ? (
-              <div className="text-center text-[13px] text-text2 italic mb-6 px-4 leading-relaxed">"{recQuote}"</div>
-            ) : (
-              <div className="mb-6" />
+            {recQuote && (
+              <div className="text-center text-[13px] text-text2 mt-3 px-4 leading-relaxed">{recQuote}</div>
             )}
-          </>
+          </section>
         )}
 
         {/* AI 推荐官入口 */}
@@ -414,6 +412,7 @@ export default function Home() {
           <span className="flex-1 h-px bg-border" /> 更多玩法 <span className="flex-1 h-px bg-border" />
         </div>
 
+        <section className="home-more-panel" aria-label="今天的心情">
         <SectionHeader title="😃 今天的心情" />
         <div className="flex gap-2.5 overflow-x-auto pb-3 mb-5 scrollbar-none">
           {moods.map((m) => (
@@ -438,18 +437,21 @@ export default function Home() {
             </div>
           </div>
         )}
+        </section>
 
+        <section className="home-more-panel" aria-label="转一转">
         <SectionHeader title="🎰 转一转" />
         <div className="relative w-[220px] h-[220px] mx-auto mb-6">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-primary z-2 drop-shadow-sm" />
           <div
             ref={wheelRef}
-            className="w-[220px] h-[220px] rounded-full overflow-hidden shadow-[0_4px_24px_rgba(232,115,74,.2)] border-4 border-primary bg-card relative"
+            className="w-[220px] h-[220px] rounded-full overflow-hidden border-4 border-primary bg-card relative"
           >
             <canvas ref={canvasRef} width={212} height={212} className="w-full h-full" />
           </div>
           <button onClick={spinWheel} disabled={spinning} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-card shadow-md z-2 flex items-center justify-center text-sm font-bold text-primary active:scale-90 transition-transform disabled:opacity-70">{spinning ? "🎰" : "转"}</button>
         </div>
+        </section>
 
         <button onClick={() => navigate("/tomorrow")} className={`w-full bg-card rounded-2xl p-4 ${cardShadow} border border-border flex items-center gap-3.5 transition-all active:scale-98`}>
           <div className="w-12 h-12 rounded-[10px] bg-gradient-to-br from-yellow-light to-primary-light flex items-center justify-center text-2xl flex-shrink-0">🌙</div>

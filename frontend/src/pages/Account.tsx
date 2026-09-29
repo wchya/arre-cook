@@ -104,8 +104,8 @@ export default function Account() {
 
         <section className="rounded-lg border border-border bg-card p-4">
           <h2 className="text-sm font-bold">登录设备</h2>
-          <p className="mt-1 text-xs leading-5 text-text3">让其他设备上的网页登录失效；当前设备也会退出。</p>
-          <button onClick={() => { if (confirm("退出所有设备？你需要重新登录。")) logoutAllMutation.mutate() }} disabled={logoutAllMutation.isPending} className="mt-3 flex h-10 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold text-text2 hover:bg-bg disabled:opacity-50"><LogOut size={15} />退出所有设备</button>
+          <p className="mt-1 text-xs leading-5 text-text3">让其他设备上的登录与 AI 连接令牌失效；当前设备也会退出。修改密码同样会撤销 AI 连接令牌。</p>
+          <button onClick={() => { if (confirm("退出所有设备？你需要重新登录，AI 连接也需要重新创建令牌。")) logoutAllMutation.mutate() }} disabled={logoutAllMutation.isPending} className="mt-3 flex h-10 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold text-text2 hover:bg-bg disabled:opacity-50"><LogOut size={15} />退出所有设备</button>
         </section>
 
         <section className="rounded-lg border border-red/25 bg-card p-4">

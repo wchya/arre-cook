@@ -169,8 +169,18 @@ func VerifyEmailCode(rawEmail, purpose, code string, dbs ...*gorm.DB) (string, e
 	if rec.Attempts >= codeMaxAttempts {
 		return "", ErrCodeTooMany
 	}
+	// Reserve the attempt before comparing: concurrent guesses must each consume
+	// one of the five tries instead of all passing a stale attempts check.
+	reserved := requestDB.Model(&models.EmailCode{}).
+		Where("id = ? AND consumed_at IS NULL AND attempts < ?", rec.ID, codeMaxAttempts).
+		UpdateColumn("attempts", gorm.Expr("attempts + 1"))
+	if reserved.Error != nil {
+		return "", reserved.Error
+	}
+	if reserved.RowsAffected == 0 {
+		return "", ErrCodeTooMany
+	}
 	if rec.CodeHash != hashCode(email, purpose, code) {
-		requestDB.Model(&rec).UpdateColumn("attempts", gorm.Expr("attempts + 1"))
 		if rec.Attempts+1 >= codeMaxAttempts {
 			return "", ErrCodeTooMany
 		}

@@ -2,6 +2,7 @@ package database
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"ninimenu/internal/achievements"
 	"ninimenu/internal/config"
@@ -161,6 +162,9 @@ func ensureBootstrapAdmin() (uint, error) {
 	if err := DB.Where("username = ?", username).First(&existing).Error; err == nil {
 		DB.Model(&existing).Update("role", models.RoleAdmin)
 		return existing.ID, nil
+	}
+	if config.C.WeakBootstrapPassword() {
+		return 0, errors.New("生产环境首次创建管理员需要设置 12 位以上、非占位的 ADMIN_PASSWORD")
 	}
 	admin = models.User{Username: &username, PasswordHash: hash, Nickname: "管理员", Role: models.RoleAdmin, TokenVersion: 1}
 	if adminEmail != "" {
