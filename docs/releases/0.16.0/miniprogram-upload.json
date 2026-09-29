@@ -1,0 +1,14 @@
+{
+  "version": "0.16.0",
+  "revision": "a82ab68a3b79af8b4aceb7a718a56d33b3620392",
+  "appid": "wx1c4522af7a2e72d1",
+  "result": {
+    "subPackageInfo": [
+      {
+        "name": "__FULL__",
+        "size": 751455
+      }
+    ],
+    "pluginInfo": []
+  }
+}

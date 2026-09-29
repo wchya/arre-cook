@@ -1,0 +1,23 @@
+{
+  "version": "0.16.0",
+  "revision": "a82ab68a3b79af8b4aceb7a718a56d33b3620392",
+  "image_id": "sha256:682c872b8d9d2fd801768e6137c39798ba4ecf7abce247ffd2e678cc08efe49d",
+  "rollback_tag": "arre-cook/ninimenu:rollback-0.15.0-pre-health-0160",
+  "local": { "status": "UP", "storage": "s3", "version": "0.16.0" },
+  "public": { "status": "UP", "storage": "s3", "version": "0.16.0" },
+  "read_endpoints": [
+    "/api/health/summary",
+    "/api/health/meal-drafts/status",
+    "/api/health/meal-drafts/candidates?q=%E9%B8%A1%E8%9B%8B",
+    "/api/health-report?days=7",
+    "/api/health/profile",
+    "/api/health/foods",
+    "/api/health/catalog",
+    "/api/dishes",
+    "/api/notifications"
+  ],
+  "rows_before": { "food_journal_entries": 16, "health_journal_batches": 0, "nutrition_foods": 0 },
+  "rows_after": { "food_journal_entries": 16, "health_journal_batches": 0, "nutrition_foods": 0 },
+  "db_auto_migrate": false,
+  "completed_at": "2026-09-30 00:33:47 Asia/Shanghai"
+}
