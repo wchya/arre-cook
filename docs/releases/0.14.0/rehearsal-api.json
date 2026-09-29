@@ -1,0 +1,11 @@
+{
+  "profile_save_race_one_success_one_conflict": true,
+  "profile_isolation_export_agent_rejection": true,
+  "clear_save_race_and_erasure_tombstone": true,
+  "nutrition_snapshot_150kcal_zero_unknown_history": true,
+  "journal_idempotency_isolation_completeness_invalidation": true,
+  "profile_plan_race_hard_constraint_and_plan_idempotency": true,
+  "account_deletion_cleans_health_data": true,
+  "database": "MySQL 8 isolated production backup",
+  "production_personal_data_written": false
+}

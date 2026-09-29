@@ -1,0 +1,39 @@
+{
+  "admin_login": 200,
+  "/api/health/profile": 200,
+  "/api/health-report?days=7": 200,
+  "/api/health-report?days=30": 200,
+  "/api/health/foods": 200,
+  "/api/health/catalog": 200,
+  "/api/me": 200,
+  "/api/dishes?page=1&pageSize=1": 200,
+  "/api/week-plan": 200,
+  "/api/achievements": 200,
+  "/api/family": 200,
+  "/api/notifications": 200,
+  "/api/assistant/status": 200,
+  "llm_enabled": true,
+  "/api/assistant/video-recipe/status": 200,
+  "video_readiness": {
+    "enabled": true,
+    "asr_enabled": true,
+    "max_duration_seconds": 600
+  },
+  "container": {
+    "image": "sha256:38c910ec0d66a665f80cf55cbf7d7f68118fdc6c8d73718cea3550700b6be408",
+    "memory": 1073741824,
+    "memory_swap": 1073741824,
+    "nano_cpus": 2000000000,
+    "stop_timeout": 110,
+    "oom_killed": false,
+    "health": "healthy",
+    "restarts": 0
+  },
+  "safe_env": {
+    "APP_VERSION": "0.14.0",
+    "GOMEMLIMIT": "192MiB",
+    "GOMAXPROCS": "2",
+    "DB_AUTO_MIGRATE": "false",
+    "VIDEO_ASR_PROVIDER": "local"
+  }
+}

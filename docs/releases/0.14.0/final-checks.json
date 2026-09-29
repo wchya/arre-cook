@@ -1,0 +1,79 @@
+{
+  "table_counts": {
+    "users": 4,
+    "dishes": 644,
+    "meal_records": 3,
+    "family_members": 2,
+    "family_plan_items": 0,
+    "family_shopping_checks": 0,
+    "dish_delete_requests": 0,
+    "user_achievements": 53
+  },
+  "ledger": {
+    "assets": 4,
+    "bytes": 1063672,
+    "references": 635,
+    "marker": "done"
+  },
+  "release_notices": {
+    "total": 4,
+    "duplicate_users": 0
+  },
+  "s3_image_readback": {
+    "status": 200,
+    "type": "image/jpeg",
+    "size": 124508
+  },
+  "provider": {
+    "quota_before": 0,
+    "client_model_override_rejected": true,
+    "food": {
+      "status": 200,
+      "events": {
+        "quota": 1,
+        "status": 3,
+        "session": 1,
+        "tool_start": 1,
+        "tool_end": 1,
+        "delta": 1,
+        "done": 1,
+        "": 1
+      },
+      "seconds": 22.91,
+      "passed": true
+    },
+    "unrelated": {
+      "status": 200,
+      "events": {
+        "quota": 1,
+        "status": 1,
+        "error": 1,
+        "done": 1,
+        "": 1
+      },
+      "seconds": 1.16,
+      "passed": true
+    },
+    "quota_after": 2,
+    "quota_delta": 2,
+    "test_sessions_cleaned": 1
+  },
+  "log_scan": {
+    "panic": 0,
+    "sql_1064": 0,
+    "fatal": 0,
+    "database_error": 0
+  },
+  "container": {
+    "health": "healthy",
+    "oom_killed": false,
+    "restarts": 0,
+    "image": "sha256:38c910ec0d66a665f80cf55cbf7d7f68118fdc6c8d73718cea3550700b6be408"
+  },
+  "host_memory_kib": {
+    "MemTotal": 3481024,
+    "MemAvailable": 1446780,
+    "SwapTotal": 2097148
+  },
+  "passed": true
+}

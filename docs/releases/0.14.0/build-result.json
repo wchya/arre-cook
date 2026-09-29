@@ -1,0 +1,13 @@
+{
+  "version": "0.14.0",
+  "revision": "478b4dd2daec76a10fae83354685ae0715d02af9",
+  "image": "sha256:38c910ec0d66a665f80cf55cbf7d7f68118fdc6c8d73718cea3550700b6be408",
+  "schema_changed": true,
+  "built_at": "2026-09-29 16:57:08",
+  "previous_version": "0.13.1",
+  "previous_image": "sha256:fc02d5bad1609d9ad67b9c35ac7650ae9ff778d4ba608280d08b3376a90db214",
+  "rollback_tag": "arre-cook/ninimenu:rollback-0.13.1-pre-health",
+  "database_backup_bytes": 154317,
+  "storage_objects": 3,
+  "created_at": "2026-09-29 16:56:33"
+}

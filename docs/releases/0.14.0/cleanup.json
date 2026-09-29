@@ -1,0 +1,9 @@
+{
+  "temporary_schema_removed": true,
+  "temporary_schema_grants_removed": true,
+  "temporary_container_removed": true,
+  "temporary_env_removed": true,
+  "production_schema_preserved": true,
+  "backups_preserved": true,
+  "rollback_image_preserved": true
+}
