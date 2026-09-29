@@ -45,7 +45,7 @@ function buildModes(options) {
   return modes
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     topPad: 64,
     modes: buildModes({ wechat: true, email: true }),

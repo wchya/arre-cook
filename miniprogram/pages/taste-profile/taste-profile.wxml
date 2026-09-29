@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="bot" title="口味画像" subtitle="根据你自己的用餐记录整理" />
 <request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 

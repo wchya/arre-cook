@@ -37,7 +37,7 @@ function groupChips(values) {
   return (values || []).map((value) => (GROUP_MAP[value] ? GROUP_MAP[value].label : value))
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     loading: true,
     view: "journal",

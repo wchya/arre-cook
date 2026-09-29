@@ -25,7 +25,7 @@
 .tab-center { display: flex; justify-content: center; }
 .ai-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; width:112rpx; height:112rpx; border-radius:40rpx; background-color:#B94E2B; background-color:var(--primary-action, #B94E2B); transition:transform .2s ease; }
 .ai-btn--press { transform: scale(.9) rotate(-4deg); box-shadow: 0 12rpx 28rpx rgba(232, 115, 74, .38); }
-.ai-btn__label { margin-top: 2rpx; color: #fff; font-size: 20rpx; font-weight: 800; line-height: 1; letter-spacing: 1rpx; }
+.ai-btn__label { margin-top: 2rpx; color: var(--on-primary); font-size: 20rpx; font-weight: 800; line-height: 1; letter-spacing: 1rpx; }
 
 @media (prefers-color-scheme: dark) {
   .tabbar {

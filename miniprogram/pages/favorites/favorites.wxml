@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="heart" title="收藏" subtitle="按自己的口味重新整理菜单" />
 <request-state wx:if="{{loadError}}" error="{{loadError}}" bind:retry="load" />
 
@@ -11,7 +12,7 @@
     <view class="empty-card__icon"><icon name="heart" size="76" stroke="2.3" color="primary" /></view>
     <view class="empty-card__title">还没有收藏</view>
     <view class="empty-card__desc">先把常吃、想吃、适合复做的菜收进来，这里会自动整理成你的菜单。</view>
-    <view class="btn btn-primary empty-card__btn" hover-class="tap-active" bindtap="goDishes"><text>浏览菜品</text><icon name="arrow-right" size="30" stroke="2.5" color="white" /></view>
+    <view class="btn btn-primary empty-card__btn" hover-class="tap-active" bindtap="goDishes"><text>浏览菜品</text><icon name="arrow-right" size="30" stroke="2.5" color="on-primary" /></view>
   </view>
 
   <block wx:else>

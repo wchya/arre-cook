@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <view class="cook">
   <nav-bar theme="dark" title="🍳 {{name || '烹饪模式'}}" subtitle="{{steps.length ? '共 ' + steps.length + ' 步 · 左右滑动切换' : ''}}" hide-back="{{true}}">
     <view class="close" hover-class="tap-active" bindtap="close" aria-role="button" aria-label="退出烹饪模式"><icon name="x" size="34" stroke="2.4" color="white" /></view>

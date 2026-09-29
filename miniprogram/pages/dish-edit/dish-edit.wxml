@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar title="{{isNew ? '新建私房菜' : '编辑菜品'}}" subtitle="{{alreadyFamily || shareFamily ? '家庭成员可见' : '仅自己可见'}}" icon="chef-hat" />
 
 <request-state wx:if="{{loading || error}}" error="{{error}}" retrying="{{loading}}" bind:retry="initialize" />
@@ -203,6 +204,6 @@
 <view wx:if="{{!loading && !error && !recovery}}" class="de-save">
   <button class="btn btn-primary btn-lg btn-block" disabled="{{!name || saving || uploadingCover || uploadingExtra || videoImportBusy}}" hover-class="tap-active" bindtap="save">
     <view wx:if="{{saving}}" class="spinner"></view>
-    <block wx:else><icon name="check" size="30" stroke="2.6" color="white" /><text>{{uploadingCover || uploadingExtra ? '图片上传中…' : isNew ? '创建私房菜' : '保存修改'}}</text></block>
+    <block wx:else><icon name="check" size="30" stroke="2.6" color="on-primary" /><text>{{uploadingCover || uploadingExtra ? '图片上传中…' : isNew ? '创建私房菜' : '保存修改'}}</text></block>
   </button>
 </view>

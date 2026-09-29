@@ -69,7 +69,7 @@ const content = {
   ]
 }
 
-Page({
+require("../../utils/theme").page({
   data: { content, taglineLines: content.tagline.split("，").map((line, index) => line + (index === 0 ? "，" : "")) },
   go(event) {
     const url = event.currentTarget.dataset.url

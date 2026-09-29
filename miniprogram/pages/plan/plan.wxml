@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="shopping-basket" title="一周菜单与买菜清单" subtitle="7 天午晚餐 · 食材自动合并" />
 
 <view class="content anim-fade-up">

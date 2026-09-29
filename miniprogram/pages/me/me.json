@@ -5,6 +5,7 @@
   "disableScroll": true,
   "usingComponents": {
     "icon": "/components/icon/index",
-    "sheet": "/components/sheet/index"
+    "sheet": "/components/sheet/index",
+    "theme-picker": "/components/theme-picker/index"
   }
 }

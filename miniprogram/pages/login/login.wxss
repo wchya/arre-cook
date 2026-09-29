@@ -2,12 +2,6 @@ page { background: var(--bg); }
 
 .login { position: relative; min-height: 100vh; overflow: hidden; }
 
-/* 暖色光晕背景（对应 Web 登录页三团 blur 光斑） */
-.glow { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(90rpx); }
-.glow-a { top: -260rpx; left: -200rpx; width: 640rpx; height: 640rpx; background: rgba(232, 115, 74, .26); }
-.glow-b { top: 260rpx; right: -200rpx; width: 580rpx; height: 580rpx; background: rgba(245, 215, 110, .32); }
-.glow-c { bottom: -160rpx; left: 180rpx; width: 540rpx; height: 540rpx; background: rgba(110, 198, 184, .22); }
-
 .login__inner { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; padding: 0 44rpx calc(28rpx + env(safe-area-inset-bottom)); }
 
 /* 品牌区 */
@@ -16,7 +10,7 @@ page { background: var(--bg); }
 .brand__desc { margin-top: 18rpx; color: var(--text2); font-size: 27rpx; line-height: 1.65; }
 
 /* 登录卡片（毛玻璃） */
-.panel { margin-top: 44rpx; padding: 32rpx 32rpx 36rpx; border: 1px solid var(--glass-border); border-radius: 56rpx; background: var(--glass-strong); box-shadow: 0 48rpx 120rpx rgba(26, 26, 46, .10); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); animation-delay: .06s; }
+.panel { margin-top: 44rpx; padding: 32rpx 32rpx 36rpx; border: 1px solid var(--glass-border); border-radius: 56rpx; background: var(--glass-strong); box-shadow: none; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); animation-delay: .06s; }
 .modes { margin-bottom: 36rpx; }
 .modes .segmented-item { font-size: 25rpx; }
 .panel__notice { margin: -8rpx 0 28rpx; }
@@ -58,7 +52,7 @@ page { background: var(--bg); }
 .consent.is-hint { background: rgba(232, 115, 74, .10); }
 .check { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; flex-shrink: 0; margin-top: 3rpx; border: 3rpx solid var(--text4); border-radius: 50%; background: var(--card); transition: background-color .2s ease, border-color .2s ease; }
 .consent.is-hint .check { border-color: var(--primary); }
-.check.is-on { border-color: var(--primary); background: var(--primary); animation: pop .3s ease; }
+.check.is-on { border-color: var(--primary-action); background: var(--primary-action); animation: pop .3s ease; }
 .consent__text { color: var(--text2); font-size: 24rpx; line-height: 1.6; }
 .link { color: var(--primary); font-weight: 600; }
 .safe-note { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 12rpx; color: var(--text3); font-size: 21rpx; }
@@ -73,3 +67,6 @@ page { background: var(--bg); }
 .brand__name { margin-top:16rpx; color:var(--primary); font-size:44rpx; font-weight:800; line-height:1.4; }
 
 .about-link { display: flex; justify-content: center; align-items: center; min-height: 44px; color: var(--primary); font-size: 24rpx; text-decoration: underline; }
+
+.login-appearance { display: flex; justify-content: flex-end; margin-bottom: 32rpx; }
+.panel .field, .panel .otp__box, .panel .segmented { background: var(--inset); }

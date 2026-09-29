@@ -34,6 +34,6 @@ page { height: 100%; overflow: hidden; background: #1A1A2E; }
 .list { padding: 0 40rpx 24rpx; }
 .list__item { display: flex; gap: 24rpx; padding: 24rpx 20rpx; border-radius: 24rpx; }
 .list__item.is-current { background: var(--primary-light); }
-.list__num { display: flex; align-items: center; justify-content: center; width: 52rpx; height: 52rpx; flex-shrink: 0; border-radius: 50%; background: var(--primary); color: #fff; font-size: 24rpx; font-weight: 700; }
+.list__num { display: flex; align-items: center; justify-content: center; width: 52rpx; height: 52rpx; flex-shrink: 0; border-radius: 50%; background: var(--primary-action); color: var(--on-primary); font-size: 24rpx; font-weight: 700; }
 .list__text { color: var(--text); font-size: 26rpx; line-height: 1.6; }
 .list__time { margin-top: 4rpx; color: var(--text3); font-size: 22rpx; }

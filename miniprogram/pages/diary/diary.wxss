@@ -54,7 +54,7 @@
 .disclaimer { margin-top: 24rpx; color: var(--text3); font-size: 22rpx; line-height: 1.7; text-align: center; }
 
 /* 悬浮按钮 */
-.fab { position: fixed; right: 36rpx; bottom: calc(56rpx + env(safe-area-inset-bottom)); z-index: 200; display: flex; align-items: center; justify-content: center; width: 104rpx; height: 104rpx; border-radius: 50%; background: var(--primary); box-shadow: 0 12rpx 32rpx rgba(232, 115, 74, .42); }
+.fab { position: fixed; right: 36rpx; bottom: calc(56rpx + env(safe-area-inset-bottom)); z-index: 200; display: flex; align-items: center; justify-content: center; width: 104rpx; height: 104rpx; border-radius: 50%; background: var(--primary-action); box-shadow: 0 12rpx 32rpx rgba(232, 115, 74, .42); }
 
 /* 表单 */
 .sheet-body { padding: 8rpx 40rpx 16rpx; }

@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <view class="screen">
   <nav-bar icon="house" title="arre食谱推荐小助手" subtitle="今天也好好吃饭" theme="plain">
     <view class="nav-bell" hover-class="tap-active" bindtap="goNotifications" aria-role="button" aria-label="站内信">
@@ -21,7 +22,7 @@
   >
     <view class="content anim-fade-up">
       <view class="hello">
-        <view class="hello__greet">{{greeting}}</view>
+        <view class="hello__top"><view class="hello__greet">{{greeting}}</view><theme-picker /></view>
         <view class="hello__title">今天<text class="accent">想吃什么</text>？</view>
       </view>
 
@@ -56,7 +57,7 @@
       </view>
 
       <view wx:elif="{{current}}" class="card rec-card anim-pop-soft" hover-class="rec-card--press" hover-stay-time="80" bindtap="openCurrent">
-        <view class="rec-card__media">
+        <view wx:if="{{current.cover}}" class="rec-card__media">
           <dish-image src="{{current.cover}}" emoji="{{current.emoji}}" emoji-size="128" lazy="{{false}}" />
           <view class="rec-card__badge">{{isSmart ? '🧠 按你的口味' : '🔥 推荐'}}</view>
           <view class="rec-card__meals">
@@ -64,7 +65,8 @@
             <text class="meal-tag meal-tag--mint {{recMeal === 'dinner' ? 'meal-tag--dinner' : ''}}">🍲 晚餐</text>
           </view>
         </view>
-        <view class="card-pad">
+        <view class="recipe-ticket">
+          <view class="recipe-ticket__eyebrow">{{isSmart ? '按你的口味 · 今日推荐' : '今天好好吃饭'}}</view>
           <view class="rec-card__name">{{current.name}}</view>
           <view class="chips">
             <text class="chip chip-primary">{{current.category}}</text>

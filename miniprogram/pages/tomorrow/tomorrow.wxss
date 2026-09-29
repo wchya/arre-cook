@@ -53,7 +53,7 @@
 .picker-input { margin-left: 12rpx; }
 .picker-cats { margin-top: 20rpx; white-space: nowrap; }
 .picker-cat { display: inline-block; margin-right: 16rpx; padding: 10rpx 28rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); color: var(--text2); font-size: 24rpx; font-weight: 700; }
-.picker-cat.is-active { border-color: var(--primary); background: var(--primary); color: #fff; }
+.picker-cat.is-active { border-color: var(--primary); background: var(--primary-action); color: var(--on-primary); }
 .picker-list { max-height: 56vh; padding: 0 40rpx 24rpx; }
 .picker-sk { height: 128rpx; margin-bottom: 16rpx; border-radius: 32rpx; }
 .picker-row { display: flex; align-items: center; gap: 24rpx; padding: 24rpx 0; }
@@ -61,7 +61,7 @@
 .picker-row__thumb { width: 112rpx; height: 112rpx; flex-shrink: 0; overflow: hidden; border-radius: 32rpx; }
 .picker-row__name { color: var(--text); font-size: 28rpx; font-weight: 800; }
 .picker-row__meta { margin-top: 6rpx; color: var(--text3); font-size: 22rpx; font-weight: 500; }
-.pick-btn { min-height: 44px; display: flex; align-items: center; gap: 6rpx; height: 64rpx; flex-shrink: 0; padding: 0 24rpx; border-radius: 999rpx; background: var(--primary); color: #fff; font-size: 24rpx; font-weight: 800; }
+.pick-btn { min-height: 44px; display: flex; align-items: center; gap: 6rpx; height: 64rpx; flex-shrink: 0; padding: 0 24rpx; border-radius: 999rpx; background: var(--primary-action); color: var(--on-primary); font-size: 24rpx; font-weight: 800; }
 .pick-btn--mint { background: var(--mint-action); }
 .pick-btn--remove { background: var(--red-light); color: var(--red); }
 .pick-btn--off { background: var(--bg); color: var(--text3); font-size: 22rpx; }

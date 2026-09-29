@@ -7,7 +7,7 @@
 
 .filters { display: flex; gap: 12rpx; margin-bottom: 28rpx; }
 .filter { padding: 10rpx 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--card); color: var(--text2); font-size: 24rpx; font-weight: 600; transition: all .2s ease; }
-.filter.is-active { border-color: var(--primary); background: var(--primary); color: #fff; }
+.filter.is-active { border-color: var(--primary); background: var(--primary-action); color: var(--on-primary); }
 
 .sk { height: 280rpx; border-radius: 32rpx; }
 .ach { position: relative; overflow: hidden; padding: 32rpx 16rpx 24rpx; border: 1px solid var(--border); border-radius: 32rpx; background: var(--card); box-shadow: var(--shadow-card); opacity: .5; filter: grayscale(.9); text-align: center; transition: transform .15s ease; }

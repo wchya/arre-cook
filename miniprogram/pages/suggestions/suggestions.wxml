@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="inbox" title="AI 建议" subtitle="由你决定是否采纳">
   <view class="toggle" hover-class="tap-active" bindtap="toggleHistory"><icon name="{{history ? 'inbox' : 'history'}}" size="26" stroke="2.4" color="text2" /><text>{{history ? '待处理' : '历史'}}</text></view>
 </nav-bar>
@@ -34,8 +35,8 @@
       </view>
     </view>
     <view wx:if="{{item.pending}}" class="sug__actions">
-      <view class="btn btn-primary {{busyId || !item.dishes.length ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-accept="{{true}}" data-meal="lunch" bindtap="resolve"><icon name="check" size="28" stroke="2.6" color="white" /><text>记为午餐</text></view>
-      <view class="btn btn-mint {{busyId || !item.dishes.length ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-accept="{{true}}" data-meal="dinner" bindtap="resolve"><icon name="check" size="28" stroke="2.6" color="white" /><text>记为晚餐</text></view>
+      <view class="btn btn-primary {{busyId || !item.dishes.length ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-accept="{{true}}" data-meal="lunch" bindtap="resolve"><icon name="check" size="28" stroke="2.6" color="on-primary" /><text>记为午餐</text></view>
+      <view class="btn btn-mint {{busyId || !item.dishes.length ? 'is-disabled' : ''}}" hover-class="tap-active" data-id="{{item.id}}" data-accept="{{true}}" data-meal="dinner" bindtap="resolve"><icon name="check" size="28" stroke="2.6" color="on-primary" /><text>记为晚餐</text></view>
     </view>
   </view>
   <view class="safe-space"></view>

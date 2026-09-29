@@ -5,7 +5,7 @@ const media = require("../../utils/media")
 const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
 
-Page({
+require("../../utils/theme").page({
   data: {
     id: 0,
     name: "",

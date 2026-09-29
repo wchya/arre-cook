@@ -9,9 +9,9 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 
 /* 午晚餐入口 */
 .meal-entries { margin-bottom: 48rpx; }
-.meal-entry { position: relative; min-height: 200rpx; padding: 36rpx; overflow: hidden; border: 3rpx solid transparent; border-radius: 32rpx; transition: transform .15s ease, border-color .2s ease; }
-.meal-entry--lunch { border-color: rgba(232, 115, 74, .12); background: var(--primary-light); }
-.meal-entry--dinner { border-color: rgba(110, 198, 184, .12); background: var(--mint-light); }
+.meal-entry { position: relative; min-height: 200rpx; padding: 36rpx; overflow: hidden; border: 3rpx solid transparent; border-radius: 56rpx; transition: transform .15s ease, border-color .2s ease; }
+.meal-entry--lunch { border-color: transparent; background: var(--card); }
+.meal-entry--dinner { border-color: transparent; background: var(--card); }
 .meal-entry--lunch.is-active { border-color: var(--primary); }
 .meal-entry--dinner.is-active { border-color: var(--mint); }
 .meal-entry.is-busy { opacity: .7; }
@@ -22,16 +22,16 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 /* 今日推荐 */
 .rec-head { scroll-margin-top: 24rpx; }
 .rec-change { margin-left: 8rpx; }
-.rec-card { overflow: hidden; transition: transform .22s var(--ease-spring); }
+.rec-card { padding: 40rpx; border-radius: 64rpx; overflow: hidden; transition: transform .22s var(--ease-spring); }
 .rec-card--press { transform: scale(.985); }
-.rec-card__media { position: relative; height: 400rpx; }
+.rec-card__media { position: relative; height: 400rpx; margin-bottom: 32rpx; overflow: hidden; border-radius: 40rpx; }
 .rec-card__badge { position: absolute; top: 24rpx; left: 24rpx; z-index: 1; padding: 6rpx 24rpx; border: 1px solid var(--glass-border); border-radius: 999rpx; background: var(--glass-strong); color: var(--primary); font-size: 24rpx; font-weight: 600; -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); }
 .rec-card__meals { position: absolute; top: 24rpx; right: 24rpx; z-index: 1; display: flex; gap: 12rpx; }
 .meal-tag { padding: 2rpx 20rpx; border-radius: 999rpx; background: var(--glass-strong); color: var(--primary); font-size: 20rpx; font-weight: 600; -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); transition: background-color .2s ease, color .2s ease; }
 .meal-tag--mint { color: var(--mint-ink); }
-.meal-tag--lunch { background: var(--primary); color: #fff; }
-.meal-tag--dinner { background: var(--mint-action); color: #fff; }
-.rec-card__name { margin-bottom: 12rpx; color: var(--text); font-size: 40rpx; font-weight: 700; line-height: 1.35; }
+.meal-tag--lunch { background: var(--primary-action); color: var(--on-primary); }
+.meal-tag--dinner { background: var(--mint-action); color: var(--on-primary); }
+.rec-card__name { margin-bottom: 12rpx; color: var(--text); font-size: 48rpx; font-weight: 800; line-height: 1.35; }
 .rec-card__reasons { margin-top: 20rpx; gap: 12rpx; }
 .rec-card__actions { display: flex; gap: 20rpx; margin-top: 28rpx; }
 .rec-sk-img { height: 400rpx; border-radius: 0; }
@@ -69,3 +69,12 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .wheel__text { position: absolute; top: 0; left: 50rpx; width: 150rpx; color: #fff; font-size: 22rpx; font-weight: 700; line-height: 40rpx; text-align: center; white-space: nowrap; }
 .wheel-hub { position: absolute; top: 50%; left: 50%; z-index: 2; display: flex; align-items: center; justify-content: center; width: 112rpx; height: 112rpx; margin: -56rpx 0 0 -56rpx; border-radius: 50%; background: var(--card); box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, .12); color: var(--primary); font-size: 30rpx; font-weight: 800; }
 .wheel-hub.is-spinning { opacity: .75; }
+
+.hello__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; gap: 16rpx; }
+.recipe-ticket { position: relative; padding: 36rpx 30rpx; border: 1px solid var(--border2); border-radius: 32rpx; background: var(--primary-light); box-shadow: inset 0 0 0 6rpx var(--primary-light), inset 0 0 0 8rpx var(--border); }
+.recipe-ticket::before, .recipe-ticket::after { content: ""; position: absolute; right: 23%; width: 32rpx; height: 32rpx; border: 1px solid var(--border2); border-radius: 50%; background: var(--card); }
+.recipe-ticket::before { top: -18rpx; border-top-color: transparent; border-left-color: transparent; transform: rotate(45deg); }
+.recipe-ticket::after { bottom: -18rpx; border-bottom-color: transparent; border-right-color: transparent; transform: rotate(45deg); }
+.recipe-ticket__eyebrow { margin-bottom: 10rpx; font-size: 22rpx; color: var(--text2); }
+.rec-card__actions .btn { min-width: 0; height: auto; min-height: 48px; padding: 20rpx 12rpx; font-size: 24rpx; }
+@media (max-width: 360px) { .rec-card { padding: 28rpx; } .recipe-ticket { padding: 32rpx 24rpx; } .rec-card__actions { flex-direction: column; gap: 16rpx; } }

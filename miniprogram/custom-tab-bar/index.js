@@ -1,3 +1,4 @@
+const appearance = require("../utils/theme")
 // 自定义 TabBar：对应 Web 端 MainLayout 底栏（首页 / 菜谱 / AI 助手 / 记录 / 我的）。
 // 中间的 AI 助手不是 Tab 页，点击进入对话页。各 Tab 页在 onShow 里调用 session.syncTabBar 同步选中态。
 const TABS = [
@@ -17,7 +18,10 @@ Component({
   },
 
   lifetimes: {
+    detached() { if (this._offAppearance) this._offAppearance() },
     attached() {
+      this.setData({ appearanceStyle: appearance.palette().style })
+      this._offAppearance = appearance.subscribe((p) => this.setData({ appearanceStyle: p.style }))
       const app = getApp()
       if (app && app.globalData.isIOS) this.setData({ isIOS: true })
     },

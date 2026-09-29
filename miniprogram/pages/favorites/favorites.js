@@ -44,7 +44,7 @@ function shelfItem(entry, repeat) {
   return { ...card, meta: repeat ? `${entry.record_count || 0} 次` : `${entry.dish.cook_time || "-"} 分钟` }
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     loading: true,
     empty: false,

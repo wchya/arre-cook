@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar icon="images" title="照片墙" subtitle="把饭桌上的片刻收起来">
   <text wx:if="{{totalPhotos}}" class="meta-pill">{{totalDays}} 天 · {{totalPhotos}} 张</text>
 </nav-bar>

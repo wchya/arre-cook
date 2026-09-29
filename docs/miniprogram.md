@@ -2,7 +2,7 @@
 
 ## 工程配置
 
-小程序名称为「arre食谱推荐小助手」，是 `miniprogram/` 下包含 24 个页面的原生 WXML/WXSS/JavaScript 工程。登录、菜谱、家庭、个人信息和站内信等主流程直接调用 Go API，不依赖 WebView。导入微信开发者工具时选择这个目录。项目 AppID 已配置；服务端 AppSecret 只放在根目录被 Git 忽略的 `.env` 中，通过 `WECHAT_APPID` 和 `WECHAT_SECRET` 传给后端。
+小程序名称为「arre食谱推荐小助手」，是 `miniprogram/` 下包含 25 个页面的原生 WXML/WXSS/JavaScript 工程。登录、菜谱、家庭、个人信息和站内信等主流程直接调用 Go API，不依赖 WebView。导入微信开发者工具时选择这个目录。项目 AppID 已配置；服务端 AppSecret 只放在根目录被 Git 忽略的 `.env` 中，通过 `WECHAT_APPID` 和 `WECHAT_SECRET` 传给后端。
 
 默认 API 地址为 `https://cook.arrebyte.top/api`，配置在 `miniprogram/app.js` 的 `apiBase`。小程序原生登录页先尝试微信快捷登录；微信未绑定时可以用 QQ/Foxmail 邮箱验证码登录，并在同一账号上绑定新获取的 `wx.login` code。服务端从不把 AppSecret 下发给小程序。
 
@@ -32,7 +32,7 @@
 
 日常开发可直接用微信开发者工具预览和上传。若部署自动上传流水线，应由 CI 将这把私钥作为受保护文件挂载，并通过微信官方 `miniprogram-ci` SDK 上传；上传版本读取根目录 `VERSION`，与本次服务端部署一致。上传成功表示进入微信后台开发版本，之后仍需体验版检查、提交审核和正式发布。
 
-2026-09-28 最新上传为 0.12.8 开发版本，推荐去重改为原生选择器，同版本后端已部署。上传回执与验证范围见 [0.12.8 发布记录](releases/0.12.8.md)。此前 0.12.7 的自定义去重弹框方案仍被用户复现重叠；历史上传记录不代表已完成真机验收或正式发布。
+2026-09-28 最新上传为 0.13.1 开发版本，收紧 iOS 主题选中边框并修正原生按钮尺寸，同版本服务端已部署。上传回执与验证范围见 [0.13.1 发布记录](releases/0.13.1.md)。四套配色与明暗模式继续保留。0.12.8 的推荐去重原生选择器继续保留。此前 0.12.7 的自定义去重弹框方案仍被用户复现重叠；历史上传记录不代表已完成真机验收或正式发布。
 
 ## 昵称编辑回归
 
@@ -57,3 +57,7 @@
 浏览器与组件模拟不能替代 iOS/Android 微信里真实的键盘、授权与图片上传测试。
 
 菜谱入口回归：`node --test scripts/tests/recipe-visibility.test.cjs`，检查私房空列表恢复、跨 Tab 清除筛选和详情返回时保留范围。服务端对应回归为 `cd backend && go test ./internal/routes -run TestPersonalRecipeCountMatchesCollectionAfterFamilySharing`。
+
+## 多主题外观
+
+首页、登录页与「我的 → 外观」可选择青柠、暖桃、海盐蓝、莓果，以及浅色、深色、跟随系统。偏好保存在当前微信设备，退出账号后保留；不改变后端饮食偏好。全站令牌、图标、下拉刷新、转盘、弹层和底栏同步更新，详细接入约定见 [界面规范](ui-guide.md#小程序主题同步)。

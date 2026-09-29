@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar title="关于我们" subtitle="认识你的日常饮食小帮手" />
 <view class="content about-content">
   <view class="about-hero">

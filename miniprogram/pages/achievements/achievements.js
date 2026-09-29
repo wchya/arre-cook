@@ -3,7 +3,7 @@ const session = require("../../utils/session")
 const ui = require("../../utils/ui")
 const fmt = require("../../utils/format")
 
-Page({
+require("../../utils/theme").page({
   data: {
     loading: true,
     list: [],

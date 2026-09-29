@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <nav-bar title="饮食记录" subtitle="实际吃过的，才进入报告" icon="activity"></nav-bar>
 
 <view class="content anim-fade-up">
@@ -153,7 +154,7 @@
   <view class="tabbar-spacer"></view>
 </view>
 
-<view wx:if="{{view === 'journal' && !loading}}" class="fab" hover-class="tap-active" bindtap="openForm"><icon name="plus" size="46" stroke="2.6" color="white" /></view>
+<view wx:if="{{view === 'journal' && !loading}}" class="fab" hover-class="tap-active" bindtap="openForm"><icon name="plus" size="46" stroke="2.6" color="on-primary" /></view>
 
 <sheet show="{{showForm}}" title="记录一餐" subtitle="实际吃过的，才进入报告" bind:close="closeForm">
   <view class="sheet-body form">

@@ -9,7 +9,7 @@ function dishChips(list) {
   return (list || []).map((dish) => ({ id: dish.id, name: dish.name }))
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     tab: "week",
     tabIndex: 0,

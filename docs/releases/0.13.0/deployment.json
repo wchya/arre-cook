@@ -1,0 +1,20 @@
+{
+  "version": "0.13.0",
+  "revision": "a52e81f5d6287e13542f247a9df87ef3db88e9b8",
+  "image": "sha256:7e2d8dd50d2c829088060f14879f19237d738abc35dc247f128de502222cf0c9",
+  "source": "/home/ubuntu/arre-cook-releases/0.13.0-a52e81f",
+  "schema_changed": false,
+  "local": {
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-28T17:57:47+08:00",
+    "version": "0.13.0"
+  },
+  "public": {
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-28T17:57:49+08:00",
+    "version": "0.13.0"
+  },
+  "completed_at": "2026-09-28 17:57:49"
+}

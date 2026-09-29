@@ -1,3 +1,4 @@
+<page-meta page-style="{{appearanceStyle}}" />
 <view class="chat">
   <nav-bar icon="message-circle" title="AI 饮食助手" subtitle="{{statusText}}" theme="default">
     <view class="head-btn" hover-class="tap-active" bindtap="openHistory" aria-role="button" aria-label="对话记录"><icon name="history" size="34" stroke="2.2" color="text2" /></view>
@@ -9,7 +10,7 @@
       <view wx:if="{{!llmEnabled}}" class="offline">当前未连接 AI 模型，可获取基础菜谱推荐和已记录的饮食报告。对话写入暂不可用，请使用饮食记录或菜谱页面填写。</view>
 
       <view wx:if="{{!messages.length && !loadingSession}}" class="welcome anim-fade-up">
-        <view class="welcome__icon"><icon name="sparkles" size="56" stroke="2.2" color="white" /></view>
+        <view class="welcome__icon"><icon name="sparkles" size="56" stroke="2.2" color="on-primary" /></view>
         <view class="welcome__title">今天想吃什么？</view>
         <view class="welcome__desc">只聊食谱与日常饮食，回复会先核对再展示</view>
         <view class="suggestions">
@@ -27,7 +28,7 @@
       <view wx:if="{{loadingSession}}" class="loading-session"><view class="spinner spinner-dark"></view><text>正在读取对话…</text></view>
 
       <view wx:for="{{messages}}" wx:key="id" class="msg {{item.role === 'user' ? 'msg--user' : 'msg--bot'}}">
-        <view wx:if="{{item.role !== 'user'}}" class="msg__avatar"><icon name="sparkles" size="30" stroke="2.3" color="white" /></view>
+        <view wx:if="{{item.role !== 'user'}}" class="msg__avatar"><icon name="sparkles" size="30" stroke="2.3" color="on-primary" /></view>
         <view class="bubble" bindlongpress="copyMessage" data-text="{{item.content}}">
           <text wx:if="{{item.content}}" class="bubble__text" user-select>{{item.content}}</text>
           <view wx:elif="{{item.streaming && !item.tools.length}}" class="typing"><view class="typing__dot"></view><view class="typing__dot"></view><view class="typing__dot"></view></view>
@@ -78,7 +79,7 @@
     <view class="composer__box {{inputFocus ? 'is-focus' : ''}}">
       <textarea class="composer__input" value="{{draft}}" maxlength="1000" auto-height adjust-position="{{false}}" show-confirm-bar="{{false}}" confirm-type="send" placeholder="聊聊今天吃什么" placeholder-class="placeholder" cursor-spacing="20" bindinput="onInput" bindfocus="onFocus" bindblur="onBlur" bindconfirm="sendDraft" bindkeyboardheightchange="onKeyboard" />
       <view class="send {{draft && !busy && !loadingSession && canSend ? '' : 'is-disabled'}}" hover-class="tap-active" bindtap="sendDraft" aria-role="button" aria-label="发送" aria-disabled="{{!draft || busy || loadingSession || !canSend}}">
-        <icon name="arrow-up" size="36" stroke="2.6" color="white" />
+        <icon name="arrow-up" size="36" stroke="2.6" color="on-primary" />
       </view>
     </view>
   </view>
@@ -102,7 +103,7 @@
       </view>
     </scroll-view>
     <view class="drawer__foot">
-      <view class="btn btn-block btn-primary" hover-class="tap-active" bindtap="newChat"><icon name="plus" size="32" stroke="2.6" color="white" /><text>新对话</text></view>
+      <view class="btn btn-block btn-primary" hover-class="tap-active" bindtap="newChat"><icon name="plus" size="32" stroke="2.6" color="on-primary" /><text>新对话</text></view>
     </view>
   </view>
 </view>

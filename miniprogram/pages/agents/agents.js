@@ -33,7 +33,7 @@ function expiryText(value) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} 过期`
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     loading: true,
     active: [], inactiveCount: 0,

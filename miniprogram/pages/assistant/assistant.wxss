@@ -25,7 +25,7 @@
 .mood-row { margin-bottom: 24rpx; white-space: nowrap; }
 .label { margin-bottom: 12rpx; color: var(--text3); font-size: 22rpx; font-weight: 700; }
 .pill { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8rpx 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); color: var(--text2); font-size: 24rpx; font-weight: 600; transition: all .2s ease; }
-.pill.is-on { border-color: var(--pink-action); background: var(--pink-action); color: #fff; }
+.pill.is-on { border-color: var(--pink-action); background: var(--pink-action); color: var(--on-primary); }
 .pill--time { padding: 12rpx 8rpx; font-size: 22rpx; text-align: center; }
 .pill.is-mint { border-color: var(--mint); background: var(--mint-light); color: var(--mint-ink); }
 .spin { animation: spin .8s linear infinite; }

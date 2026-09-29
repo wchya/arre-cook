@@ -46,7 +46,7 @@ function toRecordView(record) {
   }
 }
 
-Page({
+require("../../utils/theme").page({
   data: {
     weekHead: WEEK_HEAD,
     year: 0,

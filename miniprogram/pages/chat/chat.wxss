@@ -9,7 +9,7 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 
 /* 空状态 */
 .welcome { display: flex; flex-direction: column; align-items: center; padding: 48rpx 8rpx 24rpx; text-align: center; }
-.welcome__icon { display: flex; align-items: center; justify-content: center; width: 120rpx; height: 120rpx; margin-bottom: 28rpx; border-radius: 40rpx; background: linear-gradient(135deg, #F59A6B 0%, #E8734A 52%, #D9573A 100%); box-shadow: 0 24rpx 56rpx rgba(232, 115, 74, .35); }
+.welcome__icon { display: flex; align-items: center; justify-content: center; width: 120rpx; height: 120rpx; margin-bottom: 28rpx; border-radius: 40rpx; background: var(--primary-action); box-shadow: 0 24rpx 56rpx rgba(232, 115, 74, .35); }
 .welcome__title { color: var(--text); font-size: 40rpx; font-weight: 800; }
 .welcome__desc { max-width: 560rpx; margin-top: 10rpx; color: var(--text3); font-size: 24rpx; line-height: 1.6; }
 .suggestions { width: 100%; margin-top: 40rpx; }
@@ -22,9 +22,9 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 /* 消息 */
 .msg { display: flex; align-items: flex-start; gap: 16rpx; margin-bottom: 28rpx; animation: fadeUp .25s ease both; }
 .msg--user { justify-content: flex-end; }
-.msg__avatar { display: flex; align-items: center; justify-content: center; width: 60rpx; height: 60rpx; flex-shrink: 0; border-radius: 22rpx; background: linear-gradient(135deg, #F59A6B, #E8734A); }
+.msg__avatar { display: flex; align-items: center; justify-content: center; width: 60rpx; height: 60rpx; flex-shrink: 0; border-radius: 22rpx; background: var(--primary-action); }
 .bubble { min-width: 0; max-width: 84%; padding: 22rpx 28rpx; border-radius: 32rpx; font-size: 28rpx; line-height: 1.7; }
-.msg--user .bubble { border-bottom-right-radius: 10rpx; background: var(--primary); color: #fff; box-shadow: 0 10rpx 28rpx rgba(232, 115, 74, .22); }
+.msg--user .bubble { border-bottom-right-radius: 10rpx; background: var(--primary-action); color: var(--on-primary); box-shadow: 0 10rpx 28rpx rgba(232, 115, 74, .22); }
 .msg--bot .bubble { border: 1px solid var(--border); border-top-left-radius: 10rpx; background: var(--card); color: var(--text); box-shadow: var(--shadow-card); }
 .bubble__text { white-space: pre-wrap; word-break: break-word; }
 .bubble__error { display: flex; align-items: flex-start; gap: 8rpx; margin-top: 12rpx; color: var(--red); font-size: 22rpx; }
@@ -59,7 +59,7 @@ page { height: 100%; overflow: hidden; background: var(--bg); }
 .composer__box { display: flex; align-items: flex-end; gap: 12rpx; padding: 10rpx 10rpx 10rpx 24rpx; border: 3rpx solid var(--border); border-radius: 40rpx; background: var(--bg); transition: border-color .2s ease, background-color .2s ease; }
 .composer__box.is-focus { border-color: var(--primary); background: var(--card); }
 .composer__input { flex: 1; min-height: 44rpx; max-height: 220rpx; padding: 16rpx 0; color: var(--text); font-size: 28rpx; line-height: 1.5; }
-.send { display: flex; align-items: center; justify-content: center; width: 76rpx; height: 76rpx; flex-shrink: 0; border-radius: 50%; background: var(--primary); box-shadow: 0 8rpx 20rpx rgba(232, 115, 74, .3); transition: opacity .2s ease, transform .15s ease; }
+.send { display: flex; align-items: center; justify-content: center; width: 76rpx; height: 76rpx; flex-shrink: 0; border-radius: 50%; background: var(--primary-action); box-shadow: 0 8rpx 20rpx rgba(232, 115, 74, .3); transition: opacity .2s ease, transform .15s ease; }
 .send.is-disabled { opacity: .35; box-shadow: none; }
 
 /* 对话记录抽屉 */

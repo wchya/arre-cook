@@ -3,54 +3,54 @@
  * 尺寸换算：Web 端 1px ≈ 小程序 2rpx（以 375 宽屏为基准）。
  */
 page {
-  --bg: #FAFAF8;
-  --card: #FFFFFF;
-  --primary: #B94E2B;
-  --primary-action: #B94E2B;
-  --primary-light: #FFF0EB;
-  --primary-dark: #C85A35;
-  --mint: #227A68;
-  --mint-action: #227A68;
-  --mint-light: #E8F8F5;
-  --mint-ink: #227A68;
-  --pink: #B4485D;
-  --pink-action: #B4485D;
-  --pink-light: #FFF0EE;
-  --pink-ink: #B4485D;
-  --yellow: #957010;
-  --yellow-light: #FFF9E6;
-  --yellow-dark: #A67912;
-  --purple: #8B5CF6;
-  --purple-light: #F0E6FF;
+  --bg: #C4E38B;
+  --card: #FFFFFA;
+  --text: #405500;
+  --text2: #536039;
+  --text3: #536039;
+  --text4: #536039;
+  --primary: #526C0D;
+  --primary-action: #9DCD19;
+  --primary-dark: #8CBD0E;
+  --on-primary: #304300;
+  --primary-light: #EFF6AD;
+  --inset: #F1F5DF;
+  --hero-warm: #EFF6AD;
+  --border: #DCE7BD;
+  --border2: #DCE7BD;
+  --mint: #526C0D;
+  --mint-ink: #526C0D;
+  --mint-action: #9DCD19;
+  --mint-light: #F1F5DF;
+  --pink: #526C0D;
+  --pink-ink: #526C0D;
+  --pink-action: #9DCD19;
+  --pink-light: #EFF6AD;
+  --yellow: #526C0D;
+  --yellow-dark: #526C0D;
+  --yellow-light: #EFF6AD;
+  --purple: #526C0D;
+  --purple-light: #F1F5DF;
   --red: #DC2626;
   --red-light: #FEE2E2;
-  --text: #1A1A2E;
-  --text2: #6B7280;
-  --text3: #747880;
-  --text4: #D1D5DB;
-  --border: #F0F0EC;
-  --border2: #E5E5E0;
+  --white: #FFFFFF;
   --wechat: #07C160;
-  --shadow-card: 0 2rpx 6rpx rgba(0, 0, 0, .04), 0 8rpx 24rpx rgba(0, 0, 0, .04);
-  --shadow-float: 0 20rpx 60rpx rgba(26, 26, 46, .10);
-  --shadow-primary: 0 24rpx 56rpx rgba(232, 115, 74, .32);
-  /* 毛玻璃（iOS backdrop-filter）：安卓不支持时 rgba 高不透明度可优雅降级 */
-  --glass-bg: rgba(250, 250, 248, .82);
-  --glass-strong: rgba(255, 255, 255, .92);
-  --glass-border: rgba(255, 255, 255, .7);
-  --glass-shadow: 0 20rpx 56rpx rgba(26, 26, 46, .05);
-  /* iOS 专用：真实模糊可用，底色更通透、模糊更强，接近系统材质 */
-  --glass-ios-bg: rgba(250, 250, 248, .66);
-  --glass-ios-strong: rgba(255, 255, 255, .74);
+  --glass-bg: #FFFFFA;
+  --glass-strong: #FFFFFA;
+  --glass-border: #DCE7BD;
+  --glass-ios-bg: #FFFFFA;
+  --glass-ios-strong: #FFFFFA;
+  --highlight: rgba(255,255,255,.8);
+  --scrim: rgba(0,0,0,.48);
+  --thumb: #FFFFFA;
+  --shadow-card: 0 4rpx 16rpx rgba(0,0,0,.03);
+  --shadow-float: 0 20rpx 60rpx rgba(0,0,0,.10);
+  --shadow-primary: none;
+  --glass-shadow: none;
   --glass-blur: blur(20px) saturate(180%);
   --glass-blur-ios: blur(30px) saturate(190%);
-  --ease-spring: cubic-bezier(.2, .8, .2, 1);
-  --ease-out: cubic-bezier(.16, 1, .3, 1);
-  /* 图标块顶部内高光、头图暖色起点、遮罩、分段选择滑块：深色模式下各自换值，避免亮边与发白 */
-  --highlight: rgba(255, 255, 255, .82);
-  --hero-warm: #FFE9DE;
-  --scrim: rgba(26, 26, 46, .42);
-  --thumb: #FFFFFF;
+  --ease-spring: cubic-bezier(.2,.8,.2,1);
+  --ease-out: cubic-bezier(.16,1,.3,1);
 
   min-height: 100%;
   background: var(--bg);
@@ -133,7 +133,7 @@ button::after { border: 0; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16rpx; }
 
 /* ---------- 卡片 ---------- */
-.card { position: relative; border: 1px solid var(--border); border-radius: 32rpx; background: var(--card); box-shadow: var(--shadow-card); }
+.card { position: relative; border: 1px solid var(--border); border-radius: 56rpx; background: var(--card); box-shadow: var(--shadow-card); }
 .card-pad { padding: 32rpx; }
 .card-soft { border-radius: 32rpx; background: var(--bg); }
 
@@ -157,7 +157,7 @@ button::after { border: 0; }
 .chip-yellow { border: 1px solid rgba(245, 215, 110, .35); background: var(--yellow-light); color: var(--yellow-dark); }
 .chip-purple { background: var(--purple-light); color: var(--purple); }
 .chip-ghost { border: 1px solid var(--border); background: var(--bg); color: var(--text2); }
-.chip-solid { background: var(--primary-action); color: #fff; }
+.chip-solid { background: var(--primary-action); color: var(--on-primary); }
 
 /* ---------- 按钮 ---------- */
 .btn { position: relative; display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 84rpx; padding: 0 40rpx; border-radius: 999rpx; font-size: 28rpx; font-weight: 600; line-height: 1; white-space: nowrap; transition: transform .15s ease, opacity .15s ease; }
@@ -165,9 +165,9 @@ button::after { border: 0; }
 .btn-sm { height: 60rpx; padding: 0 24rpx; font-size: 24rpx; gap: 8rpx; }
 .btn-xs { height: 48rpx; padding: 0 20rpx; font-size: 22rpx; gap: 6rpx; }
 .btn-block { width: 100%; }
-.btn-primary { background: var(--primary-action); color: #fff; }
-.btn-primary-glow { background: var(--primary-action); color: #fff; box-shadow: var(--shadow-primary); }
-.btn-mint { background: var(--mint-action); color: #fff; }
+.btn-primary { background: var(--primary-action); color: var(--on-primary); }
+.btn-primary-glow { background: var(--primary-action); color: var(--on-primary); box-shadow: var(--shadow-primary); }
+.btn-mint { background: var(--mint-action); color: var(--on-primary); }
 .btn-soft { background: var(--primary-light); color: var(--primary); }
 .btn-ghost { border: 3rpx solid var(--border2); background: var(--card); color: var(--text); }
 .btn-danger { background: var(--red-light); color: var(--red); }
@@ -240,7 +240,7 @@ button::after { border: 0; }
 .notice-warn { background: var(--yellow-light); color: var(--yellow-dark); }
 
 /* ---------- 统计卡（对应 Web StatCard） ---------- */
-.stat-card { position: relative; overflow: hidden; padding: 32rpx 20rpx; border: 1px solid var(--border); border-radius: 32rpx; background: var(--card); box-shadow: var(--shadow-card); text-align: center; }
+.stat-card { position: relative; overflow: hidden; padding: 32rpx 20rpx; border: 1px solid var(--border); border-radius: 56rpx; background: var(--card); box-shadow: var(--shadow-card); text-align: center; }
 .stat-card::after { position: absolute; top: 0; right: 0; left: 0; height: 6rpx; content: ""; }
 .stat-card.bar-primary::after { background: var(--primary); }
 .stat-card.bar-mint::after { background: var(--mint); }
@@ -251,8 +251,8 @@ button::after { border: 0; }
 .stat-label { color: var(--text2); font-size: 24rpx; }
 
 /* ---------- 骨架屏 / 加载 ---------- */
-.skeleton { border-radius: 16rpx; background: linear-gradient(90deg, var(--border) 25%, #F7F7F4 50%, var(--border) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
-.spinner { width: 32rpx; height: 32rpx; flex-shrink: 0; border: 4rpx solid rgba(255, 255, 255, .35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+.skeleton { border-radius: 16rpx; background: linear-gradient(90deg, var(--border) 25%, var(--inset) 50%, var(--border) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+.spinner { width: 32rpx; height: 32rpx; flex-shrink: 0; border: 4rpx solid rgba(255, 255, 255, .35); border-top-color: var(--on-primary); border-radius: 50%; animation: spin .7s linear infinite; }
 .spinner-dark { border-color: rgba(232, 115, 74, .2); border-top-color: var(--primary); }
 .loading-more { padding: 32rpx 0; color: var(--text3); font-size: 24rpx; text-align: center; }
 
@@ -274,52 +274,58 @@ button::after { border: 0; }
 .anim-shake { animation: shake .45s ease; }
 .anim-pulse { animation: pulse 1.4s ease-in-out infinite; }
 
-/* ---------- 深色模式（跟随系统；需 app.json 开启 darkmode） ---------- */
+/* 首帧默认色板；页面 page-meta 的内联令牌随后同步持久外观。 */
 /* 仅覆盖 page 上的设计令牌即可全局级联进各自定义组件（CSS 变量穿透 shadow 边界）。 */
 @media (prefers-color-scheme: dark) {
   page {
-    --bg: #131316;
-    --card: #1D1D22;
-    --primary: #F0825A;
-    --primary-action: #B94E2B;
-    --primary-light: #3A2419;
-    --primary-dark: #D8683F;
-    --mint: #72CDBE;
-    --mint-light: #15302C;
-    --mint-ink: #6FD8C6;
-    --pink: #F4A8A0;
-    --pink-light: #3A2226;
-    --pink-ink: #F3A99E;
-    --yellow: #F5D76E;
-    --yellow-light: #352E18;
-    --yellow-dark: #F2CD5C;
-    --purple: #A78BFA;
-    --purple-light: #2A2140;
-    --red: #EF4444;
-    --red-light: #3B1C1C;
-    --text: #ECECF1;
-    --text2: #A1A1AA;
-    --text3: #A0A0AB;
-    --text4: #3F3F46;
-    --border: #26262C;
-    --border2: #34343C;
-    --shadow-card: 0 2rpx 6rpx rgba(0, 0, 0, .3), 0 8rpx 24rpx rgba(0, 0, 0, .28);
-    --shadow-float: 0 20rpx 60rpx rgba(0, 0, 0, .55);
-    --shadow-primary: 0 24rpx 56rpx rgba(232, 115, 74, .3);
-    --glass-bg: rgba(18, 16, 22, .72);
-    --glass-strong: rgba(42, 38, 52, .92);
-    --glass-border: rgba(255, 255, 255, .06);
-    --glass-shadow: 0 20rpx 56rpx rgba(0, 0, 0, .45);
-    --glass-ios-bg: rgba(22, 20, 28, .6);
-    --glass-ios-strong: rgba(44, 40, 54, .7);
-    --highlight: rgba(255, 255, 255, .06);
-    --hero-warm: #45291D;
-    --scrim: rgba(0, 0, 0, .6);
-    --thumb: #2C2835;
+    --bg: #161D10;
+    --card: #222D1B;
+    --text: #EFF5DF;
+    --text2: #AEBB9A;
+    --text3: #AEBB9A;
+    --text4: #AEBB9A;
+    --primary: #CAE87F;
+    --primary-action: #9DCD19;
+    --primary-dark: #8CBD0E;
+    --on-primary: #304300;
+    --primary-light: #354324;
+    --inset: #2B3623;
+    --hero-warm: #354324;
+    --border: #414F32;
+    --border2: #414F32;
+    --mint: #CAE87F;
+    --mint-ink: #CAE87F;
+    --mint-action: #9DCD19;
+    --mint-light: #2B3623;
+    --pink: #CAE87F;
+    --pink-ink: #CAE87F;
+    --pink-action: #9DCD19;
+    --pink-light: #354324;
+    --yellow: #CAE87F;
+    --yellow-dark: #CAE87F;
+    --yellow-light: #354324;
+    --purple: #CAE87F;
+    --purple-light: #2B3623;
+    --red: #FF9696;
+    --red-light: #4C2426;
+    --white: #FFFFFF;
+    --wechat: #07C160;
+    --glass-bg: #222D1B;
+    --glass-strong: #222D1B;
+    --glass-border: #414F32;
+    --glass-ios-bg: #222D1B;
+    --glass-ios-strong: #222D1B;
+    --highlight: rgba(255,255,255,.06);
+    --scrim: rgba(0,0,0,.48);
+    --thumb: #222D1B;
+    --shadow-card: 0 4rpx 16rpx rgba(0,0,0,.03);
+    --shadow-float: 0 20rpx 60rpx rgba(0,0,0,.10);
+    --shadow-primary: none;
+    --glass-shadow: none;
   }
   /* 硬编码色的深色修正 */
-  .notice-error { color: #F3A99E; }
-  .skeleton { background: linear-gradient(90deg, var(--border) 25%, #2A2733 50%, var(--border) 75%); background-size: 200% 100%; }
+  .notice-error { color: var(--red); }
+  .skeleton { background: linear-gradient(90deg, var(--border) 25%, var(--inset) 50%, var(--border) 75%); background-size: 200% 100%; }
 }
 
 /* ---------- iOS 毛玻璃增强 ---------- */

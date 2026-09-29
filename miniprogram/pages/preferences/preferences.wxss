@@ -9,7 +9,7 @@
 .spice.is-mint { border-color: var(--mint); background: var(--mint-light); color: var(--mint-ink); }
 .spice__emoji { font-size: 30rpx; line-height: 1.2; }
 .pill { display: flex; align-items: center; min-height: 44px; padding: 12rpx 24rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); color: var(--text2); font-size: 24rpx; font-weight: 600; transition: all .2s ease; }
-.pill--pink { border-color: var(--pink-action); background: var(--pink-action); color: #fff; }
+.pill--pink { border-color: var(--pink-action); background: var(--pink-action); color: var(--on-primary); }
 .pill--purple { border-color: var(--purple); background: var(--purple-light); color: var(--purple); }
 .household { display: flex; align-items: center; gap: 24rpx; }
 .household__btn { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); }

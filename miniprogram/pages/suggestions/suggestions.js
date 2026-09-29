@@ -6,7 +6,7 @@ const fmt = require("../../utils/format")
 
 const STATUS = { pending: "待处理", accepted: "已采纳", dismissed: "已忽略", expired: "已过期" }
 
-Page({
+require("../../utils/theme").page({
   data: { loading: true, history: false, items: [], busyId: 0 },
 
   onLoad() {
