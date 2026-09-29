@@ -10,7 +10,7 @@ button { min-height: 88rpx; margin: 8rpx 0; padding: 12rpx 20rpx; font-size: 26r
 .text-area { height: 150rpx; }
 .consent { display: flex; align-items: flex-start; gap: 12rpx; padding: 24rpx 0; font-size: 26rpx; line-height: 1.7; }
 .consent checkbox { flex-shrink: 0; }
-.primary { background: var(--primary); color: #fff; font-weight: 600; }
+.primary { background: var(--primary-action); color: var(--on-primary); font-weight: 600; }
 button[disabled] { opacity: .55; }
 .clear { color: var(--text2); font-size: 24rpx; }
 .erase { margin-top: 16rpx; padding: 16rpx; border: 1px solid var(--border); border-radius: 20rpx; }
