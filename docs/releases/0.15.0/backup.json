@@ -1,0 +1,6 @@
+{
+  "previous_version": "0.14.0",
+  "rollback_tag": "arre-cook/ninimenu:rollback-0.14.0-pre-health-0150",
+  "rollback_image": "sha256:38c910ec0d66a665f80cf55cbf7d7f68118fdc6c8d73718cea3550700b6be408",
+  "database_bytes": 156463
+}

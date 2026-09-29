@@ -1,0 +1,66 @@
+{
+  "public": {
+    "busy_rejections": 0,
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-29T22:56:49+08:00",
+    "version": "0.15.0"
+  },
+  "endpoints": {
+    "/api/health/summary": 200,
+    "/api/health/meal-drafts/status": 200,
+    "/api/health-report?days=7": 200,
+    "/api/health-report?days=30": 200,
+    "/api/health/profile": 200,
+    "/api/health/foods": 200,
+    "/api/health/catalog": 200,
+    "/api/dishes": 200,
+    "/api/records": 200,
+    "/api/week-plan": 200,
+    "/api/achievements": 200,
+    "/api/notifications": 200
+  },
+  "real_model_draft": {
+    "status": 200,
+    "seconds": 4.92,
+    "items": 2,
+    "client_override_rejected": true,
+    "passed": true,
+    "draft_quota_delta": 1,
+    "chat_quota_delta": 0,
+    "journal_count_unchanged": true
+  },
+  "s3_image_readback": {
+    "status": 200,
+    "type": "image/jpeg",
+    "size": 124508
+  },
+  "release_notices": {
+    "total": 4,
+    "duplicate_users": 0
+  },
+  "logs": {
+    "panic": 0,
+    "fatal": 0,
+    "sql_1064": 0,
+    "database_error": 0
+  },
+  "container": {
+    "health": "healthy",
+    "image": "sha256:0a48b37cbea4bca7823dcc4266b184ea5ca722054427682c8f0b8f8102a84385",
+    "oom_killed": false,
+    "restarts": 0,
+    "memory": 1073741824,
+    "memory_swap": 1073741824,
+    "nano_cpus": 2000000000,
+    "stop_timeout": 110,
+    "db_auto_migrate": "false",
+    "go_memory": "192MiB",
+    "go_parallelism": "2"
+  },
+  "local_asr": {
+    "provider": null,
+    "enabled": true
+  },
+  "passed": true
+}

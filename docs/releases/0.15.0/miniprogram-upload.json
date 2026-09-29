@@ -1,0 +1,15 @@
+{
+  "version": "0.15.0",
+  "revision": "7460b7454c4da8e907cf58a3a394a6a00a214295",
+  "appid": "wx1c4522af7a2e72d1",
+  "uploadedAt": "2026-09-29T14:47:14.552Z",
+  "result": {
+    "subPackageInfo": [
+      {
+        "name": "__FULL__",
+        "size": 759517
+      }
+    ],
+    "pluginInfo": []
+  }
+}

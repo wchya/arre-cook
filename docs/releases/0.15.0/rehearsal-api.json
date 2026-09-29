@@ -1,0 +1,10 @@
+{
+  "database": "MySQL 8 isolated production backup",
+  "production_personal_data_written": false,
+  "personal_auth_and_disabled_model_preserves_quota": true,
+  "same_day_fingerprint_race_and_isolated_non_food_declarations": true,
+  "atomic_batch_rollback_concurrent_replay_conflict_export_and_deleted_replay": true,
+  "breakfast_plan_and_actual_record_permanently_clear_declaration": true,
+  "account_deletion_cleans_new_tables_and_revokes_session": true,
+  "passed": true
+}

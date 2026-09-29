@@ -1,0 +1,37 @@
+{
+  "version": "0.15.0",
+  "revision": "7460b7454c4da8e907cf58a3a394a6a00a214295",
+  "image_id": "sha256:0a48b37cbea4bca7823dcc4266b184ea5ca722054427682c8f0b8f8102a84385",
+  "image_tag": "arre-cook/ninimenu:0.15.0",
+  "rollback_tag": "arre-cook/ninimenu:rollback-0.14.0-pre-health-0150",
+  "local": {
+    "busy_rejections": 0,
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-29T22:56:26+08:00",
+    "version": "0.15.0"
+  },
+  "public": {
+    "busy_rejections": 0,
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-29T22:56:29+08:00",
+    "version": "0.15.0"
+  },
+  "pre_open_endpoints": {
+    "/api/health/summary": 200,
+    "/api/health/meal-drafts/status": 200,
+    "/api/health-report?days=7": 200,
+    "/api/health-report?days=30": 200,
+    "/api/health/profile": 200,
+    "/api/health/foods": 200,
+    "/api/health/catalog": 200,
+    "/api/dishes": 200,
+    "/api/records": 200,
+    "/api/week-plan": 200,
+    "/api/achievements": 200,
+    "/api/notifications": 200
+  },
+  "completed_at": "2026-09-29 22:56:29",
+  "db_auto_migrate": "false"
+}
