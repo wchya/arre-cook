@@ -1,6 +1,10 @@
 .sk { height: 320rpx; border-radius: 32rpx; margin-bottom: 24rpx; }
 .view-seg { margin-bottom: 28rpx; }
-.section-title { display: flex; align-items: center; gap: 14rpx; }
+.content { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
+.content .card { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
+.content button { min-width: 0; max-width: 100%; }
+.section-title { display: flex; align-items: center; flex-wrap: wrap; gap: 14rpx; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.section-title > text { min-width: 0; max-width: 100%; }
 
 /* 饮食日记 */
 .day { margin-bottom: 28rpx; }
@@ -8,7 +12,7 @@
 .day__label { color: var(--text); font-size: 26rpx; font-weight: 700; }
 .day__weekday { color: var(--text3); font-size: 22rpx; }
 .day__card { padding: 8rpx 0; }
-.entry { display: flex; align-items: flex-start; gap: 18rpx; padding: 22rpx 32rpx; }
+.entry { display: flex; align-items: flex-start; gap: 18rpx; min-width: 0; max-width: 100%; padding: 22rpx 32rpx; }
 .entry + .entry { border-top: 1px solid var(--border); }
 .entry__meal { flex-shrink: 0; width: 56rpx; font-size: 44rpx; line-height: 1.1; text-align: center; }
 .entry__tag { color: var(--text3); font-size: 22rpx; font-weight: 600; }
@@ -19,18 +23,18 @@
 .row-link { display: flex; align-items: center; gap: 16rpx; margin-top: 8rpx; padding: 28rpx 32rpx; border: 1px solid var(--border); border-radius: 28rpx; background: var(--card); box-shadow: var(--shadow-card); color: var(--text2); font-size: 26rpx; font-weight: 600; }
 
 /* 健康报告 */
-.period { display: inline-flex; gap: 8rpx; margin-bottom: 24rpx; padding: 8rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); }
-.period__btn { padding: 12rpx 34rpx; border-radius: 999rpx; color: var(--text3); font-size: 24rpx; font-weight: 700; }
+.period { display: flex; box-sizing: border-box; width: 100%; max-width: 100%; gap: 8rpx; margin-bottom: 24rpx; padding: 8rpx; border: 1px solid var(--border); border-radius: 999rpx; background: var(--bg); }
+.period__btn { flex: 1 1 0; min-width: 0; padding: 12rpx 8rpx; border-radius: 999rpx; color: var(--text3); font-size: 24rpx; font-weight: 700; text-align: center; white-space: normal; }
 .period__btn.is-active { background: var(--card); color: var(--text); box-shadow: 0 2rpx 8rpx rgba(26, 26, 46, .08); }
 .stat-unit { margin-left: 8rpx; color: var(--text3); font-size: 22rpx; font-weight: 600; }
 .insight { position: relative; margin-bottom: 16rpx; padding-left: 24rpx; color: var(--text2); font-size: 26rpx; line-height: 1.7; }
 .insight:last-child { margin-bottom: 0; }
 .insight::before { position: absolute; top: 10rpx; bottom: 10rpx; left: 0; width: 6rpx; border-radius: 999rpx; background: var(--mint); content: ""; }
 
-.bar { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; font-size: 24rpx; }
+.bar { display: flex; align-items: center; gap: 16rpx; min-width: 0; max-width: 100%; margin-bottom: 20rpx; font-size: 24rpx; }
 .bar:last-child { margin-bottom: 0; }
 .bar__label { width: 132rpx; flex-shrink: 0; color: var(--text2); font-weight: 500; }
-.bar__track { flex: 1; height: 16rpx; overflow: hidden; border-radius: 999rpx; background: var(--bg); }
+.bar__track { flex: 1 1 auto; min-width: 0; height: 16rpx; overflow: hidden; border-radius: 999rpx; background: var(--bg); }
 .bar__fill { height: 100%; border-radius: 999rpx; background: var(--primary); transition: width .5s cubic-bezier(.2, .8, .2, 1); }
 .bar__fill--mint { background: var(--mint); }
 .bar__fill--pink { background: var(--pink); }
@@ -40,13 +44,13 @@
 .bar__val { width: 84rpx; flex-shrink: 0; color: var(--text3); text-align: right; font-variant-numeric: tabular-nums; }
 .hint { margin-top: 16rpx; color: var(--text3); font-size: 22rpx; line-height: 1.6; }
 
-.action { display: flex; gap: 16rpx; margin-bottom: 20rpx; }
+.action { display: flex; gap: 16rpx; min-width: 0; max-width: 100%; margin-bottom: 20rpx; }
 .action:last-child { margin-bottom: 0; }
 .action__idx { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 40rpx; height: 40rpx; border-radius: 50%; background: var(--primary-light); color: var(--primary); font-size: 22rpx; font-weight: 700; }
 .action__text { flex: 1; padding-top: 2rpx; color: var(--text2); font-size: 26rpx; line-height: 1.6; }
 
 .rec-head { display: flex; align-items: center; gap: 14rpx; padding: 28rpx 32rpx 20rpx; border-bottom: 1px solid var(--border); color: var(--text); font-size: 32rpx; font-weight: 700; }
-.rec { display: flex; align-items: center; gap: 20rpx; padding: 20rpx 32rpx; }
+.rec { display: flex; align-items: center; gap: 20rpx; min-width: 0; max-width: 100%; padding: 20rpx 32rpx; }
 .rec + .rec { border-top: 1px solid var(--border); }
 .rec__thumb { width: 96rpx; height: 96rpx; flex-shrink: 0; overflow: hidden; border-radius: 20rpx; }
 .rec__name { color: var(--text); font-size: 28rpx; font-weight: 600; }
@@ -57,7 +61,7 @@
 .fab { position: fixed; right: 36rpx; bottom: calc(56rpx + env(safe-area-inset-bottom)); z-index: 200; display: flex; align-items: center; justify-content: center; width: 104rpx; height: 104rpx; border-radius: 50%; background: var(--primary-action); box-shadow: 0 12rpx 32rpx rgba(232, 115, 74, .42); }
 
 /* 表单 */
-.sheet-body { padding: 8rpx 40rpx 16rpx; }
+.sheet-body { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; padding: 8rpx 40rpx 16rpx; }
 .form-block { margin-bottom: 28rpx; }
 .form-block:last-child { margin-bottom: 4rpx; }
 .field { gap: 16rpx; }
@@ -67,29 +71,35 @@
 .cuisine-scroll { margin-top: 16rpx; white-space: nowrap; }
 .cuisine-row { display: inline-flex; gap: 12rpx; padding-bottom: 4rpx; }
 .cuisine-row .chip { flex-shrink: 0; }
-.sheet-foot { display: flex; gap: 20rpx; padding: 20rpx 40rpx calc(28rpx + env(safe-area-inset-bottom)); }
+.sheet-foot { display: flex; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; gap: 20rpx; padding: 20rpx 40rpx calc(28rpx + env(safe-area-inset-bottom)); }
 
-.health-calendar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12rpx; margin: 24rpx 0; }
-.health-day { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 10rpx 4rpx; border: 2rpx solid var(--border); border-radius: 14rpx; background: var(--bg); color: var(--text); font-size: 26rpx; line-height: 1.35; white-space: normal; }
-.health-day.is-selected { border-color: var(--primary); background: var(--primary-light); }
+.health-calendar { display: grid; box-sizing: border-box; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; max-width: 100%; min-width: 0; gap: 12rpx; margin: 24rpx 0; }
+.health-day.health-day { display: flex; flex-direction: column; box-sizing: border-box; align-items: center; justify-content: center; width: 100%; max-width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 10rpx 4rpx; border: 2rpx solid var(--border); border-radius: 14rpx; background: var(--bg); color: var(--text); font-size: 26rpx; line-height: 1.35; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.health-day.health-day > view { display: block; max-width: 100%; min-width: 0; }
+.health-day.health-day.is-selected { border-color: var(--primary); background: var(--primary-light); }
 .health-day-label { margin-top: 2rpx; color: var(--text2); font-size: 24rpx; line-height: 1.35; }
-.health-evidence { min-width: 0; padding: 20rpx 0; border-bottom: 1px solid var(--border); color: var(--text2); font-size: 26rpx; line-height: 1.6; overflow-wrap: anywhere; word-break: break-word; }
-.health-evidence-title { color: var(--text); font-size: 27rpx; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.health-evidence { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; padding: 20rpx 0; border-bottom: 1px solid var(--border); color: var(--text2); font-size: 26rpx; line-height: 1.6; overflow-wrap: anywhere; word-break: break-word; }
+.health-evidence-title { display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; color: var(--text); font-size: 27rpx; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; word-break: break-word; }
 .health-metric-value { margin-top: 6rpx; color: var(--text); font-size: 28rpx; line-height: 1.45; }
 .health-metric-lines { margin-top: 10rpx; color: var(--text2); font-size: 25rpx; line-height: 1.6; }
 .health-metric-lines view + view { margin-top: 4rpx; }
-.health-meal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12rpx; padding: 10rpx 0; border-bottom: 1px solid var(--border); }
-.health-meal-row .health-evidence-title { flex: 1 1 180rpx; }
-.health-controls { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12rpx; min-width: 0; margin-top: 18rpx; }
-.health-controls > button, .health-meal-row > button, .health-evidence > button, .rec button, .form-block button { box-sizing: border-box; display: flex; align-items: center; justify-content: center; max-width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 20rpx; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-size: 25rpx; line-height: 1.35; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
-.health-controls > button, .health-controls > picker { flex: 1 1 180rpx; }
-.health-controls > picker .btn { box-sizing: border-box; width: 100%; min-width: 0; padding: 0 20rpx; }
-.health-meal-row > button { flex: 1 1 180rpx; }
-.health-evidence > button { width: 100%; margin-top: 14rpx; }
-.health-controls > button[disabled], .health-meal-row > button[disabled], .health-evidence > button[disabled], .rec button[disabled], .form-block button[disabled] { opacity: .5; }
-.form-block > button { margin-top: 14rpx; }
-.form-block picker .field { box-sizing: border-box; width: 100%; height: auto; min-height: 44px; padding: 14rpx 24rpx; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
-.form-block picker .field text { min-width: 0; }
-.rec { min-width: 0; }
-.rec button { flex-shrink: 0; }
-@media (min-width: 360px) { .health-calendar { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.health-meal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12rpx; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; padding: 10rpx 0; border-bottom: 1px solid var(--border); }
+.health-meal-row .health-evidence-title { flex: 1 1 180rpx; width: auto; }
+.health-controls { display: grid; grid-template-columns: minmax(0, 1fr); box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; gap: 12rpx; margin-top: 18rpx; }
+.health-controls.health-controls > button, .health-controls.health-controls > picker { display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; min-height: 44px; margin: 0; }
+.health-controls.health-controls > button, .health-meal-row.health-meal-row > button, .health-evidence.health-evidence > button, .rec.rec button, .form-block.form-block button { box-sizing: border-box; display: flex; align-items: center; justify-content: center; max-width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 20rpx; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-family: inherit; font-size: 25rpx; line-height: 1.35; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.health-controls.health-controls > picker { overflow: hidden; }
+.health-controls.health-controls > picker .btn { box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100% !important; max-width: 100%; min-width: 0; height: auto; min-height: 44px; padding: 12rpx 20rpx; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.health-meal-row.health-meal-row > button { flex: 1 1 180rpx; width: auto; }
+.health-evidence.health-evidence > button { width: 100%; margin-top: 14rpx; }
+.health-controls.health-controls > button[disabled], .health-meal-row.health-meal-row > button[disabled], .health-evidence.health-evidence > button[disabled], .rec.rec button[disabled], .form-block.form-block button[disabled] { opacity: .5; }
+.form-block.form-block { min-width: 0; max-width: 100%; }
+.form-block.form-block > button { width: 100%; margin-top: 14rpx; }
+.form-block.form-block picker { display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
+.form-block.form-block picker .field { box-sizing: border-box; display: flex; width: 100%; max-width: 100%; min-width: 0; height: auto; min-height: 44px; padding: 14rpx 24rpx; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.form-block.form-block picker .field text { min-width: 0; max-width: 100%; }
+.rec.rec button { flex: 0 1 auto; width: auto; }
+@media (min-width: 360px) {
+  .health-calendar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .health-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

@@ -1,5 +1,5 @@
 .draft { box-sizing: border-box; width: 100%; margin-bottom: 28rpx; padding: 28rpx; border: 1px solid var(--border); border-radius: 28rpx; background: var(--card); color: var(--text); }
-.draft-head { display: flex; align-items: center; gap: 20rpx; min-width: 0; }
+.draft-head { display: flex; align-items: center; gap: 20rpx; width: 100%; max-width: 100%; min-width: 0; }
 .draft-head-copy { flex: 1; min-width: 0; }
 .draft-title { font-size: 30rpx; font-weight: 700; line-height: 1.35; }
 .draft-subtitle { margin-top: 4rpx; color: var(--text2); font-size: 22rpx; line-height: 1.45; }
@@ -11,6 +11,7 @@
 .draft-section-title { margin: 28rpx 0 8rpx; color: var(--text); font-size: 28rpx; font-weight: 700; line-height: 1.4; }
 .draft-list-title { margin-top: 24rpx; color: var(--text); font-size: 26rpx; font-weight: 700; }
 .draft-field { min-width: 0; margin: 20rpx 0; }
+.draft-field picker { display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
 .draft-label { display: block; margin-bottom: 10rpx; color: var(--text2); font-size: 24rpx; font-weight: 600; line-height: 1.45; }
 .draft-optional { color: var(--text3); font-weight: 400; }
 .draft-input, .draft-textarea, .draft-select { box-sizing: border-box; display: block; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-size: 28rpx; }
@@ -21,13 +22,13 @@
 .draft-select-arrow { flex-shrink: 0; color: var(--text2); font-size: 34rpx; }
 .draft-actions { display: flex; flex-wrap: wrap; gap: 16rpx; margin: 18rpx 0; }
 .draft-actions .draft-button { flex: 1 1 180rpx; }
-.draft-button { box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: auto; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 22rpx; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-size: 26rpx; font-weight: 600; line-height: 1.35; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.draft-button.draft-button { box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: auto; max-width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 22rpx; border: 1px solid var(--border); border-radius: 16rpx; background: var(--bg); color: var(--text); font-family: inherit; font-size: 26rpx; font-weight: 600; line-height: 1.35; text-align: center; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .draft-button::after { border: 0; }
 .draft-button[disabled] { opacity: .5; }
-.draft-button--primary { border-color: var(--primary-action); background: var(--primary-action); color: var(--on-primary); }
-.draft-button--full { width: 100%; }
-.draft-button--quiet { border-color: transparent; background: transparent; color: var(--primary); }
-.draft-toggle { flex-shrink: 0; min-width: 108rpx; padding: 10rpx 18rpx; color: var(--primary); }
+.draft-button--primary.draft-button--primary { border-color: var(--primary-action); background: var(--primary-action); color: var(--on-primary); }
+.draft-button--full.draft-button--full { width: 100%; max-width: 100%; }
+.draft-button--quiet.draft-button--quiet { border-color: transparent; background: transparent; color: var(--primary); }
+.draft-toggle.draft-toggle { flex-shrink: 0; min-width: 108rpx; max-width: 42%; padding: 10rpx 18rpx; color: var(--primary); }
 .draft-item { min-width: 0; margin-top: 28rpx; padding-top: 24rpx; border-top: 1px solid var(--border); }
 .draft-item-title { margin-bottom: 12rpx; font-size: 28rpx; font-weight: 700; }
 .draft-evidence { padding: 12rpx 16rpx; border-left: 4rpx solid var(--primary); background: var(--inset); }
@@ -38,8 +39,8 @@
 .draft-candidate { min-width: 0; padding: 18rpx 0; border-bottom: 1px solid var(--border); }
 .draft-candidate:last-child { border-bottom: 0; }
 .draft-candidate .draft-button { width: 100%; margin-top: 14rpx; }
-.draft-button--select { background: var(--primary-light); color: var(--primary); }
-.draft-button--remove { margin-top: 18rpx; color: var(--red); }
+.draft-button--select.draft-button--select { background: var(--primary-light); color: var(--primary); }
+.draft-button--remove.draft-button--remove { margin-top: 18rpx; color: var(--red); }
 .draft-link { margin-top: 8rpx; word-break: break-all; }
 .draft-consent { box-sizing: border-box; display: flex; align-items: flex-start; gap: 12rpx; width: 100%; min-height: 88rpx; margin: 26rpx 0 18rpx; color: var(--text); font-size: 26rpx; line-height: 1.6; }
 .draft-consent checkbox { flex-shrink: 0; }
