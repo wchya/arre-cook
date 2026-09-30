@@ -1,0 +1,41 @@
+{
+  "version": "0.16.1",
+  "revision": "a8c01adeab578c61ed3025450c8931eff1b7b0b1",
+  "local": {
+    "busy_rejections": 0,
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-30T10:37:56+08:00",
+    "version": "0.16.1"
+  },
+  "public": {
+    "busy_rejections": 0,
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-09-30T10:37:59+08:00",
+    "version": "0.16.1"
+  },
+  "read_endpoints": [
+    "/api/health/summary",
+    "/api/health/meal-drafts/status",
+    "/api/health/meal-drafts/candidates?q=%E9%B8%A1%E8%9B%8B",
+    "/api/health-report?days=7",
+    "/api/health/profile",
+    "/api/health/foods",
+    "/api/health/catalog",
+    "/api/dishes",
+    "/api/notifications"
+  ],
+  "before": {
+    "food_journal_entries": 16,
+    "health_journal_batches": 0,
+    "nutrition_foods": 0
+  },
+  "after": {
+    "food_journal_entries": 16,
+    "health_journal_batches": 0,
+    "nutrition_foods": 0
+  },
+  "db_auto_migrate": "false",
+  "completed_at": "2026-09-30 10:37:59"
+}
