@@ -72,7 +72,7 @@
         <view class="t-sm bold c-text">还没选{{meal.short}}</view>
         <view class="t-xs c-text3 mt-8">可以智能补齐，也可以自己挑</view>
       </view>
-      <view wx:for="{{meal.dishes}}" wx:key="id" class="plan-dish">
+      <view wx:for="{{meal.dishes}}" wx:key="id" id="planned-{{meal.key}}-{{item.id}}" class="plan-dish">
         <view class="plan-dish__thumb" data-id="{{item.id}}" bindtap="openDish"><dish-image src="{{item.cover}}" emoji="{{item.emoji}}" emoji-size="56" /></view>
         <view class="flex-1" data-id="{{item.id}}" bindtap="openDish">
           <view class="plan-dish__name truncate">{{item.name}}</view>

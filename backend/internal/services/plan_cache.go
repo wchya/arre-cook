@@ -50,7 +50,8 @@ func (d *cachedPlanDish) UnmarshalJSON(data []byte) error {
 
 func decodeCachedWeekPlan(raw string) (*WeekPlan, error) {
 	var wire struct {
-		Days []struct {
+		AlgorithmVersion string `json:"algorithm_version"`
+		Days             []struct {
 			Date    string           `json:"date"`
 			DayName string           `json:"day_name"`
 			Lunch   []cachedPlanDish `json:"lunch"`
@@ -60,7 +61,7 @@ func decodeCachedWeekPlan(raw string) (*WeekPlan, error) {
 	if err := json.Unmarshal([]byte(raw), &wire); err != nil {
 		return nil, err
 	}
-	plan := &WeekPlan{Days: make([]WeekDayPlan, len(wire.Days))}
+	plan := &WeekPlan{Days: make([]WeekDayPlan, len(wire.Days)), AlgorithmVersion: wire.AlgorithmVersion}
 	for i, day := range wire.Days {
 		out := &plan.Days[i]
 		out.Date, out.DayName = day.Date, day.DayName

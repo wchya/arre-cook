@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { pickApi, dishesApi, recordsApi, dayRatingApi, behaviorApi } from "@/api"
-import type { Dish, RecommendItem } from "@/types"
+import { pickApi, mealPlansApi, dayRatingApi, recommendationFeedbackApi } from "@/api"
+import type { RecommendItem } from "@/types"
 import DishImage from "@/components/DishImage"
 import DishCard from "@/components/DishCard"
 import SectionHeader from "@/components/SectionHeader"
@@ -20,6 +20,8 @@ import HealthSummaryCard from "@/components/HealthSummaryCard"
 import ThemePicker from "@/components/ThemePicker"
 import { useAppearanceStore } from "@/store/useAppearanceStore"
 import { getDishImageUrl } from "@/lib/dish-image"
+import { recommendationDate } from "@/lib/recommendation"
+import { useRecommendationImpression } from "@/lib/use-recommendation-impression"
 
 const moods = [
   { key: "happy", emoji: "😊", label: "开心" },
@@ -39,136 +41,98 @@ function getGreeting(): string {
 }
 
 function diffLabel(d: string) { return d === "easy" ? "简单" : d === "medium" ? "中等" : "困难" }
-function dateKey(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
-}
-
 export default function Home() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const todayKey = dateKey()
+  const [todayKey, setTodayKey] = useState(recommendationDate)
   const isAdmin = useAuthStore((s) => s.user?.role === "admin")
   const appName = useAppInfoStore((s) => s.appName)
   const palette = useAppearanceStore((s) => s.palette)
   const displayMode = useAppearanceStore((s) => s.mode)
   const systemDark = useAppearanceStore((s) => s.systemDark)
 
-  const { data: dishesData, error: loadError, refetch: retryLoad } = useQuery({
-    queryKey: ["dishes", "enabled"],
-    queryFn: () => dishesApi.list({ enabled: "true", pageSize: "20", sort: "sort_order", order: "asc" }),
-  })
-  const { data: wheelData } = useQuery({
-    queryKey: ["dishes", "wheel"],
-    queryFn: () => dishesApi.list({ enabled: "true", pageSize: "12", sort: "random" }),
-  })
-  const { data: recordsData } = useQuery({
-    queryKey: ["records", "date", todayKey],
-    queryFn: () => recordsApi.forDates(todayKey, todayKey),
-  })
-  const { data: todayRating } = useQuery({
-    queryKey: ["day-rating", todayKey],
-    queryFn: () => dayRatingApi.get(todayKey),
-  })
-  // 首屏推荐：按口味画像挑 3 道，供“今日推荐 / 换一个”使用
-  const { data: initialPick } = useQuery({
-    queryKey: ["pick", "smart", "initial"],
-    queryFn: () => pickApi.smart({ count: 3, mode: "home_auto" }),
-    staleTime: Infinity,
-    retry: 0,
-  })
-
-  const [pickedRec, setPickedRec] = useState<Dish | null>(null)
   const [recItems, setRecItems] = useState<RecommendItem[]>([])
   const [recIdx, setRecIdx] = useState(0)
-  const [recQuote, setRecQuote] = useState<string>("")
+  const [recQuote, setRecQuote] = useState("")
   const [recMeal, setRecMeal] = useState<"lunch" | "dinner" | null>(null)
+  const [recommendationId, setRecommendationId] = useState("")
   const [profileSummary, setProfileSummary] = useState("")
-  const [selectedMood, setSelectedMood] = useState<string | null>(todayRating?.home_mood || null)
+  const [selectedMood, setSelectedMood] = useState<string | null>(null)
   const [spinning, setSpinning] = useState(false)
   const [changing, setChanging] = useState(false)
+  const seenRef = useRef(new Set<number>())
+  const appliedPickRef = useRef("")
   const wheelDegRef = useRef(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wheelRef = useRef<HTMLDivElement>(null)
   const confettiRef = useRef<HTMLDivElement>(null)
   const recCardRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!initialPick?.items?.length) return
-    // Seed the recommendation interaction state once the query result is available.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRecItems((prev) => (prev.length > 0 ? prev : initialPick.items))
-    setProfileSummary((prev) => prev || initialPick.profile_summary || "")
-  }, [initialPick])
-
-  const dishes = dishesData?.items || []
-  const wheelDishes = useMemo(() => wheelData?.items || [], [wheelData])
-  const todayRecords = recordsData?.items || []
-  const currentItem: RecommendItem | null = pickedRec ? null : (recItems[recIdx] ?? null)
-  const currentRec: Dish | null = pickedRec || currentItem?.dish || dishes[0] || null
-
-  const { data: moodPick } = useQuery({
-    queryKey: ["pick", "mood", selectedMood],
-    queryFn: () => pickApi.mood(selectedMood!),
-    enabled: !!selectedMood,
+  const { data: todayRating, isLoading: ratingLoading } = useQuery({
+    queryKey: ["day-rating", todayKey], queryFn: () => dayRatingApi.get(todayKey),
   })
-
+  const activeMood = selectedMood ?? todayRating?.home_mood ?? ""
+  const { data: todayPlans = [] } = useQuery({
+    queryKey: ["meal-plans", todayKey], queryFn: () => mealPlansApi.list(todayKey, todayKey),
+  })
+  const { data: initialPick, error: loadError, refetch: retryLoad, isFetching: initialLoading } = useQuery({
+    queryKey: ["pick", "smart", "initial", todayKey, recMeal, activeMood],
+    queryFn: () => pickApi.smart({ count: 3, mode: "home_auto", meal_date: todayKey, meal_type: recMeal || undefined, mood: activeMood || undefined }),
+    enabled: !ratingLoading, staleTime: 0, retry: 0,
+  })
+  const { data: wheelData } = useQuery({
+    queryKey: ["pick", "wheel", todayKey, recMeal, activeMood],
+    queryFn: () => pickApi.smart({ count: 10, mode: "wheel", meal_date: todayKey, meal_type: recMeal || undefined, mood: activeMood || undefined }),
+    enabled: !ratingLoading,
+  })
   useEffect(() => {
-    if (moodPick?.dishes?.length) {
-      qc.invalidateQueries({ queryKey: ["achievements"] })
+    const updateDate = () => {
+      const next = recommendationDate()
+      if (next !== todayKey) { setTodayKey(next); setSelectedMood(null); seenRef.current.clear() }
     }
-  }, [moodPick, qc])
-
-  // 午/晚餐推荐：走智能推荐引擎，带推荐理由，结果写入当前推荐卡并滚动过去
-  const pickMealMut = useMutation({
-    mutationFn: (meal: "lunch" | "dinner") => pickApi.smart({ meal_type: meal, count: 3, mood: selectedMood || undefined, mode: "home_meal" }),
-    onSuccess: (data, meal) => {
-      if (!data?.items?.length) {
-        toast.error("暂无可推荐的菜品")
-        return
-      }
-      setPickedRec(null)
-      setRecItems(data.items)
-      setRecIdx(0)
-      setRecQuote(data.quote || "")
-      setRecMeal(meal)
-      setProfileSummary(data.profile_summary || "")
-      qc.invalidateQueries({ queryKey: ["achievements"] })
-      toast.success(`${meal === "lunch" ? "🍳 午餐" : "🍲 晚餐"}推荐：${data.items[0].dish.name}`)
-      requestAnimationFrame(() => scrollToElement(recCardRef.current, { block: "center" }))
-    },
-    onError: () => toast.error("推荐失败，稍后再试"),
+    const refresh = () => { updateDate(); void qc.invalidateQueries({ queryKey: ["pick"] }) }
+    const interval = window.setInterval(updateDate, 30_000)
+    window.addEventListener("focus", refresh)
+    return () => { window.clearInterval(interval); window.removeEventListener("focus", refresh) }
+  }, [qc, todayKey])
+  useEffect(() => {
+    if (!initialPick || appliedPickRef.current === initialPick.recommendation_id) return
+    appliedPickRef.current = initialPick.recommendation_id
+    seenRef.current.clear()
+    // Replace stale results after date, mood or dietary preference changes.
+    setRecItems(initialPick.items || [])
+    setRecIdx(0)
+    setRecommendationId(initialPick.recommendation_id)
+    setRecQuote(initialPick.quote || "")
+    setProfileSummary(initialPick.profile_summary || "")
+  }, [initialPick])
+  const wheelDishes = useMemo(() => wheelData?.items.map((item) => item.dish) || [], [wheelData])
+  const currentItem = recItems[recIdx] ?? null
+  const currentRec = currentItem?.dish || null
+  useRecommendationImpression(recCardRef, recommendationId, currentItem?.dish.id)
+  useEffect(() => { if (currentItem) seenRef.current.add(currentItem.dish.id) }, [currentItem])
+  const { data: moodPick } = useQuery({
+    queryKey: ["pick", "mood", todayKey, activeMood],
+    queryFn: () => pickApi.mood(activeMood), enabled: !!activeMood,
   })
-
+  function chooseMeal(meal: "lunch" | "dinner") {
+    seenRef.current.clear()
+    setRecMeal(meal)
+    requestAnimationFrame(() => scrollToElement(recCardRef.current, { block: "center" }))
+  }
   const recordMut = useMutation({
-    mutationFn: (data: { dish_id: number; dish_name: string; meal_type: string; meal_date: string }) =>
-      recordsApi.create(data),
-    onSuccess: (_res, variables) => {
-      toast.success("❤ 已记录！")
+    mutationFn: (data: { dish_id: number; meal_type: string; meal_date: string; recommendation_id?: string }) => mealPlansApi.add(data),
+    onSuccess: () => {
+      toast.success("❤ 已加入菜单，吃过后再确认记录")
       launchConfetti(confettiRef.current)
-      qc.invalidateQueries({ queryKey: ["records"] })
-      qc.invalidateQueries({ queryKey: ["health-report"] })
-      qc.invalidateQueries({ queryKey: ["achievements"] })
-      // 采纳推荐 → 行为事件，供推荐分析使用
-      void behaviorApi.log({
-        event_type: "accept",
-        dish_id: variables.dish_id,
-        dish_name: variables.dish_name,
-        meta: { from: pickedRec ? "home_pick" : "home_recommend", meal_type: variables.meal_type },
-      })
+      for (const key of ["meal-plans", "week-plan", "shopping-list", "shopping-overview", "health-report", "achievements"]) void qc.invalidateQueries({ queryKey: [key] })
     },
-    onError: (err: unknown) => {
-      const msg = (err instanceof Error ? err.message : "") || "记录失败"
-      toast.error(msg)
-    },
+    onError: (err: unknown) => toast.error((err instanceof Error ? err.message : "") || "加入菜单失败"),
   })
-
   const homeMoodMut = useMutation({
     mutationFn: (mood: string) => dayRatingApi.updateHomeMood({ meal_date: todayKey, home_mood: mood }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["day-rating", todayKey] })
-      qc.invalidateQueries({ queryKey: ["day-ratings"] })
-      qc.invalidateQueries({ queryKey: ["photo-wall"] })
-      qc.invalidateQueries({ queryKey: ["achievements"] })
+      for (const key of ["day-rating", "day-ratings", "photo-wall", "achievements", "pick"]) void qc.invalidateQueries({ queryKey: [key] })
     },
     onError: () => toast.error("心情保存失败"),
   })
@@ -228,9 +192,11 @@ export default function Home() {
       onComplete: () => {
         setSpinning(false)
         const pick = wheelDishes[pickIdx]
-        setPickedRec(pick)
+        const item = wheelData?.items[pickIdx]
+        setRecItems(item ? [item] : [])
+        setRecIdx(0)
+        setRecommendationId(wheelData?.recommendation_id || "")
         setRecQuote("")
-        setRecMeal(null)
         toast.success(`🎯 转到了：${pick.name}！`)
         requestAnimationFrame(() => scrollToElement(recCardRef.current, { block: "center" }))
       },
@@ -240,18 +206,18 @@ export default function Home() {
   function handlePickMeal(mealType: "lunch" | "dinner") {
     if (!currentRec) return
     const today = todayKey
-    const alreadyPicked = todayRecords.some(
+    const alreadyPicked = todayPlans.some(
       (r) => r.dish_id === currentRec.id && r.meal_type === mealType && r.meal_date === today
     )
     if (alreadyPicked) {
-      toast.error(`${currentRec.name} 已在今日${mealType === "lunch" ? "午餐" : "晚餐"}中记录过啦~`)
+      toast.error(`${currentRec.name} 已在今日${mealType === "lunch" ? "午餐" : "晚餐"}菜单中啦~`)
       return
     }
     recordMut.mutate({
       dish_id: currentRec.id,
-      dish_name: currentRec.name,
       meal_type: mealType,
       meal_date: today,
+      recommendation_id: currentItem ? recommendationId : undefined,
     })
   }
 
@@ -262,47 +228,26 @@ export default function Home() {
     toast.success(`心情：${label}，已保存并调整推荐~`)
   }
 
-  // 换一个：先在本批推荐里翻页，翻完了按已看过的菜排除后再要一批；被跳过的菜记一条 reject 事件
+  // A skip applies to this recommendation session, not long-term taste.
   async function changeRecommend() {
     if (changing) return
-    if (currentItem) {
-      void behaviorApi.log({
-        event_type: "reject",
-        dish_id: currentItem.dish.id,
-        dish_name: currentItem.dish.name,
-        meta: { from: "home_recommend", meal_type: recMeal || "" },
-      })
-    }
-    setPickedRec(null)
-    if (recItems.length > 0 && recIdx < recItems.length - 1) {
-      setRecIdx(recIdx + 1)
-      return
-    }
     setChanging(true)
     try {
-      const seen = recItems.map((it) => it.dish.id)
+      if (currentItem && recommendationId) await recommendationFeedbackApi.send(recommendationId, currentItem.dish.id, "skip")
+      if (currentRec) seenRef.current.add(currentRec.id)
+        if (currentItem && recIdx < recItems.length - 1) { setRecIdx(recIdx + 1); return }
       const data = await pickApi.smart({
-        meal_type: recMeal || undefined,
-        mood: selectedMood || undefined,
-        count: 3,
-        exclude_dish_ids: seen,
-        mode: "home_change",
+        meal_type: recMeal || undefined, meal_date: todayKey, mood: activeMood || undefined,
+        count: 3, exclude_dish_ids: [...seenRef.current], session_id: recommendationId || undefined, mode: "home_change", refresh: true,
       })
-      if (!data?.items?.length) {
-        toast.error("没有更多推荐了")
-        return
-      }
+      if (!data.items?.length) { toast.error("符合条件的菜已经看完，可以调整条件再试"); return }
       setRecItems(data.items)
       setRecIdx(0)
+      setRecommendationId(data.recommendation_id)
       setProfileSummary(data.profile_summary || profileSummary)
-    } catch {
-      // 回退：在已加载的菜单里顺序换
-      if (dishes.length === 0) return
-      const idx = currentRec ? dishes.findIndex((d) => d.id === currentRec.id) : -1
-      setPickedRec(dishes[(idx + 1) % dishes.length])
-    } finally {
-      setChanging(false)
-    }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "暂时无法换菜，请重试")
+    } finally { setChanging(false) }
   }
 
   const moodDishes = moodPick?.dishes
@@ -337,18 +282,18 @@ export default function Home() {
         {/* 午/晚餐入口：点击真正触发推荐并同步到下方推荐卡 */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <button
-            onClick={() => pickMealMut.mutate("lunch")}
-            disabled={pickMealMut.isPending}
+            onClick={() => chooseMeal("lunch")}
+            disabled={initialLoading}
             aria-pressed={recMeal === "lunch"}
             className="meal-entry relative p-5 overflow-hidden transition-all active:scale-97 border-[1.5px] text-left disabled:opacity-60"
           >
             <span className="text-[28px] block mb-2">🍳</span>
             <div className="text-[15px] font-bold mb-0.5">中午吃点好的</div>
-            <div className="text-xs text-text2">{pickMealMut.isPending && recMeal === null ? "推荐中..." : "午餐推荐 →"}</div>
+            <div className="text-xs text-text2">{initialLoading && recMeal === null ? "推荐中..." : "午餐推荐 →"}</div>
           </button>
           <button
-            onClick={() => pickMealMut.mutate("dinner")}
-            disabled={pickMealMut.isPending}
+            onClick={() => chooseMeal("dinner")}
+            disabled={initialLoading}
             aria-pressed={recMeal === "dinner"}
             className="meal-entry relative p-5 overflow-hidden transition-all active:scale-97 border-[1.5px] text-left disabled:opacity-60"
           >
@@ -423,10 +368,10 @@ export default function Home() {
             <button
               key={m.key}
               onClick={() => handleMoodPick(m.key)}
-              className={`flex-shrink-0 p-3 px-4 rounded-2xl border-2 text-center transition-all active:scale-95 min-w-[80px] ${selectedMood === m.key ? "border-primary bg-primary-light" : "border-border bg-card"}`}
+              className={`flex-shrink-0 p-3 px-4 rounded-2xl border-2 text-center transition-all active:scale-95 min-w-[80px] ${activeMood === m.key ? "border-primary bg-primary-light" : "border-border bg-card"}`}
             >
               <span className="text-[28px] block mb-1">{m.emoji}</span>
-              <span className={`text-[11px] font-medium ${selectedMood === m.key ? "text-primary" : "text-text2"}`}>{m.label}</span>
+              <span className={`text-[11px] font-medium ${activeMood === m.key ? "text-primary" : "text-text2"}`}>{m.label}</span>
             </button>
           ))}
         </div>

@@ -408,7 +408,7 @@ function setupHome() {
  let definition, identity = 'alice'
  const calls = [], navigations = []
  const api = { token: () => identity, get: async url => { calls.push(url); return { item_count: 1 } } }
- const deps = { '../../utils/api': api, '../../utils/session': { syncTabBar() {}, requireLogin: () => true }, '../../utils/ui': {}, '../../utils/dish': {}, '../../utils/format': { greeting: () => '', dateKey: () => '2026-09-28' } }
+ const deps = { '../../utils/api': api, '../../utils/session': { syncTabBar() {}, requireLogin: () => true }, '../../utils/ui': {}, '../../utils/dish': {}, '../../utils/format': { greeting: () => '', dateKey: () => '2026-09-28' }, '../../utils/recommendation': { disconnect() {} } }
  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/home/home.js'), 'utf8'), { Page: d => { definition = d }, require: name => deps[name], wx: { navigateTo: args => navigations.push(args.url) }, clearTimeout, Date, Math })
  const page = { data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch) } }
  for (const [key, value] of Object.entries(definition)) if (typeof value === 'function') page[key] = value.bind(page)

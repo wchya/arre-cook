@@ -14,7 +14,7 @@ const (
 	ScopeRecordsRead      = "records:read"      // 用餐记录、评价、收藏、行为、周菜单、买菜清单
 	ScopeRecordsWrite     = "records:write"     // 记一餐 / 删记录
 	ScopeFavoritesWrite   = "favorites:write"   // 收藏 / 取消收藏
-	ScopePlanWrite        = "plan:write"        // 重新生成周菜单
+	ScopePlanWrite        = "plan:write"        // 管理已确认计划与重新生成周菜单
 	ScopePreferencesWrite = "preferences:write" // 修改饮食偏好
 	ScopeSuggestionsWrite = "suggestions:write" // 向用户推送推荐建议
 	ScopeBehaviorWrite    = "behavior:write"    // 写入行为事件
@@ -33,7 +33,7 @@ var ScopeLabels = map[string]string{
 	ScopeRecordsRead:      "读取用餐记录、饮食日记与报告",
 	ScopeRecordsWrite:     "代我记录/删除用餐与饮食日记",
 	ScopeFavoritesWrite:   "代我收藏菜品",
-	ScopePlanWrite:        "重新生成周菜单",
+	ScopePlanWrite:        "管理菜单计划与重新生成周菜单",
 	ScopePreferencesWrite: "修改我的饮食偏好",
 	ScopeSuggestionsWrite: "向我推送推荐建议",
 	ScopeBehaviorWrite:    "写入行为反馈",

@@ -293,6 +293,7 @@ var userOwnedModels = []any{
 	&models.UserPreference{}, &models.UserSetting{}, &models.AgentToken{}, &models.AgentAuditLog{},
 	&models.AgentSuggestion{}, &models.Notification{}, &models.ChatMessage{}, &models.ChatSession{}, &models.FoodJournalEntry{}, &models.HealthDayConfirmation{}, &models.HealthMealOmission{}, &models.HealthPlanItem{}, &models.NutritionFood{},
 	&models.AssistantUsage{}, &models.HealthProfile{}, &models.HealthProfileVersion{}, &models.HealthDraftUsage{}, &models.HealthJournalBatch{},
+	&models.UserDishAffinity{}, &models.RecommendationSnapshot{}, &models.RecommendationFeedback{},
 }
 
 // DeleteMe DELETE /api/me —— 注销账号并删除全部个人数据（不可恢复）。

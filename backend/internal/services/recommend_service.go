@@ -2,51 +2,59 @@ package services
 
 import (
 	"encoding/json"
-	"fmt"
 	"gorm.io/gorm"
-	"math"
-	"math/rand"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"sort"
 	"strings"
-	"time"
 )
 
 // RecommendRequest 推荐请求。所有字段可选；空请求 = 按口味画像给 3 道菜。
 type RecommendRequest struct {
-	MealType           string   `json:"meal_type"`
-	Mood               string   `json:"mood"`
-	Count              int      `json:"count"`
-	Keyword            string   `json:"keyword"`
-	Tastes             []string `json:"tastes"`
-	Categories         []string `json:"categories"`
-	MaxCookTime        int      `json:"max_cook_time"`
-	Difficulty         string   `json:"difficulty"`
-	IncludeIngredients []string `json:"include_ingredients"`
-	ExcludeIngredients []string `json:"exclude_ingredients"`
-	ExcludeDishIDs     []uint   `json:"exclude_dish_ids"`
-	ExcludeRecentDays  *int     `json:"exclude_recent_days"`
-	ProfileDays        int      `json:"profile_days"`
-	Diversity          *bool    `json:"diversity"`
-	IgnorePreferences  bool     `json:"ignore_preferences"`
-	Jitter             bool     `json:"jitter"`
-	Mode               string   `json:"mode"`
-	Source             string   `json:"source"`
-	Actor              string   `json:"actor"`
+	confirmedDishIDs   map[uint]bool // Real choices, distinct from earlier candidates in this batch.
+	MealDate           string        `json:"meal_date"`
+	SessionID          string        `json:"session_id"`
+	Refresh            bool          `json:"refresh"`
+	SelectedDishIDs    []uint        `json:"selected_dish_ids"`
+	MealType           string        `json:"meal_type"`
+	Mood               string        `json:"mood"`
+	Count              int           `json:"count"`
+	Keyword            string        `json:"keyword"`
+	Tastes             []string      `json:"tastes"`
+	Categories         []string      `json:"categories"`
+	MaxCookTime        int           `json:"max_cook_time"`
+	Difficulty         string        `json:"difficulty"`
+	IncludeIngredients []string      `json:"include_ingredients"`
+	ExcludeIngredients []string      `json:"exclude_ingredients"`
+	ExcludeDishIDs     []uint        `json:"exclude_dish_ids"`
+	ExcludeRecentDays  *int          `json:"exclude_recent_days"`
+	ProfileDays        int           `json:"profile_days"`
+	Diversity          *bool         `json:"diversity"`
+	IgnorePreferences  bool          `json:"ignore_preferences"`
+	Jitter             bool          `json:"jitter"`
+	Mode               string        `json:"mode"`
+	Source             string        `json:"source"`
+	Actor              string        `json:"actor"`
 }
 
 type RecommendItem struct {
+	ItemID  string `json:"item_id"`
+	parts   recommendationScoreParts
 	Dish    models.Dish `json:"dish"`
 	Score   float64     `json:"score"`
 	Reasons []string    `json:"reasons"`
 }
 
 type RecommendResponse struct {
-	Items          []RecommendItem `json:"items"`
-	CandidateCount int             `json:"candidate_count"`
-	ProfileSummary string          `json:"profile_summary"`
-	Applied        map[string]any  `json:"applied"`
+	RecommendationID string          `json:"recommendation_id"`
+	SessionID        string          `json:"session_id"`
+	ServedForDate    string          `json:"served_for_date"`
+	MealType         string          `json:"meal_type"`
+	AlgorithmVersion string          `json:"algorithm_version"`
+	Items            []RecommendItem `json:"items"`
+	CandidateCount   int             `json:"candidate_count"`
+	ProfileSummary   string          `json:"profile_summary"`
+	Applied          map[string]any  `json:"applied"`
 }
 
 type candidateFilter struct {
@@ -69,146 +77,11 @@ type candidateFilter struct {
 // RecommendDishes 站内统一推荐引擎：候选过滤 → 画像打分 → 多样性挑选 → 记录推荐事件。
 // 首页午/晚餐推荐、心情推荐、AI 助手与 /api/agent/recommend 共用这一套逻辑；只使用 uid 本人的数据。
 func RecommendDishes(uid uint, req RecommendRequest, dbs ...*gorm.DB) (*RecommendResponse, error) {
-	requestDB := database.Handle(dbs...)
-
-	count := req.Count
-	if count < 1 {
-		count = 3
-	}
-	if count > 10 {
-		count = 10
-	}
-	mealType := strings.TrimSpace(req.MealType)
-	if mealType != "lunch" && mealType != "dinner" {
-		mealType = ""
-	}
-	excludeRecentDays := UserRepeatDays(uid, requestDB)
-	if req.ExcludeRecentDays != nil {
-		excludeRecentDays = *req.ExcludeRecentDays
-		if excludeRecentDays < 0 {
-			excludeRecentDays = 0
-		}
-	}
-	diversity := true
-	if req.Diversity != nil {
-		diversity = *req.Diversity
-	}
-
-	profile := BuildTasteProfile(uid, req.ProfileDays, requestDB)
-	prefs := profile.Preferences
-
-	applied := map[string]any{
-		"meal_type":           mealType,
-		"mood":                strings.TrimSpace(req.Mood),
-		"count":               count,
-		"exclude_recent_days": excludeRecentDays,
-		"diversity":           diversity,
-		"profile_days":        profile.WindowDays,
-		"preferences_applied": !req.IgnorePreferences,
-		"relaxed":             []string{},
-	}
-	empty := &RecommendResponse{Items: []RecommendItem{}, ProfileSummary: profile.Summary, Applied: applied}
-
-	dishes := VisibleEnabledDishes(uid, requestDB)
-	if len(dishes) == 0 {
-		return empty, nil
-	}
-
-	excluded := make(map[uint]bool, len(req.ExcludeDishIDs))
-	for _, id := range req.ExcludeDishIDs {
-		if id > 0 {
-			excluded[id] = true
-		}
-	}
-	recent := map[uint]bool{}
-	if excludeRecentDays > 0 {
-		recent = recentDishIDMap(uid, excludeRecentDays, requestDB)
-	}
-
-	exclude := cleanList(req.ExcludeIngredients)
-	hardExclude, err := healthProfileExclusions(uid, requestDB)
+	ctx, err := NewRecommendationContext(uid, req.ProfileDays, dbs...)
 	if err != nil {
 		return nil, err
 	}
-	if !req.IgnorePreferences {
-		hardExclude = append(hardExclude, prefs.Allergies...)
-		exclude = append(exclude, prefs.AvoidIngredients...)
-	}
-	// Report actions must satisfy the same restrictions as plan acceptance.
-	if req.Source == "health_report" {
-		hardExclude = append(hardExclude, prefs.AvoidIngredients...)
-	}
-	maxCook := req.MaxCookTime
-
-	filter := candidateFilter{
-		mealType:    mealType,
-		categories:  stringSet(req.Categories),
-		tastes:      cleanList(req.Tastes),
-		include:     cleanList(req.IncludeIngredients),
-		exclude:     exclude,
-		hardExclude: hardExclude,
-		keyword:     strings.ToLower(strings.TrimSpace(req.Keyword)),
-		difficulty:  strings.TrimSpace(req.Difficulty),
-		maxCookTime: maxCook,
-		excluded:    excluded,
-		recent:      recent,
-		applyTastes: true,
-		applyRecent: true,
-		applyAvoid:  true,
-	}
-
-	// 逐级放宽：先去掉口味硬过滤，再去掉近期去重，最后放开忌口（过敏原永不放开），保证尽量给得出结果
-	relaxed := []string{}
-	candidates := filterCandidates(dishes, filter)
-	if len(candidates) == 0 && len(filter.tastes) > 0 {
-		filter.applyTastes = false
-		relaxed = append(relaxed, "tastes")
-		candidates = filterCandidates(dishes, filter)
-	}
-	if len(candidates) == 0 && len(recent) > 0 {
-		filter.applyRecent = false
-		relaxed = append(relaxed, "recent")
-		candidates = filterCandidates(dishes, filter)
-	}
-	if len(candidates) == 0 && len(filter.exclude) > 0 {
-		filter.applyAvoid = false
-		relaxed = append(relaxed, "avoid_ingredients")
-		candidates = filterCandidates(dishes, filter)
-	}
-	applied["relaxed"] = relaxed
-	if len(candidates) == 0 {
-		return empty, nil
-	}
-
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-
-	scored := make([]RecommendItem, 0, len(candidates))
-	for _, d := range candidates {
-		score, reasons := scoreDish(d, req, mealType, profile, today)
-		if req.Jitter {
-			score += rng.Float64() * 6
-		}
-		d.Favorite = profile.favoriteSet[d.ID]
-		scored = append(scored, RecommendItem{Dish: d, Score: math.Round(score*10) / 10, Reasons: reasons})
-	}
-	sort.SliceStable(scored, func(i, j int) bool {
-		if scored[i].Score != scored[j].Score {
-			return scored[i].Score > scored[j].Score
-		}
-		return scored[i].Dish.ID < scored[j].Dish.ID
-	})
-
-	picked := pickDiverse(scored, count, diversity)
-	logRecommendEvents(uid, picked, req, mealType, requestDB)
-
-	return &RecommendResponse{
-		Items:          picked,
-		CandidateCount: len(candidates),
-		ProfileSummary: profile.Summary,
-		Applied:        applied,
-	}, nil
+	return RecommendWithContext(ctx, req)
 }
 
 func filterCandidates(dishes []models.Dish, f candidateFilter) []models.Dish {
@@ -229,14 +102,15 @@ func filterCandidates(dishes []models.Dish, f candidateFilter) []models.Dish {
 		if f.difficulty != "" && d.Difficulty != f.difficulty {
 			continue
 		}
-		if f.maxCookTime > 0 && d.CookTime > f.maxCookTime {
+		if f.maxCookTime > 0 && (d.CookTime <= 0 || d.CookTime > f.maxCookTime) {
 			continue
 		}
 		text := dishSearchText(d)
 		if f.keyword != "" && !strings.Contains(text, f.keyword) {
 			continue
 		}
-		if !containsAll(text, f.include) {
+		requiredText := strings.Join(append(ingredientNames(d.Ingredients), ingredientNames(d.Seasonings)...), " ")
+		if !containsAll(requiredText, f.include) {
 			continue
 		}
 		if containsAny(text, f.hardExclude) {
@@ -253,213 +127,6 @@ func filterCandidates(dishes []models.Dish, f candidateFilter) []models.Dish {
 	return out
 }
 
-func scoreDish(d models.Dish, req RecommendRequest, mealType string, p *TasteProfile, today time.Time) (float64, []string) {
-	score := 10.0
-	reasons := make([]string, 0, 4)
-	add := func(points float64, reason string) {
-		score += points
-		if reason != "" && len(reasons) < 3 {
-			reasons = append(reasons, reason)
-		}
-	}
-
-	// 口味画像：取该菜最匹配的口味权重
-	best, bestName := 0.0, ""
-	for _, t := range tasteTokens(d.Taste) {
-		if w := p.tasteWeightMap[t]; w > best {
-			best, bestName = w, t
-		}
-	}
-	if best > 0 {
-		if best >= 0.12 {
-			add(30*best, "常吃口味「"+bestName+"」")
-		} else {
-			score += 30 * best
-		}
-	}
-	if w := p.categoryWeightMap[d.Category]; w > 0 {
-		score += 15 * w
-	}
-
-	for _, t := range cleanList(req.Tastes) {
-		if tasteMatches(d, t) {
-			add(12, "符合想要的口味「"+t+"」")
-			break
-		}
-	}
-
-	if d.FamilyID != 0 {
-		add(0, "家里的共享菜谱")
-	} else if d.OwnerID != 0 {
-		add(0, "你的私房菜")
-	}
-	if p.favoriteSet[d.ID] {
-		add(15, "已收藏的心头好")
-	}
-	if p.likedSet[d.ID] {
-		add(10, "上次吃评价很高")
-	}
-	if p.dislikedSet[d.ID] {
-		add(-25, "之前吃过评价一般")
-	}
-	if n := p.rejectCount[d.ID]; n > 0 {
-		score -= math.Min(float64(n)*8, 24)
-	}
-
-	if last, ok := p.LastEaten[d.ID]; ok {
-		if t, ok2 := parseMealDate(last); ok2 {
-			age := today.Sub(t).Hours() / 24
-			switch {
-			case age < 0:
-				add(-30, "已经排在明天的菜单里")
-			case age <= 3:
-				score -= 30
-			case age <= 14:
-				score -= 12 * (1 - age/14)
-			case age >= 21:
-				add(4, fmt.Sprintf("有 %d 天没吃了，换换口味", int(age)))
-			}
-		}
-	} else if p.WindowRecords > 0 {
-		add(5, "还没做过，尝个新")
-	}
-
-	// 显式偏好
-	if !req.IgnorePreferences {
-		pr := p.Preferences
-		switch pr.SpiceLevel {
-		case 0:
-			if isSpicyDish(d) {
-				score -= 30
-			} else {
-				add(8, "不辣，合你口味")
-			}
-		case 3:
-			if isSpicyDish(d) {
-				add(8, "够辣够过瘾")
-			}
-		}
-		if pr.MaxCookTime > 0 && d.CookTime > 0 {
-			if d.CookTime <= pr.MaxCookTime {
-				score += 5
-			} else {
-				score -= math.Min(float64(d.CookTime-pr.MaxCookTime)/2, 15)
-			}
-		}
-		if pr.Goals != "" && strings.Contains(pr.Goals, "减") && (containsTaste(d.Taste, "清淡") || hasAnyTag(d, "清淡", "健康", "低脂")) {
-			add(6, "清爽，贴合"+pr.Goals+"目标")
-		}
-	}
-
-	switch strings.TrimSpace(req.Mood) {
-	case "tired", "lazy":
-		if d.Difficulty == "easy" {
-			add(12, "做法简单，不费劲")
-		}
-		if d.CookTime > 0 && d.CookTime <= 25 {
-			add(8, fmt.Sprintf("%d 分钟就能上桌", d.CookTime))
-		}
-		if d.Difficulty == "hard" {
-			score -= 15
-		}
-	case "spicy":
-		if isSpicyDish(d) {
-			add(20, "够辣，正对胃口")
-		} else {
-			score -= 12
-		}
-	case "healthy":
-		if containsTaste(d.Taste, "清淡") || containsTaste(d.Taste, "鲜") || hasAnyTag(d, "汤品", "汤菜", "清淡", "健康") {
-			add(15, "清爽少负担")
-		}
-		if isSpicyDish(d) {
-			score -= 8
-		}
-	case "happy":
-		if hasAnyTag(d, "硬菜", "宴客", "聚餐") {
-			add(8, "开心就吃顿硬的")
-		}
-	}
-
-	if strings.TrimSpace(req.Mood) != "healthy" && p.SpicyRatio >= 0.5 && isSpicyDish(d) {
-		score += 6
-	}
-	if req.MaxCookTime > 0 && d.CookTime > 0 && d.CookTime <= req.MaxCookTime {
-		score += 4
-	}
-	if p.AvgCookTime > 0 && d.CookTime > 0 {
-		diff := math.Abs(float64(d.CookTime) - p.AvgCookTime)
-		if diff <= 10 {
-			score += 3
-		} else if diff >= 40 {
-			score -= 3
-		}
-	}
-	if mealType != "" && d.MealType == mealType {
-		score += 3
-	}
-
-	// 自建菜谱（私房菜 / 家庭共享）整体权重比系统公共菜谱高 30%；负分不放大
-	if score > 0 {
-		score *= DishSourceWeight(d)
-	}
-
-	if len(reasons) == 0 {
-		reasons = append(reasons, "菜单里的一道好菜")
-	}
-	return score, reasons
-}
-
-// OwnDishWeight 用户自建菜谱（私房菜、家庭共享菜谱）在推荐与随机排菜中的权重倍数。
-const OwnDishWeight = 1.3
-
-// DishSourceWeight 菜谱来源权重：自建为 OwnDishWeight，系统公共菜谱为 1。
-func DishSourceWeight(d models.Dish) float64 {
-	if d.OwnerID != 0 || d.FamilyID != 0 {
-		return OwnDishWeight
-	}
-	return 1
-}
-
-// pickDiverse 按分数贪心挑选，同一菜系最多占一半名额，避免一次推荐全是同一菜系。
-func pickDiverse(scored []RecommendItem, count int, diversity bool) []RecommendItem {
-	if !diversity {
-		if len(scored) > count {
-			return scored[:count]
-		}
-		return scored
-	}
-	perCategoryCap := int(math.Ceil(float64(count) / 2))
-	if perCategoryCap < 1 {
-		perCategoryCap = 1
-	}
-	perCategory := map[string]int{}
-	used := map[uint]bool{}
-	picked := make([]RecommendItem, 0, count)
-	for _, it := range scored {
-		if len(picked) >= count {
-			break
-		}
-		if perCategory[it.Dish.Category] >= perCategoryCap {
-			continue
-		}
-		picked = append(picked, it)
-		perCategory[it.Dish.Category]++
-		used[it.Dish.ID] = true
-	}
-	for _, it := range scored {
-		if len(picked) >= count {
-			break
-		}
-		if used[it.Dish.ID] {
-			continue
-		}
-		picked = append(picked, it)
-		used[it.Dish.ID] = true
-	}
-	return picked
-}
-
 func logRecommendEvents(uid uint, items []RecommendItem, req RecommendRequest, mealType string, dbs ...*gorm.DB) {
 	requestDB := database.Handle(dbs...)
 
@@ -467,7 +134,7 @@ func logRecommendEvents(uid uint, items []RecommendItem, req RecommendRequest, m
 		return
 	}
 	// 首页自动加载的推荐不算用户主动行为，不写事件，避免污染采纳率
-	if strings.TrimSpace(req.Mode) == "home_auto" {
+	if strings.TrimSpace(req.Mode) == "home_auto" || strings.TrimSpace(req.Mode) == "week_plan" {
 		return
 	}
 	source := strings.TrimSpace(req.Source)
@@ -477,11 +144,15 @@ func logRecommendEvents(uid uint, items []RecommendItem, req RecommendRequest, m
 	events := make([]models.BehaviorEvent, 0, len(items))
 	for _, it := range items {
 		meta, _ := json.Marshal(map[string]any{
-			"score":     it.Score,
-			"reasons":   it.Reasons,
-			"meal_type": mealType,
-			"mood":      strings.TrimSpace(req.Mood),
-			"mode":      strings.TrimSpace(req.Mode),
+			"score":             it.Score,
+			"item_id":           it.ItemID,
+			"recommendation_id": strings.SplitN(it.ItemID, ":", 2)[0],
+			"session_id":        req.SessionID,
+			"algorithm_version": RecommendationAlgorithmVersion,
+			"reasons":           it.Reasons,
+			"meal_type":         mealType,
+			"mood":              strings.TrimSpace(req.Mood),
+			"mode":              strings.TrimSpace(req.Mode),
 		})
 		events = append(events, models.BehaviorEvent{
 			UserID:    uid,
@@ -545,7 +216,7 @@ func DishSearchText(d models.Dish) string { return dishSearchText(d) }
 
 func containsAll(text string, needles []string) bool {
 	for _, n := range needles {
-		if !strings.Contains(text, strings.ToLower(n)) {
+		if !matchesRequiredIngredientTerm(text, n) {
 			return false
 		}
 	}
@@ -554,7 +225,7 @@ func containsAll(text string, needles []string) bool {
 
 func containsAny(text string, needles []string) bool {
 	for _, n := range needles {
-		if n != "" && strings.Contains(text, strings.ToLower(n)) {
+		if matchesIngredientTerm(text, n) {
 			return true
 		}
 	}

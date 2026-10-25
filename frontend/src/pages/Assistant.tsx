@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { pickApi, profileApi, recordsApi, settingsApi, behaviorApi } from "@/api"
+import { pickApi, profileApi, mealPlansApi, settingsApi, recommendationFeedbackApi } from "@/api"
 import type { RecommendItem, SmartPickRequest, TasteProfile, WeightItem } from "@/types"
 import { asArray } from "@/lib/utils"
+import { recommendationDate } from "@/lib/recommendation"
+import { useRecommendationImpression } from "@/lib/use-recommendation-impression"
 import DishImage from "@/components/DishImage"
 import PageHeader from "@/components/PageHeader"
 import { cardShadow } from "@/components/Card"
@@ -35,11 +37,6 @@ const mealOptions: Array<{ key: MealChoice; label: string }> = [
 ]
 
 const homeMoodLabel: Record<string, string> = { happy: "开心", tired: "疲惫", lazy: "想偷懒", spicy: "想吃辣", healthy: "想养生" }
-
-function todayKey() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
 
 function diffLabel(d: string) {
   return d === "easy" ? "简单" : d === "medium" ? "中等" : "困难"
@@ -141,16 +138,20 @@ function ProfileCard({ profile, loading }: { profile?: TasteProfile; loading: bo
   )
 }
 
-function RecommendRow({ item, onEat, onReject, disabled }: {
+function RecommendRow({ item, recommendationId, onEat, onReject, onDislike, disabled }: {
   item: RecommendItem
+  recommendationId: string
+  onDislike: () => void
   onEat: (meal: "lunch" | "dinner") => void
   onReject: () => void
   disabled: boolean
 }) {
   const navigate = useNavigate()
   const { dish } = item
+  const cardRef = useRef<HTMLDivElement>(null)
+  useRecommendationImpression(cardRef, recommendationId, dish.id)
   return (
-    <div className={`overflow-hidden rounded-[22px] border border-border bg-card ${cardShadow}`}>
+    <div ref={cardRef} className={`overflow-hidden rounded-[22px] border border-border bg-card ${cardShadow}`}>
       <div className="flex gap-3 p-3">
         <button onClick={() => navigate(`/dishes/${dish.id}`)} className="h-[84px] w-[84px] shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-primary-light to-pink-light" aria-label={`查看${dish.name}`}>
           <DishImage dish={dish} className="h-full w-full" emojiSize="text-[34px]" />
@@ -160,7 +161,6 @@ function RecommendRow({ item, onEat, onReject, disabled }: {
             <button onClick={() => navigate(`/dishes/${dish.id}`)} className="min-w-0 text-left">
               <div className="truncate text-[16px] font-extrabold leading-tight">{dish.name}</div>
             </button>
-            <span className="shrink-0 rounded-full bg-yellow-light px-2 py-0.5 text-[10px] font-extrabold text-yellow-dark">匹配 {Math.round(item.score)}</span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-text2">
             <span className="rounded-full bg-bg px-2 py-0.5">{dish.category}</span>
@@ -178,10 +178,11 @@ function RecommendRow({ item, onEat, onReject, disabled }: {
       <div className="grid grid-cols-[1fr_1fr_auto] gap-2 border-t border-border bg-bg/55 px-3 py-2.5">
         <button onClick={() => onEat("lunch")} disabled={disabled} className="h-9 rounded-2xl bg-primary text-[12px] font-extrabold text-white transition-all active:scale-95 disabled:opacity-50">🍳 中午吃</button>
         <button onClick={() => onEat("dinner")} disabled={disabled} className="h-9 rounded-2xl bg-mint text-[12px] font-extrabold text-white transition-all active:scale-95 disabled:opacity-50">🍲 晚上吃</button>
-        <button onClick={onReject} disabled={disabled} className="flex h-9 items-center gap-1 rounded-2xl bg-card px-3 text-[12px] font-extrabold text-text3 transition-all hover:text-red active:scale-95 disabled:opacity-50" title="不想吃，换一道">
-          <ThumbsDown size={14} strokeWidth={2.4} />
+        <button onClick={onReject} disabled={disabled} className="flex h-9 items-center gap-1 rounded-2xl bg-card px-3 text-[12px] font-extrabold text-text3 transition-all hover:text-red active:scale-95 disabled:opacity-50" title="今天不想吃" aria-label="今天不想吃">
+          <ThumbsDown size={14} strokeWidth={2.4} /> 今天不想吃
         </button>
       </div>
+      <button type="button" onClick={onDislike} disabled={disabled} className="w-full py-2 text-[11px] text-text3 disabled:opacity-50">不喜欢这道，以后少推荐</button>
     </div>
   )
 }
@@ -199,6 +200,10 @@ export default function Assistant() {
   const [items, setItems] = useState<RecommendItem[]>([])
   const [rejected, setRejected] = useState<number[]>([])
   const [lastSummary, setLastSummary] = useState("")
+  const [recommendationId, setRecommendationId] = useState("")
+  const [feedbackBusy, setFeedbackBusy] = useState(false)
+  const seenRef = useRef(new Set<number>())
+  const contextRef = useRef("")
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", 90],
@@ -208,7 +213,11 @@ export default function Assistant() {
   const tasteOptions = useMemo(() => parseList(settings?.tastes, DEFAULT_TASTES), [settings])
 
   const buildRequest = (extraExclude: number[] = []): SmartPickRequest => {
-    const req: SmartPickRequest = { count: 4, mode: "assistant" }
+    const context = JSON.stringify([recommendationDate(), meal, mood, tastes, maxCookTime, includeText, excludeText])
+    const sameContext = contextRef.current === context
+    if (!sameContext) seenRef.current.clear()
+    contextRef.current = context
+    const req: SmartPickRequest = { count: 4, mode: "assistant", meal_date: recommendationDate(), refresh: true, session_id: sameContext ? recommendationId || undefined : undefined }
     if (meal) req.meal_type = meal
     if (mood) req.mood = mood
     if (tastes.length > 0) req.tastes = tastes
@@ -217,7 +226,7 @@ export default function Assistant() {
     if (exclude.length > 0) req.exclude_ingredients = exclude
     const include = includeText.split(/[,，、\s]+/).map((s) => s.trim()).filter(Boolean)
     if (include.length > 0) req.include_ingredients = include
-    const ex = [...rejected, ...extraExclude]
+    const ex = [...new Set([...rejected, ...seenRef.current, ...extraExclude])]
     if (ex.length > 0) req.exclude_dish_ids = ex
     return req
   }
@@ -226,46 +235,52 @@ export default function Assistant() {
     mutationFn: (req: SmartPickRequest) => pickApi.smart(req),
     onSuccess: (data) => {
       setItems(data.items)
+      setRecommendationId(data.recommendation_id)
+      data.items.forEach((item) => seenRef.current.add(item.dish.id))
       setLastSummary(data.profile_summary || "")
       qc.invalidateQueries({ queryKey: ["achievements"] })
       if (data.items.length === 0) toast.error("没有符合条件的菜，放宽一下试试")
     },
-    onError: () => toast.error("暂无可推荐的菜品，放宽条件再试"),
+    onError: () => { contextRef.current = ""; toast.error("暂无可推荐的菜品，放宽条件再试") },
   })
 
   const recordMut = useMutation({
     mutationFn: (payload: { item: RecommendItem; meal: "lunch" | "dinner" }) =>
-      recordsApi.create({ dish_id: payload.item.dish.id, dish_name: payload.item.dish.name, meal_type: payload.meal, meal_date: todayKey() }),
+      mealPlansApi.add({ dish_id: payload.item.dish.id, meal_type: payload.meal, meal_date: recommendationDate(), recommendation_id: recommendationId || undefined }),
     onSuccess: (_res, payload) => {
-      toast.success(`❤ 已记录到今日${payload.meal === "lunch" ? "午餐" : "晚餐"}`)
+      toast.success(`❤ 已加入今日${payload.meal === "lunch" ? "午餐" : "晚餐"}`)
       qc.invalidateQueries({ queryKey: ["records"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       qc.invalidateQueries({ queryKey: ["profile"] })
-      void behaviorApi.log({
-        event_type: "accept",
-        dish_id: payload.item.dish.id,
-        dish_name: payload.item.dish.name,
-        meta: { from: "assistant", meal_type: payload.meal, score: payload.item.score },
-      })
+      for (const key of ["meal-plans", "week-plan", "shopping-list", "shopping-overview"]) void qc.invalidateQueries({ queryKey: [key] })
     },
     onError: (err: unknown) => toast.error((err instanceof Error ? err.message : "") || "记录失败"),
   })
 
-  function reject(item: RecommendItem) {
-    void behaviorApi.log({ event_type: "reject", dish_id: item.dish.id, dish_name: item.dish.name, meta: { from: "assistant" } })
-    setRejected((prev) => [...prev, item.dish.id])
-    setItems((prev) => prev.filter((it) => it.dish.id !== item.dish.id))
-    toast("好的，下次少推这道", { icon: "👌" })
+  async function reject(item: RecommendItem, eventType: "not_today" | "dislike") {
+    if (feedbackBusy || !recommendationId) return
+    setFeedbackBusy(true)
+    try {
+      await recommendationFeedbackApi.send(recommendationId, item.dish.id, eventType)
+      setRejected((prev) => [...prev, item.dish.id])
+      setItems((prev) => prev.filter((it) => it.dish.id !== item.dish.id))
+      if (eventType === "dislike") {
+        toast((t) => <span>已减少推荐 <button className="ml-2 font-bold text-primary" onClick={() => {
+          void recommendationFeedbackApi.send(recommendationId, item.dish.id, "undo_dislike").then(() => toast.dismiss(t.id)).catch(() => toast.error("撤销失败，请重试"))
+        }}>撤销</button></span>)
+      } else toast("这餐先不推荐这道", { icon: "👌" })
+    } catch (error) { toast.error(error instanceof Error ? error.message : "反馈保存失败，请重试") }
+    finally { setFeedbackBusy(false) }
   }
 
   function toggleTaste(t: string) {
     setTastes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
   }
 
-  const busy = recommendMut.isPending || recordMut.isPending
+  const busy = recommendMut.isPending || recordMut.isPending || feedbackBusy
 
   return (
-    <div className="animate-fadeUp pb-10">
+    <div className="animate-fadeUp flex h-dvh flex-col overflow-hidden">
       <PageHeader
         title="AI 推荐官"
         subtitle="按你的口味画像点菜，也能聊着问做法"
@@ -273,7 +288,7 @@ export default function Assistant() {
         onBack={() => navigate(-1)}
       />
 
-      <main className="px-5 py-4">
+      <main className="app-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4 pb-10">
         <div className="mx-auto max-w-[640px] space-y-4">
           <ProfileCard profile={profile} loading={profileLoading} />
 
@@ -359,9 +374,11 @@ export default function Assistant() {
                   <RecommendRow
                     key={it.dish.id}
                     item={it}
+                    recommendationId={recommendationId}
                     disabled={busy}
                     onEat={(m) => recordMut.mutate({ item: it, meal: m })}
-                    onReject={() => reject(it)}
+                    onReject={() => void reject(it, "not_today")}
+                    onDislike={() => void reject(it, "dislike")}
                   />
                 ))}
               </div>

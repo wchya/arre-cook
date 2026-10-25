@@ -2,6 +2,7 @@ const api = require("../../utils/api")
 const session = require("../../utils/session")
 const ui = require("../../utils/ui")
 const fmt = require("../../utils/format")
+const recommendation = require("../../utils/recommendation")
 
 const DAY_ORDER = { 周一: 1, 周二: 2, 周三: 3, 周四: 4, 周五: 5, 周六: 6, 周日: 7 }
 
@@ -72,8 +73,8 @@ require("../../utils/theme").page({
     try {
       const plan = await api.get("/week-plan")
       if (requestId !== this._weekRequest) return
-      const today = fmt.dateKey()
-      const tomorrow = fmt.dateKey(fmt.addDays(new Date(), 1))
+      const today = recommendation.dateKey()
+      const tomorrow = recommendation.dateKey(new Date(Date.now() + 86400000))
       const days = (plan.days || []).slice()
         .sort((a, b) => (DAY_ORDER[a.day_name] || 0) - (DAY_ORDER[b.day_name] || 0))
         .map((day) => ({
@@ -147,9 +148,9 @@ require("../../utils/theme").page({
     if (!records.length) return
     this.setData({ recording: true })
     try {
-      const result = await api.post("/records/batch", { records })
+      for (const record of records) await api.post("/meal-plans", { dish_id: record.dish_id, meal_type: record.meal_type, meal_date: record.meal_date })
       this.setData({ quickOpen: false })
-      ui.toast(result.skipped ? `已记录 ${result.created.length} 道，${result.skipped} 道已存在` : "❤ 已记录！", result.skipped ? "" : "success")
+      ui.toast("❤ 已加入菜单，吃过后再记餐", "success")
       this.loadShopping()
     } catch (error) {
       ui.toast(error.message || "记录失败")

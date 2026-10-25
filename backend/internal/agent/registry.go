@@ -257,7 +257,7 @@ func MCPTools(p *auth.Principal) []map[string]any {
 			"inputSchema": t.Schema,
 			"annotations": map[string]any{
 				"readOnlyHint":    !t.Write,
-				"destructiveHint": t.Name == "delete_meal_record" || t.Name == "delete_food_journal" || t.Name == "delete_private_recipe",
+				"destructiveHint": t.Name == "delete_meal_record" || t.Name == "delete_food_journal" || t.Name == "delete_private_recipe" || t.Name == "replace_meal_plan" || t.Name == "cancel_meal_plan",
 				"openWorldHint":   false,
 			},
 		})

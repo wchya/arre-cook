@@ -22,7 +22,7 @@ NiniMenu 为 Hermes、DeepSeek Harness、自建 Agent 和兼容 MCP 的客户端
 | `records:read` | 读取用餐记录、饮食日记、报告、评分、收藏、行为、周菜单和购物清单 |
 | `records:write` | 记录或删除用餐及手动饮食日记 |
 | `favorites:write` | 收藏或取消收藏 |
-| `plan:write` | 重新生成周菜单 |
+| `plan:write` | 管理已确认菜单与重新生成周菜单 |
 | `preferences:write` | 修改饮食偏好 |
 | `suggestions:write` | 向用户提交建议 |
 | `behavior:write` | 写入行为反馈 |
@@ -109,8 +109,32 @@ DeepSeek 等 OpenAI 兼容模型的推荐流程：把 `/api/agent/tools` 返回�
 
 ## 建议闭环
 
-顾问型 Agent 使用 `create_suggestion` 提交菜品或周计划建议。用户在「建议收件箱」查看后选择采纳或忽略；只有用户采纳时才会写入对应的用餐记录。Agent 可用 `list_suggestions` 查看状态，后续建议可结合用户反馈调整。
+顾问型 Agent 使用 `create_suggestion` 提交菜品或周计划建议。用户在「建议收件箱」查看后选择采纳或忽略；只有用户采纳时才会加入对应的菜单计划，实际吃过后再记餐。Agent 可用 `list_suggestions` 查看状态，后续建议可结合用户反馈调整。
 
 ## OpenAPI
 
 `GET /api/agent/openapi.json` 提供 OpenAPI 3.1 文档，可导入支持 Bearer 鉴权的 Dify、Coze 或 GPT Actions。该文档描述工具调用接口；访问数据仍需使用用户个人令牌。
+## 推荐与计划协议 2.1
+
+`recommend_dishes` 与 `POST /api/agent/recommend` 保留已有参数和 `items[].score`，新增 `meal_date`、`session_id`、`refresh`、`selected_dish_ids`，返回 `recommendation_id`、`session_id`、`served_for_date`、`meal_type`、`algorithm_version`、`items[].item_id`。`score` 是兼容保留的内部排序值，不向用户展示，也不解释为概率或营养评分。`ignore_preferences` 不能绕过过敏与忌口。
+
+推荐后的第三方 Agent 工作流：
+
+1. 调 `get_context`、`get_preferences`，再调 `recommend_dishes`；只使用真实返回的菜名和 ID。
+2. 实际向用户展示某道菜后，用 `recommendation_feedback` 记 `impression`；预取不记曝光。
+3. 换一个记 `skip`，并用原 `session_id`、`refresh=true` 请求下一批；今天不想吃记 `not_today`，明确不喜欢才记 `dislike`，撤销用 `undo_dislike`。
+4. 用户明确选定一餐时调用 `plan_meal`，实际已经吃过再调用 `log_meal`。计划不是实际饮食或好评。
+
+| 新工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `recommendation_feedback` | `behavior:write` | 输入 `recommendation_id, dish_id, event_type, request_key?`；重试复用动作键 |
+| `list_meal_plans` | `records:read` | 读取已确认计划，与实际记录分开 |
+| `plan_meal` | `plan:write` | 输入 `dish_id, meal_date, meal_type, recommendation_id?`，幂等添加 |
+| `replace_meal_plan` | `plan:write` | 输入整餐 `dish_ids` 和可选 `recommendation_ids`，原子替换 |
+| `cancel_meal_plan` | `plan:write` | 输入 `plan_id`，不删除实际用餐记录 |
+
+直接 REST 同时提供 `/api/agent/meal-plans` 的 GET/POST/PUT、`/api/agent/meal-plans/:id` 的 DELETE，以及 `/api/agent/recommendation-feedback` 的 POST，权限与工具一致。现有 readonly/advisor/full 预设继续有效：顾问可推送待用户采纳建议和记录反馈，不能直接修改已确认计划。
+
+兼容注意：`log_feedback.reject` 解释为短期不想吃，不当作长期差评；`dislike → undo_dislike → dislike` 可重复切换。旧 MCP `log_meal` 的未来日期转为计划，须 `plan:write`，返回 `planned=true/plan_id`；旧 Agent REST `/records` 返回实际 `created` 与独立 `planned` 数组。建议收件箱采纳的 `created` 数组现在是已确认计划，响应增加 `planned=true`。请勿再将这些结果称为“已经吃过”。
+
+所有新工具来自同一注册表，自动出现在 MCP `tools/list`、Function Calling 和 OpenAPI；实际权限、用户归属和源标识由服务端确定。详细规则及迁移说明见 [每日菜谱推荐](recommendations.md)。

@@ -4,6 +4,7 @@ const ui = require("../../utils/ui")
 const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
 const theme = require("../../utils/theme")
+const recommendation = require("../../utils/recommendation")
 
 const SPIN_MS = 3200
 
@@ -66,12 +67,23 @@ require("../../utils/theme").page({
       const built = buildWheel(this._wheelDishes)
       this.setData({ wheelBg: built.background, wheelLabels: built.labels })
     })
-    this._fallback = []
+    this._seen = []
+    this._recommendationId = ""
     this.boot()
   },
 
   onShow() {
     this._summaryHidden = false
+    this._recommendationHidden = false
+    if (this._recommendationIdentity !== api.token()) {
+      this._recommendationIdentity = api.token()
+      this._seen = []
+      this._recommendationId = ""
+      this._bootDate = ""
+      this._recRaw = []
+      this._today = []
+      this.setData({ current: null, recItems: [], currentReasons: [], recMeal: "", mood: "" })
+    }
     if (this._summaryIdentity !== api.token()) { this._summaryIdentity = api.token(); this.setData({ healthSummary: null, healthSummaryLoading: true, healthSummaryError: false }) }
     session.syncTabBar(this, 0)
     if (!session.requireLogin()) return
@@ -79,12 +91,14 @@ require("../../utils/theme").page({
     if (this._booted) {
       this.loadToday()
       this.loadUnread()
+      if (!this._booting) this.boot()
     }
   },
 
-  onHide() { this._summaryHidden = true; this._summaryRequest = (this._summaryRequest || 0) + 1 },
+  onHide() { this._recommendationHidden = true; recommendation.disconnect(this); this._summaryHidden = true; this._summaryRequest = (this._summaryRequest || 0) + 1 },
 
   onUnload() {
+    recommendation.disconnect(this)
     this._summaryHidden = true; this._summaryRequest = (this._summaryRequest || 0) + 1
     if (this._offWheelTheme) this._offWheelTheme()
     clearTimeout(this._spinTimer)
@@ -98,35 +112,40 @@ require("../../utils/theme").page({
   },
 
   async boot() {
-    if (!session.hasSession()) return
+    if (!session.hasSession() || this._booting) return
     this._booted = true
+    this._booting = true
     this.setData({ loadingRec: true, error: "" })
-    const today = fmt.dateKey()
-    const results = await Promise.allSettled([
-      api.post("/pick/smart", { count: 3, mode: "home_auto" }),
-      api.get("/dishes", { enabled: "true", pageSize: 12, sort: "random" }),
-      api.get("/day-rating", { date: today }),
-      this.loadToday(),
-      this.loadUnread(),
-    ])
-    const [pick, wheel, rating] = results
-    if (pick.status === "fulfilled" && pick.value && pick.value.items && pick.value.items.length) {
-      this.setRecommendations(pick.value, "")
+    const today = recommendation.dateKey()
+    if (this._bootDate !== today) {
+      this._bootDate = today
+      this._seen = []
+      this._recommendationId = ""
+      this.setData({ mood: "", current: null, recMeal: "" })
     }
-    if (wheel.status === "fulfilled") {
-      const items = (wheel.value && wheel.value.items) || []
-      this._wheelDishes = items
-      this._fallback = items
-      const built = buildWheel(items)
-      this.setData({ wheelBg: built.background, wheelLabels: built.labels })
-      if (!this.data.current && items.length) this.showSingle(items[0], false)
+    try {
+      const rating = await api.get("/day-rating", { date: today }).catch(() => null)
+      const mood = rating && rating.home_mood || ""
+      this.setData({ mood })
+      const results = await Promise.allSettled([
+        api.post("/pick/smart", { count: 3, mode: "home_auto", meal_date: today, meal_type: this.data.recMeal || undefined, mood: mood || undefined }),
+        api.post("/pick/smart", { count: 10, mode: "wheel", meal_date: today, mood: mood || undefined }),
+        this.loadToday(), this.loadUnread(),
+      ])
+      const [pick, wheel] = results
+      if (pick.status === "fulfilled" && pick.value && pick.value.items) this.setRecommendations(pick.value, this.data.recMeal)
+      else this.setData({ current: null, error: "暂时无法加载推荐，下拉重试或调整条件" })
+      if (wheel.status === "fulfilled") {
+        this._wheelResult = wheel.value
+        this._wheelDishes = (wheel.value.items || []).map((item) => item.dish)
+        const built = buildWheel(this._wheelDishes)
+        this.setData({ wheelBg: built.background, wheelLabels: built.labels })
+      }
+      if (mood) this.loadMoodDishes(mood)
+    } finally {
+      this._booting = false
+      this.setData({ loadingRec: false })
     }
-    if (rating.status === "fulfilled" && rating.value && rating.value.home_mood) {
-      this.setData({ mood: rating.value.home_mood })
-      this.loadMoodDishes(rating.value.home_mood)
-    }
-    if (pick.status === "rejected" && wheel.status === "rejected") this.setData({ error: "暂时无法加载推荐，下拉重试" })
-    this.setData({ loadingRec: false })
   },
 
   async onRefresh() {
@@ -136,10 +155,10 @@ require("../../utils/theme").page({
   },
 
   async loadToday() {
-    const today = fmt.dateKey()
+    const today = recommendation.dateKey()
     try {
-      const result = await api.get("/records", { date_from: today, date_to: today, pageSize: 50 })
-      this._today = result.items || []
+      const result = await api.get("/meal-plans", { date_from: today, date_to: today })
+      this._today = result || []
     } catch (_) { /* ignore */ }
     await this.loadHealthSummary()
   },
@@ -168,6 +187,8 @@ require("../../utils/theme").page({
   // ---------- 推荐 ----------
 
   setRecommendations(result, meal) {
+    if (this._recommendationId !== result.recommendation_id) this._seen = this._seen || []
+    this._recommendationId = result.recommendation_id
     this._recRaw = result.items
     this.setData({
       recItems: result.items.map((item) => item.dish.id),
@@ -182,12 +203,14 @@ require("../../utils/theme").page({
   showItem(index) {
     const item = this._recRaw && this._recRaw[index]
     if (!item) return
+    recommendation.disconnect(this)
+    this._seen = Array.from(new Set([...(this._seen || []), item.dish.id]))
     this.setData({
       recIndex: index,
       current: dishUtil.toCard(item.dish),
       currentReasons: item.reasons || [],
       isSmart: true,
-    })
+    }, () => recommendation.observe(this, ".rec-card", this._recommendationId, item.dish.id))
   },
 
   showSingle(dish, smart) {
@@ -204,7 +227,8 @@ require("../../utils/theme").page({
     ui.haptic()
     this.setData({ pickingMeal: meal })
     try {
-      const result = await api.post("/pick/smart", { meal_type: meal, count: 3, mood: this.data.mood || undefined, mode: "home_meal" })
+      const result = await api.post("/pick/smart", { meal_type: meal, meal_date: recommendation.dateKey(), count: 3, mood: this.data.mood || undefined, mode: "home_auto" })
+      this._seen = []
       if (!result || !result.items || !result.items.length) {
         ui.toast("暂无可推荐的菜品")
         return
@@ -219,44 +243,28 @@ require("../../utils/theme").page({
     }
   },
 
-  // 换一个：先在本批推荐里翻页，翻完了排除已看过的菜再要一批；被跳过的菜记一条 reject 事件
+  // Session skips are temporary and never become long-term dislikes.
   async changeRecommend() {
     if (this.data.changing) return
     const raw = this._recRaw && this._recRaw[this.data.recIndex]
-    if (raw && this.data.isSmart) {
-      api.behavior({ event_type: "reject", dish_id: raw.dish.id, dish_name: raw.dish.name, meta: { from: "home_recommend", meal_type: this.data.recMeal, client: "miniprogram" } })
-    }
-    ui.haptic()
-    if (this.data.isSmart && this._recRaw && this.data.recIndex < this._recRaw.length - 1) {
-      this.showItem(this.data.recIndex + 1)
-      return
-    }
     this.setData({ changing: true })
     try {
-      const seen = (this._recRaw || []).map((item) => item.dish.id)
-      const result = await api.post("/pick/smart", {
-        meal_type: this.data.recMeal || undefined,
-        mood: this.data.mood || undefined,
-        count: 3,
-        exclude_dish_ids: seen,
-        mode: "home_change",
-      })
-      if (!result || !result.items || !result.items.length) {
-        ui.toast("没有更多推荐了")
+      if (raw && this.data.isSmart) await recommendation.feedback(this._recommendationId, raw.dish.id, "skip")
+      ui.haptic()
+      if (this.data.isSmart && this._recRaw && this.data.recIndex < this._recRaw.length - 1) {
+        this.showItem(this.data.recIndex + 1)
         return
       }
-      const quote = this.data.recQuote
+      const result = await api.post("/pick/smart", {
+        meal_type: this.data.recMeal || undefined, meal_date: recommendation.dateKey(),
+        mood: this.data.mood || undefined, count: 3, exclude_dish_ids: this._seen || [],
+        session_id: this._recommendationId || undefined, mode: "home_change", refresh: true,
+      })
+      if (!result || !result.items || !result.items.length) { ui.toast("符合条件的菜已经看完，可以调整条件再试"); return }
       this.setRecommendations(result, this.data.recMeal)
-      this.setData({ recQuote: quote })
-    } catch (_) {
-      // 回退：在已加载的菜单里顺序换
-      const list = this._fallback
-      if (!list.length) return
-      const idx = this.data.current ? list.findIndex((dish) => dish.id === this.data.current.id) : -1
-      this.showSingle(list[(idx + 1) % list.length], false)
-    } finally {
-      this.setData({ changing: false })
-    }
+    } catch (error) {
+      ui.toast(error.message || "暂时无法换菜，请重试")
+    } finally { this.setData({ changing: false }) }
   },
 
   openCurrent() {
@@ -271,22 +279,21 @@ require("../../utils/theme").page({
     await this.record(dish, meal, this.data.isSmart ? "home_recommend" : "home_pick")
   },
 
-  async record(dish, meal, from) {
+  async record(dish, meal) {
     if (this.data.recordingMeal) return
     const label = meal === "lunch" ? "午餐" : "晚餐"
-    const today = fmt.dateKey()
+    const today = recommendation.dateKey()
     if (this._today.some((record) => record.dish_id === dish.id && record.meal_type === meal && record.meal_date === today)) {
-      ui.toast(`${dish.name} 已在今日${label}中记录过啦~`)
+      ui.toast(`${dish.name} 已在今日${label}菜单中啦~`)
       return
     }
     this.setData({ recordingMeal: meal })
     try {
-      await api.post("/records", { dish_id: dish.id, dish_name: dish.name, meal_type: meal, meal_date: today })
+      await api.post("/meal-plans", { dish_id: dish.id, meal_type: meal, meal_date: today, recommendation_id: this.data.isSmart ? this._recommendationId : undefined })
       ui.haptic("medium")
-      ui.toast("❤ 已记录！")
+      ui.toast("❤ 已加入菜单，吃过后再记餐")
       const confetti = this.selectComponent("#confetti")
       if (confetti) confetti.fire()
-      api.behavior({ event_type: "accept", dish_id: dish.id, dish_name: dish.name, meta: { from, meal_type: meal, client: "miniprogram" } })
       this.loadToday()
     } catch (error) {
       ui.toast(error.message || "记录失败")
@@ -302,10 +309,17 @@ require("../../utils/theme").page({
     const meta = dishUtil.HOME_MOOD_MAP[mood]
     ui.haptic()
     this.setData({ mood })
-    api.post("/day-rating/home-mood", { meal_date: fmt.dateKey(), home_mood: mood })
+    api.post("/day-rating/home-mood", { meal_date: recommendation.dateKey(), home_mood: mood })
       .then(() => ui.toast(`心情：${meta ? meta.label : mood}，已保存并调整推荐~`))
       .catch(() => ui.toast("心情保存失败"))
     this.loadMoodDishes(mood)
+    this._seen = []
+    this.setData({ current: null, loadingRec: true })
+    try {
+      const result = await api.post("/pick/smart", { count: 3, meal_date: recommendation.dateKey(), meal_type: this.data.recMeal || undefined, mood, mode: "home_auto" })
+      if (mood === this.data.mood) this.setRecommendations(result, this.data.recMeal)
+    } catch (error) { ui.toast(error.message || "推荐调整失败，请重试") }
+    finally { this.setData({ loadingRec: false }) }
   },
 
   async loadMoodDishes(mood) {
@@ -336,7 +350,9 @@ require("../../utils/theme").page({
     this._spinTimer = setTimeout(() => {
       const dish = dishes[pick]
       this.setData({ spinning: false, recMeal: "", recQuote: "" })
-      this.showSingle(dish, false)
+      this._recRaw = [this._wheelResult.items[pick]]
+      this._recommendationId = this._wheelResult.recommendation_id
+      this.showItem(0)
       ui.haptic("heavy")
       ui.toast(`🎯 转到了：${dish.name}！`)
       this.scrollToRec()

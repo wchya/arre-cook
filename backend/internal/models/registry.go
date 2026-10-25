@@ -43,5 +43,7 @@ func SchemaModels() []any {
 		&HomeInventory{},
 		&ShoppingItemCategory{},
 		&BehaviorEvent{},
+		&RecommendationFeedback{},
+		&UserDishAffinity{}, &RecommendationSnapshot{},
 	}
 }

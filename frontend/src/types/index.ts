@@ -355,6 +355,9 @@ export interface MealRecord {
 }
 
 export interface PickResult {
+  recommendation_id?: string
+  session_id?: string
+  items?: RecommendItem[]
   dishes: Dish[]
   quote: string
 }
@@ -580,12 +583,17 @@ export interface DishRecordsResponse {
 // ---- 智能推荐 / 口味画像 / 行为事件 ----
 
 export interface RecommendItem {
+  item_id?: string
   dish: Dish
   score: number
   reasons: string[]
 }
 
 export interface SmartPickRequest {
+  meal_date?: string
+  session_id?: string
+  refresh?: boolean
+  selected_dish_ids?: number[]
   meal_type?: string
   mood?: string
   count?: number
@@ -602,6 +610,11 @@ export interface SmartPickRequest {
 }
 
 export interface SmartPickResult {
+  session_id?: string
+  recommendation_id: string
+  served_for_date: string
+  meal_type: string
+  algorithm_version: string
   items: RecommendItem[]
   profile_summary: string
   applied: Record<string, unknown>
@@ -914,3 +927,19 @@ export interface HealthDraftBatchItem {
   nutrition_portion_count?: number
 }
 export interface HealthJournalBatchInput { request_key: string; confirmed: boolean; meal_date: string; meal_type: string; items: HealthDraftBatchItem[] }
+
+export interface MealPlan {
+  recommendation_id?: string
+  id: number
+  dish_id: number
+  dish_name: string
+  meal_date: string
+  meal_type: string
+  status: string
+  available: boolean
+  created_at: string
+  dish_image_url?: string
+  dish_emoji?: string
+}
+
+export type RecommendationFeedbackType = "impression" | "skip" | "not_today" | "dislike" | "undo_dislike" | "accept"

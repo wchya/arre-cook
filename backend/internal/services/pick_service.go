@@ -2,12 +2,10 @@ package services
 
 import (
 	"gorm.io/gorm"
-	"math"
 	"math/rand"
 	"ninimenu/internal/config"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
-	"sort"
 	"strings"
 	"time"
 )
@@ -19,185 +17,41 @@ type TomorrowPickOptions struct {
 	ExcludeIDs []uint
 }
 
-// PickTomorrowDishes 明日菜单：按偏好档位（快手/清淡/辣/收藏/均衡）过滤排序，用户的过敏原/忌口始终生效。
+// PickTomorrowDishes keeps the original dish-only contract while sharing the
+// personal scoring engine used by home, MCP and weekly menus.
 func PickTomorrowDishes(uid uint, opts TomorrowPickOptions, dbs ...*gorm.DB) ([]models.Dish, error) {
-	requestDB := database.Handle(dbs...)
-
-	count := opts.Count
-	if count < 1 {
-		count = 1
-	}
-	if count > 10 {
-		count = 10
-	}
-
-	mealType := strings.TrimSpace(opts.MealType)
-	if mealType != "lunch" && mealType != "dinner" {
-		mealType = ""
-	}
-
-	profile := strings.TrimSpace(opts.Profile)
-	if profile == "" {
-		profile = "balanced"
-	}
-
-	var all []models.Dish
-	query := requestDB.Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true)
-	if mealType != "" {
-		query = query.Where("meal_type IN ?", []string{mealType, "all", ""})
-	}
-	query.Find(&all)
-
-	blocked, err := loadDietaryExclusions(uid, requestDB)
+	result, err := PickTomorrowRecommendations(uid, opts, dbs...)
 	if err != nil {
 		return nil, err
 	}
-	dishes := make([]models.Dish, 0, len(all))
-	for _, d := range all {
-		if !containsAny(dishSearchText(d), blocked) {
-			dishes = append(dishes, d)
-		}
+	dishes := make([]models.Dish, 0, len(result.Items))
+	for _, item := range result.Items {
+		dishes = append(dishes, item.Dish)
 	}
-	if len(dishes) == 0 {
-		return nil, nil
-	}
-	MarkFavorites(uid, dishes, requestDB)
-
-	excluded := make(map[uint]bool, len(opts.ExcludeIDs))
-	for _, id := range opts.ExcludeIDs {
-		if id > 0 {
-			excluded[id] = true
-		}
-	}
-
-	recent := recentDishIDMap(uid, UserRepeatDays(uid, requestDB), requestDB)
-	pool := filterTomorrowPool(dishes, profile, excluded, recent, true)
-	if len(pool) == 0 {
-		pool = filterTomorrowPool(dishes, profile, excluded, recent, false)
-	}
-	if len(pool) == 0 {
-		pool = filterTomorrowPool(dishes, "balanced", excluded, recent, false)
-	}
-	if len(pool) == 0 {
-		pool = filterTomorrowPool(dishes, "balanced", map[uint]bool{}, recent, false)
-	}
-
-	sortTomorrowPool(pool, profile)
-	if len(pool) > count {
-		pool = pool[:count]
-	}
-	return pool, nil
+	return dishes, nil
 }
 
-func filterTomorrowPool(dishes []models.Dish, profile string, excluded map[uint]bool, recent map[uint]bool, strictProfile bool) []models.Dish {
-	var result []models.Dish
-	for _, d := range dishes {
-		if excluded[d.ID] {
-			continue
-		}
-		if recent[d.ID] {
-			continue
-		}
-		if strictProfile && !matchesTomorrowProfile(d, profile) {
-			continue
-		}
-		result = append(result, d)
+func PickTomorrowRecommendations(uid uint, opts TomorrowPickOptions, dbs ...*gorm.DB) (*RecommendResponse, error) {
+	count := min(max(opts.Count, 1), MaxDishesPerMeal)
+	req := RecommendRequest{
+		MealType: strings.TrimSpace(opts.MealType),
+		MealDate: healthNow().AddDate(0, 0, 1).Format("2006-01-02"),
+		Count:    count, ExcludeDishIDs: opts.ExcludeIDs,
+		Mode: "tomorrow", Source: "app", Jitter: true,
 	}
-	if len(result) > 0 {
-		return result
-	}
-
-	for _, d := range dishes {
-		if excluded[d.ID] {
-			continue
-		}
-		if strictProfile && !matchesTomorrowProfile(d, profile) {
-			continue
-		}
-		result = append(result, d)
-	}
-	return result
-}
-
-func matchesTomorrowProfile(d models.Dish, profile string) bool {
-	switch profile {
+	switch strings.TrimSpace(opts.Profile) {
 	case "quick":
-		return d.Difficulty == "easy" || d.CookTime > 0 && d.CookTime <= 25 || strings.Contains(d.Category, "快手")
+		req.Mood, req.MaxCookTime = "lazy", 30
 	case "light":
-		return containsTaste(d.Taste, "清淡") || containsTaste(d.Taste, "鲜") || strings.Contains(d.Category, "汤")
+		req.Mood = "healthy"
 	case "spicy":
-		return containsTaste(d.Taste, "辣") || strings.Contains(d.Category, "川菜") || strings.Contains(d.Category, "湘菜") || strings.Contains(d.Category, "贵州菜") || strings.Contains(d.Name, "辣")
+		req.Mood, req.Tastes = "spicy", []string{"辣"}
 	case "favorite":
-		return d.Favorite
-	default:
-		return true
+		// The core exposes favorite preference through its request mode. It
+		// remains a soft preference so a small collection can still yield meals.
+		req.Mode = "tomorrow_favorite"
 	}
-}
-
-// sortTomorrowPool 按档位得分加权随机排序（Efraimidis–Spirakis）：得分平方作权重，高分菜明显靠前
-// 但每次仍有变化；自建菜谱的权重再乘 OwnDishWeight，同分时被排进明日菜单的概率高 30%。
-func sortTomorrowPool(dishes []models.Dish, profile string) {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	keys := make(map[uint]float64, len(dishes))
-	for _, d := range dishes {
-		base := float64(tomorrowDishScore(d, profile) + 10)
-		keys[d.ID] = math.Pow(r.Float64(), 1/(base*base*DishSourceWeight(d)))
-	}
-	sort.SliceStable(dishes, func(i, j int) bool {
-		a, b := keys[dishes[i].ID], keys[dishes[j].ID]
-		if a != b {
-			return a > b
-		}
-		return dishes[i].ID < dishes[j].ID
-	})
-}
-
-func tomorrowDishScore(d models.Dish, profile string) int {
-	score := 0
-	if d.Favorite {
-		score += 12
-	}
-	if matchesTomorrowProfile(d, profile) {
-		score += 40
-	}
-	switch profile {
-	case "quick":
-		if d.Difficulty == "easy" {
-			score += 18
-		}
-		if d.CookTime > 0 {
-			score += maxInt(0, 35-d.CookTime)
-		}
-	case "light":
-		if containsTaste(d.Taste, "清淡") {
-			score += 18
-		}
-		if containsTaste(d.Taste, "鲜") {
-			score += 10
-		}
-		if strings.Contains(d.Category, "汤") {
-			score += 8
-		}
-	case "spicy":
-		if containsTaste(d.Taste, "辣") {
-			score += 18
-		}
-		if strings.Contains(d.Category, "川菜") || strings.Contains(d.Category, "湘菜") || strings.Contains(d.Category, "贵州菜") {
-			score += 8
-		}
-	case "favorite":
-		if d.Favorite {
-			score += 30
-		}
-	default:
-		if d.Difficulty == "easy" {
-			score += 6
-		}
-		if d.CookTime > 0 && d.CookTime <= 35 {
-			score += 4
-		}
-	}
-	return score
+	return RecommendDishes(uid, req, dbs...)
 }
 
 func recentDishIDMap(uid uint, days int, dbs ...*gorm.DB) map[uint]bool {
@@ -206,10 +60,10 @@ func recentDishIDMap(uid uint, days int, dbs ...*gorm.DB) map[uint]bool {
 	if days <= 0 {
 		return map[uint]bool{}
 	}
-	since := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
+	since := healthNow().AddDate(0, 0, -days).Format("2006-01-02")
 	var recentIDs []uint
 	requestDB.Model(&models.MealRecord{}).Scopes(database.OwnedBy(uid)).
-		Where("meal_date >= ?", since).
+		Where("meal_date >= ? AND meal_date <= ?", since, healthToday()).
 		Pluck("dish_id", &recentIDs)
 
 	result := make(map[uint]bool, len(recentIDs))

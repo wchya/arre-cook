@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { dishesApi, pickApi, recordsApi } from "@/api"
-import type { Dish, DishIngredient, MealRecord } from "@/types"
+import { dishesApi, pickApi, mealPlansApi } from "@/api"
+import type { Dish, DishIngredient, MealPlan } from "@/types"
 import { asArray } from "@/lib/utils"
 import { useDebouncedValue } from "@/lib/use-debounced-value"
+import { useRecommendationImpression } from "@/lib/use-recommendation-impression"
+import { healthDate } from "@/lib/health-date"
 import { launchConfetti } from "@/lib/confetti"
 import DishImage from "@/components/DishImage"
 import PageHeader from "@/components/PageHeader"
@@ -33,6 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
+type PlanDish = Dish & { recommendation_id?: string }
 type MealType = "lunch" | "dinner"
 type PlanProfile = "balanced" | "quick" | "light" | "spicy" | "favorite"
 
@@ -84,10 +87,8 @@ const mealMeta: Record<MealType, {
 }
 
 function getTomorrow() {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  const str = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-  return { str, label: `${str.slice(5)} ${weekdayNames[d.getDay()]}` }
+  const str = healthDate(1)
+  return { str, label: `${str.slice(5)} ${weekdayNames[new Date(`${str}T00:00:00Z`).getUTCDay()]}` }
 }
 
 function diffLabel(difficulty: string) {
@@ -114,7 +115,7 @@ function matchesMeal(dish: Dish, meal: MealType) {
   return !dish.meal_type || dish.meal_type === "all" || dish.meal_type === meal
 }
 
-function uniqueById(items: Dish[]) {
+function uniqueById(items: PlanDish[]) {
   const seen = new Set<number>()
   return items.filter((item) => {
     if (seen.has(item.id)) return false
@@ -123,14 +124,14 @@ function uniqueById(items: Dish[]) {
   })
 }
 
-function mealRecords(records: MealRecord[], meal: MealType) {
+function mealRecords(records: MealPlan[], meal: MealType) {
   return records
     .filter((r) => r.meal_type === meal)
     .slice()
     .sort((a, b) => a.id - b.id)
 }
 
-function keyFromRecords(records: MealRecord[]) {
+function keyFromRecords(records: MealPlan[]) {
   return mealOrder
     .map((meal) => `${meal}:${mealRecords(records, meal).map((r) => r.dish_id).join(",")}`)
     .join("|")
@@ -140,9 +141,10 @@ function keyFromDishes(lunch: Dish[], dinner: Dish[]) {
   return `lunch:${lunch.map((d) => d.id).join(",")}|dinner:${dinner.map((d) => d.id).join(",")}`
 }
 
-function recordToDish(record: MealRecord): Dish {
+function recordToDish(record: MealPlan): PlanDish {
   return {
     id: record.dish_id,
+    recommendation_id: record.recommendation_id,
     name: record.dish_name,
     image_url: record.dish_image_url || "",
     video_url: "",
@@ -324,15 +326,17 @@ function DishRow({
   onSwap,
   onRemove,
 }: {
-  dish: Dish
+  dish: PlanDish
   meal: MealType
   onOpen: () => void
   onSwap: () => void
   onRemove: () => void
 }) {
   const meta = mealMeta[meal]
+  const cardRef = useRef<HTMLDivElement>(null)
+  useRecommendationImpression(cardRef, dish.recommendation_id || "", dish.id)
   return (
-    <div className="flex items-center gap-3 py-3">
+    <div ref={cardRef} className="flex items-center gap-3 py-3">
       <button onClick={onOpen} className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-primary-light to-pink-light" aria-label={`查看${dish.name}`}>
         <DishImage dish={dish} className="h-full w-full" emojiSize="text-[30px]" />
       </button>
@@ -383,7 +387,7 @@ function MealPlanner({
   onOpenPicker,
 }: {
   meal: MealType
-  dishes: Dish[]
+  dishes: PlanDish[]
   target: number
   disabled: boolean
   onTargetChange: (value: number) => void
@@ -669,8 +673,7 @@ function LoadingState() {
 }
 
 interface SavePlanPayload {
-  oldRecords: MealRecord[]
-  records: Partial<MealRecord>[]
+  records: Partial<MealPlan>[]
   wasSaved: boolean
 }
 
@@ -682,17 +685,17 @@ export default function Tomorrow() {
 
   const [profile, setProfile] = useState<PlanProfile>("balanced")
   const [targets, setTargets] = useState<Record<MealType, number>>(defaultTargets)
-  const [lunch, setLunch] = useState<Dish[]>([])
-  const [dinner, setDinner] = useState<Dish[]>([])
-  const [originalRecords, setOriginalRecords] = useState<MealRecord[]>([])
+  const [lunch, setLunch] = useState<PlanDish[]>([])
+  const [dinner, setDinner] = useState<PlanDish[]>([])
+  const [originalRecords, setOriginalRecords] = useState<MealPlan[]>([])
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
   const [pickerMeal, setPickerMeal] = useState<MealType | null>(null)
   const [picking, setPicking] = useState(false)
   const initStartedForRef = useRef<string | null>(null)
 
   const { data: tomorrowRecords, isLoading: recordsLoading } = useQuery({
-    queryKey: ["records", "tomorrow", tomorrowStr],
-    queryFn: () => recordsApi.list({ date_from: tomorrowStr, date_to: tomorrowStr, pageSize: "100" }),
+    queryKey: ["meal-plans", "tomorrow", tomorrowStr],
+    queryFn: () => mealPlansApi.list(tomorrowStr, tomorrowStr),
   })
 
   useEffect(() => {
@@ -700,7 +703,7 @@ export default function Tomorrow() {
     if (initStartedForRef.current === tomorrowStr) return
     initStartedForRef.current = tomorrowStr
 
-    const records = tomorrowRecords?.items || []
+    const records = tomorrowRecords || []
     setOriginalRecords(records)
 
     if (records.length > 0) {
@@ -730,10 +733,10 @@ export default function Tomorrow() {
     return map
   }, [lunch, dinner])
 
-  const recordsToSave = useMemo<Partial<MealRecord>[]>(() => {
-    const records: Partial<MealRecord>[] = []
-    lunch.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "lunch", meal_date: tomorrowStr }))
-    dinner.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "dinner", meal_date: tomorrowStr }))
+  const recordsToSave = useMemo<Partial<MealPlan>[]>(() => {
+    const records: Partial<MealPlan>[] = []
+    lunch.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "lunch", meal_date: tomorrowStr, recommendation_id: dish.recommendation_id }))
+    dinner.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "dinner", meal_date: tomorrowStr, recommendation_id: dish.recommendation_id }))
     return records
   }, [dinner, lunch, tomorrowStr])
 
@@ -746,22 +749,20 @@ export default function Tomorrow() {
   const disabled = loading || picking
 
   const savePlanMut = useMutation({
-    mutationFn: async ({ oldRecords, records }: SavePlanPayload) => {
-      await Promise.all(
-        oldRecords.map(async (record) => {
-          try {
-            await recordsApi.delete(record.id)
-          } catch {
-            // Stale local records should not block replacing tomorrow's plan.
-          }
-        }),
-      )
-      if (records.length === 0) return { created: [] as MealRecord[], skipped: 0, total: 0 }
-      return recordsApi.batchCreate(records)
+    mutationFn: async ({ records }: SavePlanPayload) => {
+      const created: MealPlan[] = []
+      // Each meal is atomically replaced; failed writes leave that meal intact.
+      for (const meal of mealOrder) {
+        const ids = records.filter((record) => record.meal_type === meal).map((record) => record.dish_id!)
+        const recommendationIds = Object.fromEntries(records.filter((record) => record.meal_type === meal && record.recommendation_id).map((record) => [record.dish_id!, record.recommendation_id!]))
+        created.push(...await mealPlansApi.replace(tomorrowStr, meal, ids, recommendationIds))
+      }
+      return { created }
     },
     onSuccess: (res, variables) => {
       setOriginalRecords(res.created)
-      qc.invalidateQueries({ queryKey: ["records"] })
+      qc.invalidateQueries({ queryKey: ["meal-plans"] })
+      qc.invalidateQueries({ queryKey: ["week-plan"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       qc.refetchQueries({ queryKey: ["shopping-list"] })
       launchConfetti(confettiRef.current)
@@ -774,7 +775,7 @@ export default function Tomorrow() {
     return meal === "lunch" ? lunch : dinner
   }
 
-  function updateMeal(meal: MealType, updater: (prev: Dish[]) => Dish[]) {
+  function updateMeal(meal: MealType, updater: (prev: PlanDish[]) => PlanDish[]) {
     if (meal === "lunch") setLunch(updater)
     else setDinner(updater)
   }
@@ -798,7 +799,7 @@ export default function Tomorrow() {
       count,
       exclude_ids: excludeIds,
     })
-    return res.dishes || []
+    return (res.dishes || []).map((dish) => ({ ...dish, recommendation_id: res.recommendation_id }))
   }
 
   async function fillMeal(meal: MealType) {
@@ -917,7 +918,7 @@ export default function Tomorrow() {
       toast("菜单没有变化")
       return
     }
-    savePlanMut.mutate({ oldRecords: originalRecords, records: recordsToSave, wasSaved: hasSavedPlan })
+    savePlanMut.mutate({ records: recordsToSave, wasSaved: hasSavedPlan })
   }
 
   return (

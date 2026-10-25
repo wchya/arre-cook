@@ -4,13 +4,11 @@ import (
 	"errors"
 	"gorm.io/gorm"
 	"io"
-	"math/rand"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"ninimenu/internal/services"
 	"ninimenu/internal/utils"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,6 +29,10 @@ func recommendForApp(u uint, req services.RecommendRequest, dbs ...*gorm.DB) []m
 	requestDB := database.Handle(dbs...)
 
 	req.Source = "app"
+	req.Actor = ""
+	if req.Mode == "week_plan" {
+		req.Mode = "app"
+	}
 	req.Jitter = true
 	result, err := services.RecommendDishes(u, req, requestDB)
 	if err != nil || result == nil {
@@ -104,6 +106,10 @@ func PickSmart(c *gin.Context) {
 		return
 	}
 	req.Source = "app"
+	req.Actor = ""
+	if req.Mode == "week_plan" {
+		req.Mode = "app"
+	}
 	req.Jitter = true
 	result, err := services.RecommendDishes(uid(c), req, database.DB.WithContext(c.Request.Context()))
 	if err != nil || result == nil || len(result.Items) == 0 {
@@ -114,10 +120,15 @@ func PickSmart(c *gin.Context) {
 		services.RecordAchievementEvent(uid(c), "recommend_mood", req.Mood, database.DB.WithContext(c.Request.Context()))
 	}
 	utils.Success(c, gin.H{
-		"items":           result.Items,
-		"profile_summary": result.ProfileSummary,
-		"applied":         result.Applied,
-		"quote":           services.GetRandomQuote("", database.DB.WithContext(c.Request.Context())),
+		"items":             result.Items,
+		"recommendation_id": result.RecommendationID,
+		"session_id":        result.SessionID,
+		"served_for_date":   result.ServedForDate,
+		"meal_type":         result.MealType,
+		"algorithm_version": result.AlgorithmVersion,
+		"profile_summary":   result.ProfileSummary,
+		"applied":           result.Applied,
+		"quote":             services.GetRandomQuote("", database.DB.WithContext(c.Request.Context())),
 	})
 }
 
@@ -128,39 +139,31 @@ func PickTomorrow(c *gin.Context) {
 		return
 	}
 
-	dishes, err := services.PickTomorrowDishes(uid(c), services.TomorrowPickOptions{
+	result, err := services.PickTomorrowRecommendations(uid(c), services.TomorrowPickOptions{
 		MealType: req.MealType, Profile: req.Profile, Count: req.Count, ExcludeIDs: req.ExcludeIDs,
 	}, database.DB.WithContext(c.Request.Context()))
-	if err != nil || len(dishes) == 0 {
+	if err != nil || result == nil || len(result.Items) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
+	}
+	dishes := make([]models.Dish, 0, len(result.Items))
+	for _, item := range result.Items {
+		dishes = append(dishes, item.Dish)
 	}
 
 	services.RecordAchievementEvent(uid(c), "recommend_mood", req.Profile, database.DB.WithContext(c.Request.Context()))
-	utils.Success(c, gin.H{"dishes": dishes, "quote": services.GetRandomQuote(req.Profile, database.DB.WithContext(c.Request.Context()))})
+	utils.Success(c, gin.H{"dishes": dishes, "items": result.Items, "recommendation_id": result.RecommendationID,
+		"session_id": result.SessionID, "served_for_date": result.ServedForDate, "meal_type": result.MealType,
+		"algorithm_version": result.AlgorithmVersion, "applied": result.Applied, "quote": services.GetRandomQuote(req.Profile, database.DB.WithContext(c.Request.Context()))})
 }
 
 func PickBlindBox(c *gin.Context) {
-	dishes := services.VisibleEnabledDishes(uid(c), database.DB.WithContext(c.Request.Context()))
-	if len(dishes) == 0 {
+	result, err := services.RecommendDishes(uid(c), services.RecommendRequest{Count: 1, Source: "app", Mode: "blind_box", Refresh: true, Jitter: true}, database.DB.WithContext(c.Request.Context()))
+	if err != nil || result == nil || len(result.Items) == 0 {
 		utils.NotFound(c, "没有可推荐的菜品")
 		return
 	}
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	// 自建菜谱被抽中的概率高 30%（与推荐引擎的来源权重一致）
-	total := 0.0
-	for _, d := range dishes {
-		total += services.DishSourceWeight(d)
-	}
-	x, idx := r.Float64()*total, len(dishes)-1
-	for i, d := range dishes {
-		if x -= services.DishSourceWeight(d); x < 0 {
-			idx = i
-			break
-		}
-	}
-	dish := dishes[idx]
+	dish := result.Items[0].Dish
 	services.MarkFavorite(uid(c), &dish, database.DB.WithContext(c.Request.Context()))
 
 	hint := "点我揭晓今日惊喜~"
@@ -170,8 +173,7 @@ func PickBlindBox(c *gin.Context) {
 	}
 
 	services.RecordAchievementEvent(uid(c), "blind_box", "", database.DB.WithContext(c.Request.Context()))
-	services.LogBehavior(uid(c), "recommend", dish.ID, dish.Name, "app", "", map[string]any{"mode": "blind_box"}, database.DB.WithContext(c.Request.Context()))
-	utils.Success(c, gin.H{"hint": hint, "dish": dish, "quote": services.GetRandomQuote("", database.DB.WithContext(c.Request.Context()))})
+	utils.Success(c, gin.H{"hint": hint, "dish": dish, "recommendation_id": result.RecommendationID, "session_id": result.SessionID, "quote": services.GetRandomQuote("", database.DB.WithContext(c.Request.Context()))})
 }
 
 func getPickCount(c *gin.Context) int {

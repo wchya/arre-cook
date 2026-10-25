@@ -3,7 +3,7 @@ const session = require("../../utils/session")
 const ui = require("../../utils/ui")
 const media = require("../../utils/media")
 const dishUtil = require("../../utils/dish")
-const fmt = require("../../utils/format")
+const recommendation = require("../../utils/recommendation")
 
 const DEFAULT_TASTES = ["辣", "麻辣", "香辣", "酸辣", "鲜辣", "酸", "甜", "鲜", "清淡", "咸鲜", "蒜香", "酱香"]
 const MOODS = [
@@ -64,10 +64,19 @@ require("../../utils/theme").page({
 
   onLoad() {
     this._rejected = []
+    this._seen = []
+    this._recommendationId = ""
     if (!session.requireLogin("/pages/assistant/assistant")) return
     this.loadProfile()
     this.loadTastes()
   },
+
+  onShow() {
+    this._recommendationHidden = false
+    ;(this.data.items || []).forEach((item) => recommendation.observe(this, `#recommendation-${item.id}`, this._recommendationId, item.id))
+  },
+  onHide() { this._recommendationHidden = true; recommendation.disconnect(this) },
+  onUnload() { recommendation.disconnect(this) },
 
   async loadProfile() {
     try {
@@ -123,7 +132,11 @@ require("../../utils/theme").page({
   onExclude(event) { this.setData({ excludeText: event.detail.value }) },
 
   buildRequest() {
-    const req = { count: 4, mode: "assistant" }
+    const context = JSON.stringify([recommendation.dateKey(), this.data.meal, this.data.mood, this.data.maxCookTime, this.data.includeText, this.data.excludeText, this.data.tasteOptions])
+    const sameContext = this._recommendationContext === context
+    if (!sameContext) this._seen = []
+    this._recommendationContext = context
+    const req = { count: 4, mode: "assistant", meal_date: recommendation.dateKey(), refresh: true, session_id: sameContext ? this._recommendationId || undefined : undefined }
     if (this.data.meal) req.meal_type = this.data.meal
     if (this.data.mood) req.mood = this.data.mood
     const tastes = this.data.tasteOptions.filter((item) => item.on).map((item) => item.name)
@@ -133,7 +146,7 @@ require("../../utils/theme").page({
     if (include.length) req.include_ingredients = include
     const exclude = splitWords(this.data.excludeText)
     if (exclude.length) req.exclude_ingredients = exclude
-    if (this._rejected.length) req.exclude_dish_ids = this._rejected.slice()
+    if (this._rejected.length || this._seen.length) req.exclude_dish_ids = Array.from(new Set(this._rejected.concat(this._seen)))
     return req
   },
 
@@ -143,12 +156,16 @@ require("../../utils/theme").page({
     this.setData({ picking: true })
     try {
       const result = await api.post("/pick/smart", this.buildRequest())
+      this._recommendationId = result.recommendation_id
       this._raw = result.items || []
-      const items = this._raw.map((item) => ({ ...dishUtil.toCard(item.dish), score: Math.round(item.score || 0), reasons: item.reasons || [] }))
-      this.setData({ items, summary: result.profile_summary || "" })
+      this._seen = Array.from(new Set(this._seen.concat(this._raw.map((item) => item.dish.id))))
+      recommendation.disconnect(this)
+      const items = this._raw.map((item) => ({ ...dishUtil.toCard(item.dish), reasons: item.reasons || [] }))
+      this.setData({ items, summary: result.profile_summary || "" }, () => items.forEach((item) => recommendation.observe(this, `#recommendation-${item.id}`, this._recommendationId, item.id)))
       if (!items.length) ui.toast("没有符合条件的菜，放宽一下试试")
       else wx.pageScrollTo({ selector: "#results", offsetTop: -120, duration: 300 })
     } catch (_) {
+      this._recommendationContext = ""
       ui.toast("暂无可推荐的菜品，放宽条件再试")
     } finally {
       this.setData({ picking: false })
@@ -168,11 +185,10 @@ require("../../utils/theme").page({
     if (!item || this.data.busyId) return
     this.setData({ busyId: id })
     try {
-      await api.post("/records", { dish_id: id, dish_name: item.name, meal_type: meal, meal_date: fmt.dateKey() })
-      ui.toast(`❤ 已记录到今日${meal === "lunch" ? "午餐" : "晚餐"}`)
+      await api.post("/meal-plans", { dish_id: id, meal_type: meal, meal_date: recommendation.dateKey(), recommendation_id: this._recommendationId })
+      ui.toast(`❤ 已加入今日${meal === "lunch" ? "午餐" : "晚餐"}`)
       const confetti = this.selectComponent("#confetti")
       if (confetti) confetti.fire()
-      api.behavior({ event_type: "accept", dish_id: id, dish_name: item.name, meta: { from: "assistant", meal_type: meal, score: item.score, client: "miniprogram" } })
     } catch (error) {
       ui.toast(error.message || "记录失败")
     } finally {
@@ -180,15 +196,35 @@ require("../../utils/theme").page({
     }
   },
 
-  reject(event) {
+  async reject(event) {
     const id = Number(event.currentTarget.dataset.id)
+    const kind = event.currentTarget.dataset.kind === "dislike" ? "dislike" : "not_today"
     const item = this.data.items.find((entry) => entry.id === id)
-    if (!item) return
-    ui.haptic()
-    api.behavior({ event_type: "reject", dish_id: id, dish_name: item.name, meta: { from: "assistant", client: "miniprogram" } })
-    this._rejected.push(id)
-    this.setData({ items: this.data.items.filter((entry) => entry.id !== id) })
-    ui.toast("👌 好的，下次少推这道")
+    if (!item || this.data.busyId) return
+    this.setData({ busyId: id })
+    try {
+      await recommendation.feedback(this._recommendationId, id, kind)
+      this._rejected.push(id)
+      this.setData({ items: this.data.items.filter((entry) => entry.id !== id) })
+      if (kind === "dislike") {
+        this._lastDislike = { id, recommendationId: this._recommendationId }
+        this.setData({ canUndoDislike: true })
+        ui.toast("已减少推荐，可以撤销")
+      } else ui.toast("👌 这餐先不推荐这道")
+    } catch (error) { ui.toast(error.message || "反馈保存失败，请重试") }
+    finally { this.setData({ busyId: 0 }) }
+  },
+
+  async undoDislike() {
+    const last = this._lastDislike
+    if (!last || this.data.busyId) return
+    this.setData({ busyId: last.id })
+    try {
+      await recommendation.feedback(last.recommendationId, last.id, "undo_dislike")
+      this.setData({ canUndoDislike: false })
+      ui.toast("已撤销不喜欢")
+    } catch (error) { ui.toast(error.message || "撤销失败，请重试") }
+    finally { this.setData({ busyId: 0 }) }
   },
 
   goChat() { wx.navigateTo({ url: "/pages/chat/chat" }) },

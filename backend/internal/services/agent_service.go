@@ -149,13 +149,17 @@ type ResolveInput struct {
 	MealDate string `json:"meal_date"`
 }
 
-// ResolveSuggestion 用户采纳或忽略建议。采纳时按餐次写入用餐记录；两种结果都回流为行为事件。
-func ResolveSuggestion(uid uint, id any, in ResolveInput, dbs ...*gorm.DB) (created []models.MealRecord, err error) {
+// ResolveSuggestion adds an accepted suggestion to the confirmed menu. Planning
+// never asserts that the user actually ate the dish.
+func ResolveSuggestion(uid uint, id any, in ResolveInput, dbs ...*gorm.DB) (created []models.HealthPlanItem, err error) {
 	requestDB := database.Handle(dbs...)
 
 	var suggestion models.AgentSuggestion
 	var selected []uint
 	err = requestDB.Transaction(func(tx *gorm.DB) error {
+		if e := lockHealthProfileUser(uid, tx); e != nil {
+			return e
+		}
 		if e := tx.Model(&models.AgentSuggestion{}).Where("id = ? AND user_id = ?", id, uid).UpdateColumn("id", gorm.Expr("id")).Error; e != nil {
 			return e
 		}
@@ -191,14 +195,24 @@ func ResolveSuggestion(uid uint, id any, in ResolveInput, dbs ...*gorm.DB) (crea
 		}
 		if in.Accept {
 			mealType := firstNonEmpty(in.MealType, suggestion.MealType)
-			date := firstNonEmpty(in.MealDate, suggestion.MealDate)
+			date, e := NormalizeMealPlanDate(firstNonEmpty(in.MealDate, suggestion.MealDate))
+			if e != nil {
+				return e
+			}
 			if mealType != "" {
+				if e := validateMealPlanSlot(date, mealType); e != nil {
+					return e
+				}
+				blocked, e := loadDietaryExclusions(uid, tx)
+				if e != nil {
+					return e
+				}
 				for _, did := range selected {
-					rec, _, _, e := createMealRecordTx(tx, uid, MealInput{DishID: did, MealType: mealType, MealDate: date})
+					plan, e := acceptMealPlanTx(tx, uid, MealPlanInput{DishID: did, MealType: mealType, MealDate: date, Source: suggestion.Source}, 0, blocked)
 					if e != nil {
 						return e
 					}
-					created = append(created, *rec)
+					created = append(created, plan)
 				}
 			}
 		}
@@ -209,17 +223,20 @@ func ResolveSuggestion(uid uint, id any, in ResolveInput, dbs ...*gorm.DB) (crea
 		if result.RowsAffected != 1 {
 			return errors.New("建议状态已变化")
 		}
+		for _, did := range selected {
+			event := "not_today"
+			if in.Accept {
+				event = "accept"
+			}
+			meta, _ := json.Marshal(map[string]any{"suggestion_id": suggestion.ID})
+			if e := tx.Create(&models.BehaviorEvent{UserID: uid, EventType: event, DishID: did, Source: suggestion.Source, Meta: string(meta)}).Error; e != nil {
+				return e
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-	event := "reject"
-	if in.Accept {
-		event = "accept"
-	}
-	for _, did := range selected {
-		LogBehavior(uid, event, did, "", suggestion.Source, "", map[string]any{"suggestion_id": suggestion.ID}, requestDB)
 	}
 	if len(created) > 0 {
 		QueueAutoAchievementSync(uid)

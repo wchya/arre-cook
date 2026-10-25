@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // 智能体开放接口（/api/agent/*）
@@ -26,7 +27,7 @@ import (
 // 嵌入式会话令牌（App 通过 postMessage 交给内嵌智能体），或用户本人的登录态。
 // 数据只落在该用户上，并受令牌 scopes 限制。工具定义见 internal/agent，与 MCP、站内助手共用。
 
-const agentAPIVersion = "2.0"
+const agentAPIVersion = "2.1"
 
 func principal(c *gin.Context) *auth.Principal { return auth.GetPrincipal(c) }
 
@@ -105,7 +106,7 @@ func GetAgentCapabilities(c *gin.Context) {
 			"difficulty":   []string{"easy", "medium", "hard"},
 			"moods":        []string{"happy", "tired", "lazy", "spicy", "healthy"},
 			"record_moods": gin.H{"values": []string{"yum", "ok", "no"}, "desc": "yum=好吃, ok=一般, no=不想再吃"},
-			"event_types":  []string{"view", "recommend", "accept", "reject", "search", "chat", "feedback", "custom"},
+			"event_types":  []string{"view", "recommend", "impression", "skip", "not_today", "dislike", "undo_dislike", "plan", "accept", "reject", "search", "chat", "feedback", "custom"},
 			"scopes":       auth.ScopeLabels,
 		},
 		"tools": agent.Catalog(p),
@@ -116,6 +117,9 @@ func GetAgentCapabilities(c *gin.Context) {
 			{"method": "GET", "path": "/api/agent/profile", "scope": auth.ScopeProfileRead},
 			{"method": "GET|PUT", "path": "/api/agent/preferences", "scope": auth.ScopeProfileRead + " / " + auth.ScopePreferencesWrite},
 			{"method": "POST", "path": "/api/agent/recommend", "scope": auth.ScopeDishesRead + " + " + auth.ScopeProfileRead},
+			{"method": "POST", "path": "/api/agent/recommendation-feedback", "scope": auth.ScopeBehaviorWrite},
+			{"method": "GET", "path": "/api/agent/meal-plans", "scope": auth.ScopeRecordsRead},
+			{"method": "POST|PUT|DELETE", "path": "/api/agent/meal-plans[/id]", "scope": auth.ScopePlanWrite},
 			{"method": "GET|POST", "path": "/api/agent/records", "scope": auth.ScopeRecordsRead + " / " + auth.ScopeRecordsWrite},
 			{"method": "DELETE", "path": "/api/agent/records/:id", "scope": auth.ScopeRecordsWrite},
 			{"method": "GET", "path": "/api/agent/favorites", "scope": auth.ScopeRecordsRead},
@@ -289,9 +293,10 @@ func AgentRecommend(c *gin.Context) {
 	req.Source = p.Source()
 	req.Actor = p.Actor
 	req.IgnorePreferences = false
+	req.Mode = "agent_rest"
 	result, err := services.RecommendDishes(uid(c), req, database.DB.WithContext(c.Request.Context()))
 	if err != nil {
-		utils.InternalError(c, "推荐失败")
+		utils.BadRequest(c, err.Error())
 		return
 	}
 	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "recommend", Status: "ok"}, database.DB.WithContext(c.Request.Context()))
@@ -401,9 +406,26 @@ func CreateAgentRecords(c *gin.Context) {
 	}
 	p := principal(c)
 	created := make([]models.MealRecord, 0, len(list))
+	planned := make([]models.HealthPlanItem, 0)
 	errs := make([]string, 0)
 	for _, in := range list {
-		rec, err := services.CreateMealRecord(uid(c), in, p.Source(), firstNonEmpty(req.Actor, p.Actor), database.DB.WithContext(c.Request.Context()))
+		if date, err := services.NormalizeMealPlanDate(in.MealDate); err == nil && date > services.Today() && !p.Can(auth.ScopePlanWrite) {
+			utils.Forbidden(c, "未来餐次需要 plan:write 权限，请改用菜单计划接口")
+			return
+		}
+	}
+	for _, in := range list {
+		rec, err := services.CreateMealRecord(uid(c), in, p.Source(), p.Actor, database.DB.WithContext(c.Request.Context()))
+		if errors.Is(err, services.ErrFutureMealUsePlan) {
+			date, _ := services.NormalizeMealPlanDate(in.MealDate)
+			plan, planErr := services.AcceptMealPlan(uid(c), services.MealPlanInput{DishID: in.DishID, MealDate: date, MealType: in.MealType, Source: p.Source(), Actor: p.Actor}, database.DB.WithContext(c.Request.Context()))
+			if planErr != nil {
+				errs = append(errs, planErr.Error())
+			} else {
+				planned = append(planned, *plan)
+			}
+			continue
+		}
 		if err != nil {
 			errs = append(errs, err.Error())
 			continue
@@ -411,7 +433,7 @@ func CreateAgentRecords(c *gin.Context) {
 		created = append(created, *rec)
 	}
 	services.WriteAudit(services.AuditEntry{UserID: uid(c), TokenID: p.TokenID, Actor: p.Actor, Channel: "rest", Tool: "log_meal", Args: list, Status: "ok"}, database.DB.WithContext(c.Request.Context()))
-	utils.Success(c, gin.H{"created": created, "skipped": len(list) - len(created), "total": len(list), "errors": errs})
+	utils.Success(c, gin.H{"created": created, "planned": planned, "skipped": len(list) - len(created) - len(planned), "total": len(list), "errors": errs})
 }
 
 func firstNonEmpty(values ...string) string {
@@ -482,12 +504,20 @@ func CreateAgentBehavior(c *gin.Context) {
 	}
 	p := principal(c)
 	saved := 0
-	for _, e := range list {
-		if !services.IsValidEventType(e.EventType) {
-			continue
+	if err := database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		for _, e := range list {
+			if !services.IsValidEventType(e.EventType) {
+				continue
+			}
+			if err := writeTransportBehavior(uid(c), e, p.Source(), p.Actor, tx); err != nil {
+				return err
+			}
+			saved++
 		}
-		services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, p.Source(), firstNonEmpty(e.Actor, p.Actor), e.Meta, database.DB.WithContext(c.Request.Context()))
-		saved++
+		return nil
+	}); err != nil {
+		utils.BadRequest(c, err.Error())
+		return
 	}
 	utils.Success(c, gin.H{"saved": saved})
 }
@@ -499,8 +529,34 @@ func CreateAppBehavior(c *gin.Context) {
 		utils.BadRequest(c, "请求数据无效")
 		return
 	}
-	services.LogBehavior(uid(c), e.EventType, e.DishID, e.DishName, "app", "", e.Meta, database.DB.WithContext(c.Request.Context()))
+	if err := writeTransportBehavior(uid(c), e, "app", "", database.DB.WithContext(c.Request.Context())); err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
 	utils.Success(c, nil)
+}
+
+// Legacy behavior endpoints remain usable, but cannot forge the new attributed
+// event stream or its session associations.
+func writeTransportBehavior(userID uint, e behaviorInput, source, actor string, db *gorm.DB) error {
+	recommendationID, _ := e.Meta["recommendation_id"].(string)
+	switch e.EventType {
+	case "plan":
+		return errors.New("请使用菜单计划接口加入菜品")
+	case "impression", "skip", "not_today", "dislike", "undo_dislike":
+		requestKey, _ := e.Meta["request_key"].(string)
+		note, _ := e.Meta["note"].(string)
+		_, err := services.RecordRecommendationFeedback(userID, services.RecommendationFeedbackInput{RecommendationID: recommendationID, DishID: e.DishID, EventType: e.EventType, RequestKey: requestKey, Note: note}, source, actor, db)
+		return err
+	case "accept":
+		if recommendationID != "" {
+			requestKey, _ := e.Meta["request_key"].(string)
+			_, err := services.RecordRecommendationFeedback(userID, services.RecommendationFeedbackInput{RecommendationID: recommendationID, DishID: e.DishID, EventType: "accept", RequestKey: requestKey}, source, actor, db)
+			return err
+		}
+	}
+	services.LogBehavior(userID, e.EventType, e.DishID, e.DishName, source, actor, e.Meta, db)
+	return nil
 }
 
 // GetAgentBehavior GET /api/agent/behavior
@@ -761,7 +817,7 @@ func ResolveMySuggestion(c *gin.Context) {
 		return
 	}
 	if created == nil {
-		created = []models.MealRecord{}
+		created = []models.HealthPlanItem{}
 	}
-	utils.Success(c, gin.H{"created": created})
+	utils.Success(c, gin.H{"created": created, "planned": true})
 }

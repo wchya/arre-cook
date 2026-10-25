@@ -74,14 +74,22 @@ type TasteProfile struct {
 	Preferences      Preferences     `json:"preferences"`
 	Summary          string          `json:"summary"`
 
-	tasteWeightMap    map[string]float64
-	categoryWeightMap map[string]float64
-	favoriteSet       map[uint]bool
-	likedSet          map[uint]bool
-	dislikedSet       map[uint]bool
-	eatenCount        map[uint]int
-	viewCount         map[uint]int
-	rejectCount       map[uint]int
+	tasteWeightMap      map[string]float64
+	categoryWeightMap   map[string]float64
+	favoriteSet         map[uint]bool
+	likedSet            map[uint]bool
+	dislikedSet         map[uint]bool
+	eatenCount          map[uint]int
+	viewCount           map[uint]int
+	rejectCount         map[uint]int
+	dishEvidence        map[uint]*affinityEvidence
+	tasteNegative       map[string]float64
+	categoryNegative    map[string]float64
+	notToday            map[uint]bool
+	loadErr             error
+	ingredientNegative  map[string]float64
+	ingredientWeightMap map[string]float64
+	recentMainCounts    map[string]int
 }
 
 func normalizeProfileDays(days int) int {
@@ -99,55 +107,69 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 	requestDB := database.Handle(dbs...)
 
 	days = normalizeProfileDays(days)
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	now := recommendationNow()
+	today := recommendationDay(now)
 	repeatDays := UserRepeatDays(uid, requestDB)
 
 	p := &TasteProfile{
-		GeneratedAt:       now.Format(time.RFC3339),
-		WindowDays:        days,
-		RepeatDays:        repeatDays,
-		MealTypeCounts:    map[string]int{},
-		TasteWeights:      []WeightItem{},
-		CategoryWeights:   []WeightItem{},
-		DifficultyCounts:  map[string]int{},
-		TopIngredients:    []WeightItem{},
-		TopDishes:         []DishFrequency{},
-		RecentDishIDs:     []uint{},
-		LastEaten:         map[uint]string{},
-		FavoriteDishes:    []DishBrief{},
-		LikedDishes:       []DishBrief{},
-		DislikedDishes:    []DishBrief{},
-		MoodCounts:        map[string]int{},
-		HomeMoodCounts:    map[string]int{},
-		BehaviorCounts:    map[string]int{},
-		RejectedDishes:    []DishFrequency{},
-		MostViewedDishes:  []DishFrequency{},
-		Preferences:       GetPreferences(uid, requestDB),
-		tasteWeightMap:    map[string]float64{},
-		categoryWeightMap: map[string]float64{},
-		favoriteSet:       map[uint]bool{},
-		likedSet:          map[uint]bool{},
-		dislikedSet:       map[uint]bool{},
-		eatenCount:        map[uint]int{},
-		viewCount:         map[uint]int{},
-		rejectCount:       map[uint]int{},
+		GeneratedAt:         now.Format(time.RFC3339),
+		WindowDays:          days,
+		RepeatDays:          repeatDays,
+		MealTypeCounts:      map[string]int{},
+		TasteWeights:        []WeightItem{},
+		CategoryWeights:     []WeightItem{},
+		DifficultyCounts:    map[string]int{},
+		TopIngredients:      []WeightItem{},
+		TopDishes:           []DishFrequency{},
+		RecentDishIDs:       []uint{},
+		LastEaten:           map[uint]string{},
+		FavoriteDishes:      []DishBrief{},
+		LikedDishes:         []DishBrief{},
+		DislikedDishes:      []DishBrief{},
+		MoodCounts:          map[string]int{},
+		HomeMoodCounts:      map[string]int{},
+		BehaviorCounts:      map[string]int{},
+		RejectedDishes:      []DishFrequency{},
+		MostViewedDishes:    []DishFrequency{},
+		Preferences:         GetPreferences(uid, requestDB),
+		tasteWeightMap:      map[string]float64{},
+		categoryWeightMap:   map[string]float64{},
+		favoriteSet:         map[uint]bool{},
+		likedSet:            map[uint]bool{},
+		dislikedSet:         map[uint]bool{},
+		eatenCount:          map[uint]int{},
+		viewCount:           map[uint]int{},
+		rejectCount:         map[uint]int{},
+		dishEvidence:        map[uint]*affinityEvidence{},
+		tasteNegative:       map[string]float64{},
+		categoryNegative:    map[string]float64{},
+		notToday:            map[uint]bool{},
+		ingredientNegative:  map[string]float64{},
+		ingredientWeightMap: map[string]float64{},
+		recentMainCounts:    map[string]int{},
 	}
 
 	var allDishes []models.Dish
-	requestDB.Unscoped().Scopes(database.VisibleDishes(uid)).
+	if err := requestDB.Unscoped().Scopes(database.VisibleDishes(uid)).
 		Select("id", "name", "category", "taste", "ingredients", "seasonings", "cook_time", "difficulty", "owner_id", "deleted_at").
-		Find(&allDishes)
+		Find(&allDishes).Error; err != nil {
+		p.loadErr = err
+		return p
+	}
 	dishByID := make(map[uint]models.Dish, len(allDishes))
 	for _, d := range allDishes {
 		dishByID[d.ID] = d
 	}
 
 	var records []models.MealRecord
-	requestDB.Scopes(database.OwnedBy(uid)).
+	if err := requestDB.Scopes(database.OwnedBy(uid)).
 		Select("id", "dish_id", "dish_name", "meal_type", "meal_date", "rating", "mood", "created_at").
-		Order("meal_date ASC, created_at ASC").
-		Find(&records)
+		Where("meal_date <= ?", today.Format("2006-01-02")).
+		Order("meal_date ASC, created_at ASC, id ASC").
+		Find(&records).Error; err != nil {
+		p.loadErr = err
+		return p
+	}
 	p.TotalRecords = len(records)
 
 	tasteAcc := map[string]float64{}
@@ -165,14 +187,13 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 		if r.MealDate > p.LastEaten[r.DishID] {
 			p.LastEaten[r.DishID] = r.MealDate
 		}
-		date, ok := parseMealDate(r.MealDate)
-		if !ok {
+		date, dateErr := time.ParseInLocation("2006-01-02", r.MealDate, recommendationLocation)
+		if dateErr != nil {
 			continue
 		}
 		age := today.Sub(date).Hours() / 24
 		if age < 0 {
-			// 明日菜单等未来日期的记录，按“今天”对待
-			age = 0
+			continue // An intention to eat is not evidence of eating or liking.
 		}
 		if age > float64(days) {
 			continue
@@ -184,30 +205,22 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 			p.MoodCounts[r.Mood]++
 		}
 
-		w := 1.0
-		switch r.Mood {
-		case "yum", "great":
-			w += 0.8
-		case "no", "meh":
-			w -= 0.7
+		value, strength := mealSatisfaction(r)
+		decay := math.Pow(0.5, age/profileHalfLife)
+		p.addDishEvidence(r.DishID, value, strength*decay)
+		// Explicit poor ratings contribute negative evidence rather than a
+		// smaller positive vote for the same taste/cuisine.
+		w := (value - 50) / 50 * strength * decay
+		if strength < 1 {
+			w = 0.25 * decay
 		}
-		if r.Rating > 0 {
-			w += float64(r.Rating-3) * 0.25
-		}
-		if w < 0.15 {
-			w = 0.15
-		}
-		w *= math.Pow(0.5, age/profileHalfLife)
-		weightSum += w
-
-		// 喜好判定以最新一次记录为准
-		if r.Mood == "yum" || r.Mood == "great" || r.Rating >= 4 {
+		weightSum += math.Max(0, w)
+		delete(p.likedSet, r.DishID)
+		delete(p.dislikedSet, r.DishID)
+		if value >= 75 && strength >= 1 {
 			p.likedSet[r.DishID] = true
-			delete(p.dislikedSet, r.DishID)
-		}
-		if r.Mood == "no" || r.Mood == "meh" || (r.Rating > 0 && r.Rating <= 2) {
+		} else if value <= 25 && strength >= 1 {
 			p.dislikedSet[r.DishID] = true
-			delete(p.likedSet, r.DishID)
 		}
 
 		d, found := dishByID[r.DishID]
@@ -215,11 +228,19 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 			continue
 		}
 		for _, t := range tasteTokens(d.Taste) {
-			tasteAcc[t] += w
+			if w < 0 {
+				p.tasteNegative[t] += -w
+			} else {
+				tasteAcc[t] += w
+			}
 			tasteCnt[t]++
 		}
 		if c := strings.TrimSpace(d.Category); c != "" {
-			catAcc[c] += w
+			if w < 0 {
+				p.categoryNegative[c] += -w
+			} else {
+				catAcc[c] += w
+			}
 			catCnt[c]++
 		}
 		if d.Difficulty != "" {
@@ -230,11 +251,22 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 			cookN++
 		}
 		if isSpicyDish(d) {
-			spicyAcc += w
+			spicyAcc += math.Max(0, w)
 		}
 		for _, name := range ingredientNames(d.Ingredients) {
-			ingAcc[name] += w
+			name = canonicalIngredient(name)
+			if w < 0 {
+				p.ingredientNegative[name] += -w
+			} else {
+				ingAcc[name] += w
+			}
 			ingCnt[name]++
+		}
+		if age <= 7 {
+			f := dishFeatures(d)
+			if f.Main != "" {
+				p.recentMainCounts[f.Main]++
+			}
 		}
 	}
 
@@ -252,7 +284,7 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 	}
 	p.TasteWeights, p.tasteWeightMap = normalizeWeights(tasteAcc, tasteCnt, 10)
 	p.CategoryWeights, p.categoryWeightMap = normalizeWeights(catAcc, catCnt, 8)
-	p.TopIngredients, _ = normalizeWeights(ingAcc, ingCnt, 12)
+	p.TopIngredients, p.ingredientWeightMap = normalizeWeights(ingAcc, ingCnt, 12)
 
 	for id, cnt := range p.eatenCount {
 		name := ""
@@ -272,13 +304,98 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 	sort.Slice(p.RecentDishIDs, func(i, j int) bool { return p.RecentDishIDs[i] < p.RecentDishIDs[j] })
 
 	var favorites []models.Favorite
-	requestDB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Find(&favorites)
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Order("created_at DESC").Find(&favorites).Error; err != nil {
+		p.loadErr = err
+		return p
+	}
 	for _, f := range favorites {
 		p.favoriteSet[f.DishID] = true
 		if d, ok := dishByID[f.DishID]; ok && !d.DeletedAt.Valid {
 			p.FavoriteDishes = append(p.FavoriteDishes, briefOf(d))
 		}
 	}
+
+	since := today.AddDate(0, 0, -days)
+	var ratings []models.DayRating
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Select("home_mood", "mood", "meal_date").
+		Where("meal_date >= ?", since.Format("2006-01-02")).
+		Find(&ratings).Error; err != nil {
+		p.loadErr = err
+		return p
+	}
+	for _, r := range ratings {
+		if r.HomeMood != "" {
+			p.HomeMoodCounts[r.HomeMood]++
+		}
+	}
+
+	var events []models.BehaviorEvent
+	if err := requestDB.Scopes(database.OwnedBy(uid)).Select("id", "event_type", "dish_id", "meta", "created_at").Where("created_at >= ?", since).Order("created_at ASC, id ASC").Find(&events).Error; err != nil {
+		p.loadErr = err
+		return p
+	}
+	rejectSince := now.AddDate(0, 0, -1)
+	dislikeEvents := map[uint]models.BehaviorEvent{}
+	for _, e := range events {
+		p.BehaviorCounts[e.EventType]++
+		if e.DishID == 0 {
+			continue
+		}
+		switch e.EventType {
+		case "view":
+			p.viewCount[e.DishID]++
+		case "reject":
+			// Legacy reject also meant “show me another”; only weak, one-day fatigue.
+			if e.CreatedAt.After(rejectSince) {
+				p.rejectCount[e.DishID]++
+			}
+		case "not_today":
+			if e.CreatedAt.In(recommendationLocation).Format("2006-01-02") == today.Format("2006-01-02") {
+				p.notToday[e.DishID] = true
+			}
+		case "dislike":
+			dislikeEvents[e.DishID] = e
+		case "undo_dislike":
+			delete(dislikeEvents, e.DishID)
+		}
+	}
+	for dishID, e := range dislikeEvents {
+		age := today.Sub(recommendationDay(e.CreatedAt)).Hours() / 24
+		p.addDishEvidence(dishID, 0, 4*math.Pow(0.5, math.Max(0, age)/profileHalfLife))
+		p.dislikedSet[dishID] = true
+		delete(p.likedSet, dishID)
+	}
+	// A served batch is not an impression; only attributed, visible cards form
+	// the denominator. Reliable feedback is idempotent in the feedback service.
+	impressions, accepts := map[string]bool{}, map[string]bool{}
+	for _, e := range events {
+		var meta struct {
+			RecommendationID string `json:"recommendation_id"`
+		}
+		_ = json.Unmarshal([]byte(e.Meta), &meta)
+		if meta.RecommendationID == "" || e.DishID == 0 {
+			continue
+		}
+		key := fmt.Sprintf("%s:%d", meta.RecommendationID, e.DishID)
+		if e.EventType == "impression" {
+			impressions[key] = true
+		}
+		if e.EventType == "accept" {
+			accepts[key] = true
+		}
+	}
+	if len(impressions) > 0 {
+		n := 0
+		for key := range accepts {
+			if impressions[key] {
+				n++
+			}
+		}
+		p.AcceptRate = math.Round(float64(n)/float64(len(impressions))*100) / 100
+	}
+
+	p.LikedDishes = []DishBrief{}
+	p.DislikedDishes = []DishBrief{}
 	for id := range p.likedSet {
 		if d, ok := dishByID[id]; ok && !d.DeletedAt.Valid {
 			p.LikedDishes = append(p.LikedDishes, briefOf(d))
@@ -291,42 +408,6 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 	}
 	sortBriefs(p.LikedDishes)
 	sortBriefs(p.DislikedDishes)
-
-	since := today.AddDate(0, 0, -days)
-	var ratings []models.DayRating
-	requestDB.Scopes(database.OwnedBy(uid)).Select("home_mood", "mood", "meal_date").
-		Where("meal_date >= ?", since.Format("2006-01-02")).
-		Find(&ratings)
-	for _, r := range ratings {
-		if r.HomeMood != "" {
-			p.HomeMoodCounts[r.HomeMood]++
-		}
-	}
-
-	var events []models.BehaviorEvent
-	requestDB.Scopes(database.OwnedBy(uid)).Select("event_type", "dish_id", "created_at").Where("created_at >= ?", since).Find(&events)
-	rejectSince := now.AddDate(0, 0, -30)
-	for _, e := range events {
-		p.BehaviorCounts[e.EventType]++
-		if e.DishID == 0 {
-			continue
-		}
-		switch e.EventType {
-		case "view":
-			p.viewCount[e.DishID]++
-		case "reject":
-			// 近 30 天的“不想吃”才影响推荐，避免一次拒绝永久打入冷宫
-			if e.CreatedAt.After(rejectSince) {
-				p.rejectCount[e.DishID]++
-			}
-		}
-	}
-	if rec := p.BehaviorCounts["recommend"]; rec > 0 {
-		p.AcceptRate = math.Round(float64(p.BehaviorCounts["accept"])/float64(rec)*100) / 100
-		if p.AcceptRate > 1 {
-			p.AcceptRate = 1
-		}
-	}
 	p.MostViewedDishes = frequencyList(p.viewCount, dishByID, p.LastEaten, 8)
 	p.RejectedDishes = frequencyList(p.rejectCount, dishByID, p.LastEaten, 8)
 

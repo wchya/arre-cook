@@ -166,7 +166,7 @@ func init() {
 	register(&Tool{
 		Name:        "recommend_dishes",
 		Title:       "智能推荐",
-		Description: "调用站内推荐引擎：按用户口味画像 + 显式偏好（过敏原/忌口硬过滤）+ 你给的约束打分，自动避开最近吃过的菜并保证菜系多样，返回带推荐理由的菜品。给用户推荐菜时优先使用它，而不是自己编菜名。",
+		Description: "调用统一推荐引擎：遵守过敏、忌口和排除条件，结合个人喜好、当餐需求、近期食用、做饭便利和整餐搭配选菜。返回 recommendation_id/session_id、有效日期和推荐理由；score 为兼容保留的内部排序分，不是概率或营养评价，不向用户展示。只有实际向用户展示的菜才用 recommendation_feedback 记录 impression；准备吃用 plan_meal，已吃过用 log_meal。换批传 session_id 和 refresh=true。",
 		Scope:       auth.ScopeDishesRead,
 		Scopes:      []string{auth.ScopeDishesRead, auth.ScopeProfileRead},
 		Schema: object(map[string]any{
@@ -181,6 +181,12 @@ func init() {
 			"include_ingredients": strArray("必须用到的食材"),
 			"exclude_ingredients": strArray("本次额外排除的食材"),
 			"exclude_dish_ids":    intArray("排除的菜品 ID（如用户刚拒绝的）"),
+			"meal_date":           str("推荐用于哪一天，YYYY-MM-DD，默认北京时间今天"),
+			"session_id":          str("上次返回的 session_id；连续换菜时复用"),
+			"refresh":             boolean("主动换一批；排除同一会话已展示或跳过的菜"),
+			"selected_dish_ids":   intArray("这餐已经选好的菜品 ID，用于搭配与排重"),
+			"exclude_recent_days": integer("近期食用冷却天数，0 不限制，默认个人设置", 0, 365),
+			"diversity":           boolean("是否考虑菜系、主食材和做法多样性，默认 true"),
 		}),
 		Handler: func(ctx *Ctx, args json.RawMessage) (any, error) {
 			req, err := decode[services.RecommendRequest](args)
@@ -195,9 +201,10 @@ func init() {
 			}
 			items := make([]map[string]any, 0, len(res.Items))
 			for _, it := range res.Items {
-				items = append(items, map[string]any{"dish": services.ToDishCard(it.Dish), "score": it.Score, "reasons": it.Reasons})
+				items = append(items, map[string]any{"dish": services.ToDishCard(it.Dish), "score": it.Score, "item_id": it.ItemID, "reasons": it.Reasons})
 			}
-			return map[string]any{"items": items, "candidate_count": res.CandidateCount, "profile_summary": res.ProfileSummary, "applied": res.Applied}, nil
+			return map[string]any{"items": items, "candidate_count": res.CandidateCount, "profile_summary": res.ProfileSummary, "applied": res.Applied,
+				"recommendation_id": res.RecommendationID, "session_id": res.SessionID, "served_for_date": res.ServedForDate, "meal_type": res.MealType, "algorithm_version": res.AlgorithmVersion}, nil
 		},
 	})
 
@@ -259,7 +266,7 @@ func init() {
 	register(&Tool{
 		Name:        "log_meal",
 		Title:       "记一餐",
-		Description: "把一道菜记入用户某天的早餐、午餐或晚餐（同时生成买菜清单）。仅在用户明确说“就吃这个/帮我记上/记一下”时调用。meal_date 可用 YYYY-MM-DD、today、tomorrow。",
+		Description: "记录用户已经实际吃过的一道菜（同时维护买菜清单）。仅在用户明确说“已经吃了/帮我记录刚吃的”时调用；准备吃、今晚吃、明天吃请用 plan_meal。未来日期的旧调用兼容转为计划，返回 planned=true，不写入真实用餐记录。",
 		Scope:       auth.ScopeRecordsWrite,
 		Write:       true,
 		Schema: object(map[string]any{
@@ -273,6 +280,16 @@ func init() {
 			in, err := decode[services.MealInput](args)
 			if err != nil {
 				return nil, err
+			}
+			if date, err := services.NormalizeMealPlanDate(in.MealDate); err == nil && date > services.Today() {
+				if !ctx.Principal.Can(auth.ScopePlanWrite) {
+					return nil, ErrForbidden{Scope: auth.ScopePlanWrite}
+				}
+				plan, err := services.AcceptMealPlan(ctx.UID(), services.MealPlanInput{DishID: in.DishID, MealType: in.MealType, MealDate: date, Source: ctx.Source(), Actor: actorName(ctx)}, database.DB.WithContext(ctx.Context))
+				if err != nil {
+					return nil, err
+				}
+				return map[string]any{"planned": true, "plan_id": plan.ID, "dish_id": plan.DishID, "dish_name": plan.DishName, "meal_type": plan.MealType, "meal_date": plan.MealDate}, nil
 			}
 			rec, err := services.CreateMealRecord(ctx.UID(), in, ctx.Source(), actorName(ctx), database.DB.WithContext(ctx.Context))
 			if err != nil {
@@ -486,25 +503,29 @@ func init() {
 	register(&Tool{
 		Name:        "log_feedback",
 		Title:       "记录反馈",
-		Description: "记录用户对某道菜的反馈，用于改进推荐：reject=不想吃/被拒绝，feedback=一般反馈，view=看过。例如用户说“最近不想吃鱼香肉丝”。",
+		Description: "兼容旧版菜品反馈。reject按今天不想吃处理，不能代表长期不喜欢；长期明确不喜欢用dislike，撤销用undo_dislike。对一次推荐的展示、换菜和反馈优先使用recommendation_feedback并携带recommendation_id，便于幂等与归因。不要推测用户意见。",
 		Scope:       auth.ScopeBehaviorWrite,
 		Write:       true,
 		Schema: object(map[string]any{
-			"event_type": str("事件类型", "reject", "feedback", "view", "search", "chat", "custom"),
-			"dish_id":    integer("菜品 ID（可选）", 0, 1<<31-1),
-			"note":       str("用户原话或说明"),
+			"event_type":        str("事件类型", "reject", "not_today", "dislike", "undo_dislike", "skip", "impression", "feedback", "view", "search", "chat", "custom"),
+			"dish_id":           integer("菜品 ID（可选）", 0, 1<<31-1),
+			"note":              str("用户原话或说明"),
+			"recommendation_id": str("关联的推荐ID，可选"),
+			"request_key":       str("幂等动作键，可选"),
 		}, "event_type"),
 		Handler: func(ctx *Ctx, args json.RawMessage) (any, error) {
-			in, err := decode[struct {
-				EventType string `json:"event_type"`
-				DishID    uint   `json:"dish_id"`
-				Note      string `json:"note"`
-			}](args)
+			in, err := decode[services.RecommendationFeedbackInput](args)
 			if err != nil {
 				return nil, err
 			}
 			if !services.IsValidEventType(in.EventType) {
 				return nil, errors.New("event_type 无效")
+			}
+			if in.EventType == "reject" {
+				in.EventType = "not_today"
+			}
+			if in.RecommendationID != "" || in.EventType == "dislike" || in.EventType == "undo_dislike" || in.EventType == "impression" || in.EventType == "skip" {
+				return services.RecordRecommendationFeedback(ctx.UID(), in, ctx.Source(), actorName(ctx), database.DB.WithContext(ctx.Context))
 			}
 			services.LogBehavior(ctx.UID(), in.EventType, in.DishID, "", ctx.Source(), actorName(ctx), map[string]any{"note": in.Note}, database.DB.WithContext(ctx.Context))
 			return map[string]any{"ok": true}, nil
@@ -514,7 +535,7 @@ func init() {
 	register(&Tool{
 		Name:  "create_suggestion",
 		Title: "推送推荐建议",
-		Description: "向用户的「AI 建议」收件箱推送一条推荐（例如“明晚试试这两道”），用户在 App 里一键采纳（自动记入对应餐次）或忽略，结果会回流为行为数据。" +
+		Description: "向用户的「AI 建议」收件箱推送一条推荐（例如“明晚试试这两道”），用户在 App 里一键采纳（加入对应餐次计划）或忽略，结果会回流为行为数据。" +
 			"外部智能体做推荐管理时优先用它，而不是直接改用户的记录。",
 		Scope: auth.ScopeSuggestionsWrite,
 		Write: true,
@@ -615,5 +636,5 @@ func compactPlan(plan *services.WeekPlan) any {
 	for _, d := range plan.Days {
 		days = append(days, map[string]any{"date": d.Date, "day": d.DayName, "breakfast": names(d.Breakfast), "lunch": names(d.Lunch), "dinner": names(d.Dinner)})
 	}
-	return map[string]any{"days": days}
+	return map[string]any{"days": days, "algorithm_version": plan.AlgorithmVersion}
 }

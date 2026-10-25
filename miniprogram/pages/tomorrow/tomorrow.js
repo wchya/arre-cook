@@ -4,6 +4,7 @@ const ui = require("../../utils/ui")
 const media = require("../../utils/media")
 const dishUtil = require("../../utils/dish")
 const fmt = require("../../utils/format")
+const recommendation = require("../../utils/recommendation")
 
 const MAX_PER_MEAL = 5
 const DEFAULT_TARGETS = { lunch: 2, dinner: 2 }
@@ -20,13 +21,13 @@ const MEAL_META = {
 }
 
 function tomorrow() {
-  const d = fmt.addDays(new Date(), 1)
-  const key = fmt.dateKey(d)
-  return { key, label: `${key.slice(5)} ${fmt.WEEKDAYS[d.getDay()]}` }
+  const key = recommendation.dateKey(new Date(Date.now() + 86400000))
+  return { key, label: `${key.slice(5)} ${fmt.WEEKDAYS[new Date(`${key}T00:00:00Z`).getUTCDay()]}` }
 }
 
 function planCard(dish) {
   const card = dishUtil.toCard(dish)
+  card.recommendation_id = dish.recommendation_id
   card.diffLabel = dish.difficulty === "hard" ? "费点劲" : card.diffLabel
   card.timeText = card.cookTime > 0 ? `${card.cookTime}分钟` : "时间未填"
   return card
@@ -35,6 +36,7 @@ function planCard(dish) {
 function recordCard(record) {
   return {
     id: record.dish_id,
+    recommendation_id: record.recommendation_id,
     name: record.dish_name,
     category: "",
     cookTime: 0,
@@ -101,10 +103,21 @@ require("../../utils/theme").page({
     this.init()
   },
 
+  onShow() { this._recommendationHidden = false; if (this._plan) this.observePlan() },
+  onHide() { this._recommendationHidden = true; recommendation.disconnect(this) },
+  onUnload() { recommendation.disconnect(this) },
+
+  observePlan() {
+    recommendation.disconnect(this)
+    for (const meal of ["lunch", "dinner"]) {
+      this._plan[meal].forEach((dish) => recommendation.observe(this, `#planned-${meal}-${dish.id}`, dish.recommendation_id, dish.id))
+    }
+  },
+
   async init() {
     try {
-      const result = await api.get("/records", { date_from: this.data.dateKey, date_to: this.data.dateKey, pageSize: 100 })
-      const records = result.items || []
+      const result = await api.get("/meal-plans", { date_from: this.data.dateKey, date_to: this.data.dateKey })
+      const records = result || []
       this._original = records
       if (records.length) {
         this._plan.lunch = mealRecords(records, "lunch").map(recordCard)
@@ -149,7 +162,7 @@ require("../../utils/theme").page({
       dinnerMinutes: minutes(dinner),
       hasSaved,
       hasChanges: currentKey !== recordsKey(this._original),
-    })
+    }, () => this.observePlan())
     if (this.data.pickerOpen) this.renderPicker()
   },
 
@@ -158,7 +171,7 @@ require("../../utils/theme").page({
   async request(meal, count, excludeIds) {
     if (count <= 0) return []
     const result = await api.post("/pick/tomorrow", { meal_type: meal, profile: this.data.profile, count, exclude_ids: excludeIds || [] })
-    return (result.dishes || []).map(planCard)
+    return (result.dishes || []).map((dish) => planCard({ ...dish, recommendation_id: result.recommendation_id }))
   },
 
   async generateAll() {
@@ -359,12 +372,14 @@ require("../../utils/theme").page({
     const wasSaved = this.data.hasSaved
     this.setData({ saving: true })
     try {
-      await Promise.all(this._original.map((record) => api.delete(`/records/${record.id}`).catch(() => null)))
-      const records = []
-      lunch.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "lunch", meal_date: this.data.dateKey }))
-      dinner.forEach((dish) => records.push({ dish_id: dish.id, dish_name: dish.name, meal_type: "dinner", meal_date: this.data.dateKey }))
-      const result = await api.post("/records/batch", { records })
-      this._original = result.created || []
+      const created = []
+      for (const meal of ["lunch", "dinner"]) {
+        const recommendationIds = {}
+        this._plan[meal].forEach((dish) => { if (dish.recommendation_id) recommendationIds[dish.id] = dish.recommendation_id })
+        const result = await api.put("/meal-plans", { meal_date: this.data.dateKey, meal_type: meal, dish_ids: this._plan[meal].map((dish) => dish.id), recommendation_ids: recommendationIds })
+        created.push(...(result || []))
+      }
+      this._original = created
       this.render()
       const confetti = this.selectComponent("#confetti")
       if (confetti) confetti.fire()

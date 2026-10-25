@@ -23,9 +23,10 @@ export default function Suggestions() {
     },
     onSuccess: (_result, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["suggestions"] })
-      void queryClient.invalidateQueries({ queryKey: ["records"] })
+      void queryClient.invalidateQueries({ queryKey: ["meal-plans"] })
       void queryClient.invalidateQueries({ queryKey: ["stats"] })
-      toast.success(variables.accept ? "已加入用餐记录" : "已忽略这条建议")
+      void queryClient.invalidateQueries({ queryKey: ["week-plan"] })
+      toast.success(variables.accept ? "已加入菜单，吃过后再记餐" : "已忽略这条建议")
     },
     onError: (error) => toast.error(errorMessage(error, "操作失败")),
   })
@@ -62,8 +63,8 @@ export default function Suggestions() {
               {suggestion.dishes.map((dish) => <button key={dish.id} onClick={() => navigate(`/dishes/${dish.id}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-bg/70"><span className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-bg"><DishImage dish={dish} className="h-full w-full" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{dish.name}</span><span className="text-[11px] text-text3">{dish.category} · {dish.cook_time || "-"} 分钟</span></span></button>)}
             </div>}
             {suggestion.status === "pending" && <div className="grid grid-cols-2 gap-2 p-3">
-              <button onClick={() => resolveMutation.mutate({ id: suggestion.id, accept: true, meal_type: "lunch" })} disabled={resolveMutation.isPending || suggestion.dishes.length === 0} className="flex h-10 items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-semibold text-white disabled:opacity-50"><Check size={14} />记为午餐</button>
-              <button onClick={() => resolveMutation.mutate({ id: suggestion.id, accept: true, meal_type: "dinner" })} disabled={resolveMutation.isPending || suggestion.dishes.length === 0} className="flex h-10 items-center justify-center gap-1.5 rounded-md bg-mint text-xs font-semibold text-white disabled:opacity-50"><Check size={14} />记为晚餐</button>
+              <button onClick={() => resolveMutation.mutate({ id: suggestion.id, accept: true, meal_type: "lunch" })} disabled={resolveMutation.isPending || suggestion.dishes.length === 0} className="flex h-10 items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-semibold text-white disabled:opacity-50"><Check size={14} />加入午餐菜单</button>
+              <button onClick={() => resolveMutation.mutate({ id: suggestion.id, accept: true, meal_type: "dinner" })} disabled={resolveMutation.isPending || suggestion.dishes.length === 0} className="flex h-10 items-center justify-center gap-1.5 rounded-md bg-mint text-xs font-semibold text-white disabled:opacity-50"><Check size={14} />加入晚餐菜单</button>
             </div>}
           </article>
         ))}

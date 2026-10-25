@@ -65,7 +65,7 @@ require("../../utils/theme").page({
     this.setData({ busyId: id })
     try {
       await api.post(`/suggestions/${id}/resolve`, accept ? { accept: true, meal_type: meal, dish_ids: item.dishes.map((dish) => dish.id) } : { accept: false })
-      ui.toast(accept ? "已加入用餐记录" : "已忽略这条建议", accept ? "success" : "")
+      ui.toast(accept ? "已加入菜单，吃过后再记餐" : "已忽略这条建议", accept ? "success" : "")
       await this.load()
     } catch (error) {
       ui.toast(error.message || "操作失败")

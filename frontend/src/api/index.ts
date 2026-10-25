@@ -8,7 +8,7 @@ import type {
   ChatCard, AssistantStatus, AssistantQuota, AdminUser, SiteSettings, AppInfo, FamilySnapshot, FamilyPlanItem,
   FamilyShoppingItem, FoodJournalEntry, FoodJournalInput, HealthReport, HealthSummary, HealthDraftStatus, HealthMealDraftItem, HealthDraftCandidates, HealthJournalBatchInput, HealthProfile, HealthProfileInput, NutritionFood, NutritionRecipeInput, NutritionCatalogFood,
   NotificationPage,
-  DishVideoMeta,
+  DishVideoMeta, MealPlan, RecommendationFeedbackType,
 } from "@/types"
 
 export { getUploadErrorMessage, errorMessage, ApiError }
@@ -109,7 +109,7 @@ export const adminNotificationsApi = {
 export const suggestionsApi = {
   list: (status = "pending") => api<Suggestion[]>("GET", "/suggestions", { status }),
   resolve: (id: number, data: { accept: boolean; dish_ids?: number[]; meal_type?: string; meal_date?: string }) =>
-    api<{ created: MealRecord[] }>("POST", `/suggestions/${id}/resolve`, data),
+    api<{ created: MealPlan[]; planned: boolean }>("POST", `/suggestions/${id}/resolve`, data),
 }
 
 export const assistantApi = {
@@ -233,6 +233,22 @@ export const profileApi = {
 // 行为埋点：浏览 / 采纳 / 拒绝推荐等，失败静默（不影响主流程）
 export const behaviorApi = {
   log: (data: BehaviorEventInput) => api<null>("POST", "/behavior", data).catch(() => null),
+}
+
+export const recommendationFeedbackApi = {
+  send: (recommendationId: string, dishId: number, eventType: RecommendationFeedbackType) =>
+    api<null>("POST", "/recommendation-feedback", {
+      recommendation_id: recommendationId, dish_id: dishId, event_type: eventType,
+      request_key: `${recommendationId}:${dishId}:${eventType}`,
+    }),
+}
+
+export const mealPlansApi = {
+  list: (from: string, to: string) => api<MealPlan[]>("GET", "/meal-plans", { date_from: from, date_to: to }),
+  add: (data: { dish_id: number; meal_date: string; meal_type: string; recommendation_id?: string }) => api<MealPlan>("POST", "/meal-plans", data),
+  replace: (mealDate: string, mealType: string, dishIds: number[], recommendationIds?: Record<number, string>) =>
+    api<MealPlan[]>("PUT", "/meal-plans", { meal_date: mealDate, meal_type: mealType, dish_ids: dishIds, recommendation_ids: recommendationIds }),
+  remove: (id: number) => api<null>("DELETE", `/meal-plans/${id}`),
 }
 
 export const recordsApi = {

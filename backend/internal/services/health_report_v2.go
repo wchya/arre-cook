@@ -264,28 +264,38 @@ func ListHealthPlans(uid uint, from, to string, db *gorm.DB) ([]HealthPlanView, 
 	if err := db.Scopes(database.OwnedBy(uid)).Where("meal_date >= ? AND meal_date <= ?", from, to).Order("meal_date, meal_type, id").Find(&plans).Error; err != nil {
 		return nil, err
 	}
-	out := []HealthPlanView{}
+	out := make([]HealthPlanView, 0, len(plans))
+	if len(plans) == 0 {
+		return out, nil
+	}
 	blocked, err := loadDietaryExclusions(uid, db)
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]uint, 0, len(plans))
 	for _, p := range plans {
-		var n int64
-		if err := db.Model(&models.MealRecord{}).Where("user_id = ? AND meal_date = ? AND meal_type = ? AND dish_id = ?", uid, p.MealDate, p.MealType, p.DishID).Count(&n).Error; err != nil {
-			return nil, err
-		}
+		ids = append(ids, p.DishID)
+	}
+	available := map[uint]bool{}
+	for _, dish := range menuCandidates(uid, ids, db) {
+		available[dish.ID] = !DishViolatesDietaryExclusions(dish, blocked)
+	}
+	var records []models.MealRecord
+	if err := db.Scopes(database.OwnedBy(uid)).Select("dish_id", "meal_date", "meal_type").Where("meal_date >= ? AND meal_date <= ? AND meal_date <= ? AND dish_id IN ?", from, to, healthToday(), ids).Find(&records).Error; err != nil {
+		return nil, err
+	}
+	recorded := map[string]bool{}
+	for _, r := range records {
+		recorded[fmt.Sprintf("%s:%s:%d", r.MealDate, r.MealType, r.DishID)] = true
+	}
+	for _, p := range plans {
 		status := "planned"
-		if n > 0 {
+		if recorded[fmt.Sprintf("%s:%s:%d", p.MealDate, p.MealType, p.DishID)] {
 			status = "recorded"
 		} else if p.MealDate < healthToday() {
 			status = "unconfirmed"
 		}
-		var dish models.Dish
-		err := db.Scopes(database.VisibleDishes(uid)).First(&dish, p.DishID).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		out = append(out, HealthPlanView{HealthPlanItem: p, Status: status, Available: err == nil && dish.Enabled && !containsAny(dishSearchText(dish), blocked)})
+		out = append(out, HealthPlanView{HealthPlanItem: p, Status: status, Available: available[p.DishID]})
 	}
 	return out, nil
 }
@@ -298,85 +308,14 @@ type HealthPlanInput struct {
 }
 
 func AcceptHealthPlan(uid uint, in HealthPlanInput, dbs ...*gorm.DB) (*models.HealthPlanItem, error) {
-	db := database.Handle(dbs...)
-	if _, err := time.Parse("2006-01-02", in.MealDate); err != nil || in.MealDate < healthToday() || in.MealDate > healthNow().AddDate(0, 0, 6).Format("2006-01-02") {
-		return nil, errors.New("请选择今天起七天内的日期")
-	}
-	if !isMainMeal(in.MealType) {
-		return nil, ErrInvalidMealType
-	}
 	if in.PeriodDays != 7 && in.PeriodDays != 30 {
 		return nil, errors.New("报告周期无效")
 	}
-	var result models.HealthPlanItem
-	err := db.Transaction(func(tx *gorm.DB) error {
-		// Serialize explicit plan changes per account, including retries/cancellation.
-		if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
-			return err
-		}
-		var dish models.Dish
-		if err := tx.Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true).First(&dish, in.DishID).Error; err != nil {
-			return ErrDishNotFound
-		}
-		blocked, err := loadDietaryExclusions(uid, tx)
-		if err != nil {
-			return err
-		}
-		if containsAny(dishSearchText(dish), blocked) {
-			return errors.New("这道菜与当前忌口冲突，请换一道")
-		}
-		q := tx.Where("user_id = ? AND meal_date = ? AND meal_type = ? AND dish_id = ?", uid, in.MealDate, in.MealType, in.DishID)
-		if err := tx.Where("user_id = ? AND meal_date = ? AND meal_type = ? AND dish_id = ?", uid, in.MealDate, in.MealType, in.DishID).First(&result).Error; err == nil {
-			return nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		var count int64
-		if err := tx.Model(&models.HealthPlanItem{}).Where("user_id = ? AND meal_date = ? AND meal_type = ?", uid, in.MealDate, in.MealType).Count(&count).Error; err != nil {
-			return err
-		}
-		if count >= int64(MaxDishesPerMeal) {
-			return errors.New("这餐已安排足够菜品，请先撤销再添加")
-		}
-		result = models.HealthPlanItem{UserID: uid, MealDate: in.MealDate, MealType: in.MealType, DishID: dish.ID, DishName: dish.Name, ReportFrom: healthNow().AddDate(0, 0, 1-in.PeriodDays).Format("2006-01-02"), ReportTo: healthToday()}
-		if err := tx.Create(&result).Error; err != nil {
-			return err
-		}
-		var existing int64
-		if err := q.Model(&models.ShoppingCheck{}).Count(&existing).Error; err != nil {
-			return err
-		}
-		if existing == 0 {
-			_, err := addShoppingItems(tx, uid, dish, in.MealType, in.MealDate)
-			return err
-		}
-		return nil
-	})
-	return &result, err
+	return acceptMealPlan(uid, MealPlanInput{DishID: in.DishID, MealDate: in.MealDate, MealType: in.MealType, Source: "health_report"}, in.PeriodDays, database.Handle(dbs...))
 }
 
 func CancelHealthPlan(uid, id uint, dbs ...*gorm.DB) error {
-	return database.Handle(dbs...).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.User{}).Where("id = ?", uid).UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
-			return err
-		}
-		var p models.HealthPlanItem
-		if err := tx.Scopes(database.OwnedBy(uid)).First(&p, id).Error; err != nil {
-			return ErrRecordNotFound
-		}
-		if err := tx.Delete(&p).Error; err != nil {
-			return err
-		}
-		var records int64
-		q := tx.Where("user_id = ? AND meal_date = ? AND meal_type = ? AND dish_id = ?", uid, p.MealDate, p.MealType, p.DishID)
-		if err := q.Model(&models.MealRecord{}).Count(&records).Error; err != nil {
-			return err
-		}
-		if records == 0 {
-			return tx.Where("user_id = ? AND meal_date = ? AND meal_type = ? AND dish_id = ?", uid, p.MealDate, p.MealType, p.DishID).Delete(&models.ShoppingCheck{}).Error
-		}
-		return nil
-	})
+	return CancelMealPlan(uid, id, dbs...)
 }
 
 // Explicit choices override the corresponding random slot; cache remains untouched.
@@ -384,20 +323,9 @@ func applyHealthPlans(uid uint, plan *WeekPlan, db *gorm.DB) {
 	if plan == nil || len(plan.Days) == 0 {
 		return
 	}
-	var items []models.HealthPlanItem
-	if db.Where("user_id = ? AND meal_date >= ? AND meal_date <= ?", uid, plan.Days[0].Date, plan.Days[len(plan.Days)-1].Date).Order("id").Find(&items).Error != nil {
-		return
-	}
-	blocked, err := loadDietaryExclusions(uid, db)
+	slots, err := visibleMealPlanSlots(uid, plan.Days[0].Date, plan.Days[len(plan.Days)-1].Date, db)
 	if err != nil {
 		return
-	}
-	slots := map[string][]models.Dish{}
-	for _, p := range items {
-		var d models.Dish
-		if db.Scopes(database.VisibleDishes(uid)).Where("enabled = ?", true).First(&d, p.DishID).Error == nil && !containsAny(dishSearchText(d), blocked) {
-			slots[p.MealDate+":"+p.MealType] = append(slots[p.MealDate+":"+p.MealType], d)
-		}
 	}
 	for i := range plan.Days {
 		day := &plan.Days[i]

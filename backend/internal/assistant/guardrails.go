@@ -181,8 +181,8 @@ func logReviewFailure(stage, reason string, maxTokens int, result *llm.Result) {
 	log.Printf("[assistant-review] stage=%s reason=%s finish=%s max_tokens=%d content_bytes=%d tool_calls=%d", stage, reason, finish, maxTokens, contentBytes, toolCalls)
 }
 
-var negativeWriteIntent = regexp.MustCompile(`(不要|不许|禁止|无需|不用|不必|别)[^，。！？；\n]{0,6}(保存|新建|添加|收录|记下|记录|修改|更新|调整|收藏|重排|重新生成|设置|打分|评分)`)
-var writeQuestion = regexp.MustCompile(`(如何|怎么|怎样|哪里)[^，。！？；\n]{0,8}(保存|新建|添加|收录|记下|记录|修改|更新|调整|收藏|设置|打分|评分)`)
+var negativeWriteIntent = regexp.MustCompile(`(不要|不许|禁止|无需|不用|不必|别)[^，。！？；\n]{0,6}(保存|新建|添加|收录|记下|记录|修改|更新|调整|收藏|重排|重新生成|设置|打分|评分|安排|加入|准备吃)`)
+var writeQuestion = regexp.MustCompile(`(如何|怎么|怎样|哪里)[^，。！？；\n]{0,8}(保存|新建|添加|收录|记下|记录|修改|更新|调整|收藏|设置|打分|评分|安排|加入)`)
 
 func chatWriteAllowed(name, text string) bool {
 	if negativeWriteIntent.MatchString(text) || writeQuestion.MatchString(text) {
@@ -192,6 +192,11 @@ func chatWriteAllowed(name, text string) bool {
 	switch name {
 	case "log_meal", "log_food_journal":
 		return has("记下", "记上", "记录", "我吃了", "我刚吃", "今天吃了")
+	case "plan_meal":
+		if has("吃什么", "吃啥", "吃点什么", "推荐什么", "推荐几道") {
+			return false
+		}
+		return has("加入菜单", "安排菜单", "就吃这个", "准备吃", "今晚吃", "明天吃", "中午吃", "晚上吃")
 	case "create_private_recipe":
 		return has("保存", "新建", "添加", "收录", "记下") && has("菜谱", "食谱", "私房菜", "做法")
 	case "update_private_recipe":
@@ -204,8 +209,8 @@ func chatWriteAllowed(name, text string) bool {
 		return has("重排", "重新安排", "重新生成") && has("菜单")
 	case "create_suggestion":
 		return has("保存建议", "推送建议", "安排菜单")
-	case "log_feedback":
-		return has("不想吃", "不喜欢", "踩雷", "别推荐")
+	case "log_feedback", "recommendation_feedback":
+		return has("不想吃", "不喜欢", "踩雷", "别推荐", "换一个", "恢复推荐", "撤销不喜欢")
 	case "rate_meal":
 		return has("打分", "评分", "评价")
 	default:

@@ -2,24 +2,17 @@ import RequestState from "@/components/RequestState"
 import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { weekPlanApi, shoppingListApi, recordsApi } from "@/api"
+import { weekPlanApi, shoppingListApi, mealPlansApi } from "@/api"
 import { Flip, gsap, motionDuration, useGSAP } from "@/lib/gsap"
 import AnimatedBottomSheet from "@/components/AnimatedBottomSheet"
 import PageHeader from "@/components/PageHeader"
 import type { WeekDayPlan, ShoppingCategory, MealRecord } from "@/types"
 import toast from "react-hot-toast"
 import { ShoppingBasket } from "lucide-react"
+import { healthDate } from "@/lib/health-date"
 
-function getTodayStr() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
-
-function getTomorrowStr() {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
+function getTodayStr() { return healthDate() }
+function getTomorrowStr() { return healthDate(1) }
 
 const dayOrder: Record<string, number> = { "周一": 1, "周二": 2, "周三": 3, "周四": 4, "周五": 5, "周六": 6, "周日": 7 }
 
@@ -181,16 +174,19 @@ export default function More() {
   })
 
   const recordMut = useMutation({
-    mutationFn: (data: Partial<MealRecord>[]) => recordsApi.batchCreate(data),
+    mutationFn: async (data: Partial<MealRecord>[]) => {
+      for (const record of data) await mealPlansApi.add({ dish_id: record.dish_id!, meal_date: record.meal_date!, meal_type: record.meal_type! })
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["records"] })
+      qc.invalidateQueries({ queryKey: ["meal-plans"] })
+      qc.invalidateQueries({ queryKey: ["week-plan"] })
       qc.invalidateQueries({ queryKey: ["health-report"] })
       qc.invalidateQueries({ queryKey: ["achievements"] })
       qc.refetchQueries({ queryKey: ["shopping-list"] })
-      toast.success("❤ 已记录！")
+      toast.success("❤ 已加入菜单，吃过后再记餐")
       setModalDay(null)
     },
-    onError: () => toast.error("记录失败"),
+    onError: () => toast.error("加入菜单失败，请重试"),
   })
 
   const checkMut = useMutation({

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"gorm.io/gorm"
 	"math"
-	"math/rand"
 	"ninimenu/internal/database"
 	"ninimenu/internal/models"
 	"regexp"
@@ -23,12 +22,15 @@ type WeekDayPlan struct {
 	Dinner    []models.Dish `json:"dinner"`
 }
 
+const weekPlanAlgorithmVersion = RecommendationAlgorithmVersion
+
 type WeekPlan struct {
-	Days []WeekDayPlan `json:"days"`
+	Days             []WeekDayPlan `json:"days"`
+	AlgorithmVersion string        `json:"algorithm_version"`
 }
 
 func getCurrentWeekKey() string {
-	now := time.Now()
+	now := healthNow()
 	weekday := int(now.Weekday())
 	if weekday == 0 {
 		weekday = 7
@@ -67,7 +69,7 @@ func GetCachedWeekPlan(uid uint, dbs ...*gorm.DB) *WeekPlan {
 	weekKey := getCurrentWeekKey()
 
 	if raw := database.GetUserSetting(uid, "week_plan_cache", "", requestDB); raw != "" && len(raw) <= 128<<10 {
-		if plan, err := decodeCachedWeekPlan(raw); err == nil && len(plan.Days) > 0 && len(plan.Days) <= 7 && plan.Days[0].Date == weekKey && hydrateWeekPlan(uid, plan, requestDB) {
+		if plan, err := decodeCachedWeekPlan(raw); err == nil && len(plan.Days) > 0 && len(plan.Days) <= 7 && plan.AlgorithmVersion == weekPlanAlgorithmVersion && plan.Days[0].Date == weekKey && hydrateWeekPlan(uid, plan, requestDB) {
 			return withFavorites(uid, plan, requestDB)
 		}
 	}
@@ -107,8 +109,9 @@ func saveWeekPlanCache(uid uint, plan *WeekPlan, dbs ...*gorm.DB) {
 		Dinner  []dishID `json:"dinner"`
 	}
 	compact := struct {
-		Days []cachedDay `json:"days"`
-	}{Days: make([]cachedDay, len(plan.Days))}
+		Days             []cachedDay `json:"days"`
+		AlgorithmVersion string      `json:"algorithm_version"`
+	}{Days: make([]cachedDay, len(plan.Days)), AlgorithmVersion: weekPlanAlgorithmVersion}
 	for i, day := range plan.Days {
 		compact.Days[i] = cachedDay{Date: day.Date, DayName: day.DayName}
 		for _, d := range day.Lunch {
@@ -157,142 +160,84 @@ func withFavorites(uid uint, plan *WeekPlan, dbs ...*gorm.DB) *WeekPlan {
 
 func GenerateWeekPlan(uid uint, dbs ...*gorm.DB) (*WeekPlan, error) {
 	requestDB := database.Handle(dbs...)
-
-	blocked, err := loadDietaryExclusions(uid, requestDB)
+	ctx, err := NewRecommendationContext(uid, 0, requestDB)
 	if err != nil {
 		return nil, err
 	}
-	var dishes []models.Dish
-	for _, d := range menuCandidates(uid, nil, requestDB) {
-		if !containsAny(dishSearchText(d), blocked) {
-			dishes = append(dishes, d)
-		}
-	}
-	if len(dishes) == 0 {
-		return &WeekPlan{Days: []WeekDayPlan{}}, nil
-	}
-
 	lunchCount := getUserSettingInt(uid, "lunch_dishes_per_day", getSettingInt("lunch_dishes_per_day", 1, requestDB), requestDB)
 	dinnerCount := getUserSettingInt(uid, "dinner_dishes_per_day", getSettingInt("dinner_dishes_per_day", 1, requestDB), requestDB)
-
-	var lunchPool, dinnerPool []models.Dish
-	for _, d := range dishes {
-		tags := parseTags(d.Tags)
-		mt := d.MealType
-		if mt == "all" || mt == "lunch" || containsTag(tags, "午餐") || containsTag(tags, "lunch") {
-			lunchPool = append(lunchPool, d)
-		}
-		if mt == "all" || mt == "dinner" || containsTag(tags, "晚餐") || containsTag(tags, "dinner") {
-			dinnerPool = append(dinnerPool, d)
-		}
-	}
-	if len(lunchPool) == 0 {
-		lunchPool = dishes
-	}
-	if len(dinnerPool) == 0 {
-		dinnerPool = dishes
-	}
-
+	monday, _ := time.ParseInLocation("2006-01-02", getCurrentWeekKey(), healthLocation)
 	dayNames := []string{"周一", "周二", "周三", "周四", "周五", "周六", "周日"}
-	now := time.Now()
-	weekday := int(now.Weekday())
-	if weekday == 0 {
-		weekday = 7
+
+	// Reserve every explicit choice before generating any slot, including a
+	// dinner chosen later in the week. Generated ideas never displace it.
+	locked, err := visibleMealPlanSlots(uid, monday.Format("2006-01-02"), monday.AddDate(0, 0, 6).Format("2006-01-02"), requestDB)
+	if err != nil {
+		return nil, err
 	}
-	monday := now.AddDate(0, 0, 1-weekday)
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	var days []WeekDayPlan
-	usedAllIDs := make(map[uint]bool)
-
-	for i := 0; i < 7; i++ {
-		date := monday.AddDate(0, 0, i)
-		dayPlan := WeekDayPlan{
-			Date:    date.Format("2006-01-02"),
-			DayName: dayNames[i],
-		}
-
-		usedThisDay := make(map[uint]bool)
-
-		dayPlan.Lunch = pickNDishes(lunchPool, lunchCount, usedAllIDs, usedThisDay, r)
-		dayPlan.Dinner = pickNDishes(dinnerPool, dinnerCount, usedAllIDs, usedThisDay, r)
-
-		days = append(days, dayPlan)
-	}
-
-	return &WeekPlan{Days: days}, nil
-}
-
-func pickNDishes(pool []models.Dish, count int, globalUsed map[uint]bool, dayUsed map[uint]bool, r *rand.Rand) []models.Dish {
-	count = min(max(count, 0), MaxDishesPerMeal)
-	type ranked struct {
-		dish  models.Dish
-		score float64
-		used  bool
-	}
-	candidates := make([]ranked, 0, len(pool))
-	for _, d := range pool {
-		if !dayUsed[d.ID] {
-			candidates = append(candidates, ranked{d, -math.Log(1-r.Float64()) / DishSourceWeight(d), globalUsed[d.ID]})
-		}
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		if candidates[i].used != candidates[j].used {
-			return !candidates[i].used
-		}
-		return candidates[i].score < candidates[j].score
-	})
-	picked := make([]models.Dish, 0, min(count, len(candidates)))
-	for _, c := range candidates[:min(count, len(candidates))] {
-		picked = append(picked, c.dish)
-		globalUsed[c.dish.ID] = true
-		dayUsed[c.dish.ID] = true
-	}
-	return picked
-}
-
-// weightedDishIndex 按菜谱来源加权随机：自建菜谱被抽中的概率是系统菜谱的 OwnDishWeight 倍。
-func weightedDishIndex(pool []models.Dish, r *rand.Rand) int {
-	total := 0.0
-	for _, d := range pool {
-		total += DishSourceWeight(d)
-	}
-	x := r.Float64() * total
-	for i, d := range pool {
-		x -= DishSourceWeight(d)
-		if x < 0 {
-			return i
-		}
-	}
-	return len(pool) - 1
-}
-
-func filterAvailableBoth(dishes []models.Dish, globalUsed map[uint]bool, dayUsed map[uint]bool) []models.Dish {
-	var result []models.Dish
-	for _, d := range dishes {
-		if !globalUsed[d.ID] && !dayUsed[d.ID] {
-			result = append(result, d)
-		}
-	}
-	if len(result) == 0 {
+	usedAll := map[uint]bool{}
+	for _, dishes := range locked {
 		for _, d := range dishes {
-			if !dayUsed[d.ID] {
-				result = append(result, d)
+			usedAll[d.ID] = true
+		}
+	}
+	plan := &WeekPlan{Days: make([]WeekDayPlan, 0, 7), AlgorithmVersion: weekPlanAlgorithmVersion}
+	for i := 0; i < 7; i++ {
+		date := monday.AddDate(0, 0, i).Format("2006-01-02")
+		day := WeekDayPlan{Date: date, DayName: dayNames[i], Breakfast: locked[date+":breakfast"]}
+		usedDay := map[uint]bool{}
+		for _, meal := range []string{"breakfast", "lunch", "dinner"} {
+			for _, d := range locked[date+":"+meal] {
+				usedDay[d.ID] = true
 			}
 		}
-	}
-	return result
-}
-
-func filterAvailable(dishes []models.Dish, used map[uint]bool) []models.Dish {
-	var result []models.Dish
-	for _, d := range dishes {
-		if !used[d.ID] {
-			result = append(result, d)
+		for _, slot := range []struct {
+			meal   string
+			count  int
+			target *[]models.Dish
+		}{
+			{"lunch", lunchCount, &day.Lunch}, {"dinner", dinnerCount, &day.Dinner},
+		} {
+			if chosen := locked[date+":"+slot.meal]; len(chosen) > 0 {
+				*slot.target = chosen
+				continue
+			}
+			picked := make([]models.Dish, 0, slot.count)
+			for pass := 0; pass < 2 && len(picked) < slot.count; pass++ {
+				excluded := map[uint]bool{}
+				for id := range usedDay {
+					excluded[id] = true
+				}
+				if pass == 0 {
+					for id := range usedAll {
+						excluded[id] = true
+					}
+				}
+				ids := make([]uint, 0, len(excluded))
+				for id := range excluded {
+					ids = append(ids, id)
+				}
+				sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+				selected := make([]uint, 0, len(picked))
+				for _, d := range picked {
+					selected = append(selected, d.ID)
+				}
+				result, err := RecommendWithContext(ctx, RecommendRequest{MealType: slot.meal, MealDate: date, Count: slot.count - len(picked), ExcludeDishIDs: ids, SelectedDishIDs: selected, Mode: "week_plan", Source: "app", Refresh: true, Jitter: true})
+				if err != nil {
+					return nil, err
+				}
+				for _, item := range result.Items {
+					if !usedDay[item.Dish.ID] {
+						picked = append(picked, item.Dish)
+						usedDay[item.Dish.ID], usedAll[item.Dish.ID] = true, true
+					}
+				}
+			}
+			*slot.target = picked
 		}
+		plan.Days = append(plan.Days, day)
 	}
-	return result
+	return plan, nil
 }
 
 func parseTags(tagsStr string) []string {
@@ -821,7 +766,7 @@ func hydrateWeekPlan(uid uint, plan *WeekPlan, dbs ...*gorm.DB) bool {
 		return false
 	}
 	for _, d := range menuCandidates(uid, ids, requestDB) {
-		if !containsAny(dishSearchText(d), blocked) {
+		if !DishViolatesDietaryExclusions(d, blocked) {
 			current[d.ID] = d
 		}
 	}

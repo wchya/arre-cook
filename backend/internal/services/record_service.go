@@ -12,11 +12,12 @@ import (
 )
 
 var (
-	ErrDishNotFound    = errors.New("菜品不存在")
-	ErrRecordNotFound  = errors.New("记录不存在")
-	ErrInvalidMealType = errors.New("餐次只能是 breakfast、lunch 或 dinner")
-	ErrInvalidDate     = errors.New("日期格式应为 YYYY-MM-DD")
-	ErrDuplicateMeal   = errors.New("该菜品已在当日该餐次中记录过")
+	ErrDishNotFound      = errors.New("菜品不存在")
+	ErrRecordNotFound    = errors.New("记录不存在")
+	ErrInvalidMealType   = errors.New("餐次只能是 breakfast、lunch 或 dinner")
+	ErrInvalidDate       = errors.New("日期格式应为 YYYY-MM-DD")
+	ErrDuplicateMeal     = errors.New("该菜品已在当日该餐次中记录过")
+	ErrFutureMealUsePlan = errors.New("未来餐次请加入菜单计划，实际吃过后再记餐")
 )
 
 // MealInput 记一餐的输入。菜名以数据库为准，不信任调用方传入。
@@ -30,7 +31,7 @@ type MealInput struct {
 	Photo    string `json:"photo"`
 }
 
-func Today() string { return time.Now().Format("2006-01-02") }
+func Today() string { return healthToday() }
 
 func normalizeMealDate(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
@@ -38,7 +39,7 @@ func normalizeMealDate(raw string) (string, error) {
 		return Today(), nil
 	}
 	if raw == "tomorrow" || raw == "明天" {
-		return time.Now().AddDate(0, 0, 1).Format("2006-01-02"), nil
+		return healthNow().AddDate(0, 0, 1).Format("2006-01-02"), nil
 	}
 	if _, err := time.Parse("2006-01-02", raw); err != nil {
 		return "", ErrInvalidDate
@@ -83,6 +84,9 @@ func createMealRecordTx(tx *gorm.DB, uid uint, in MealInput) (*models.MealRecord
 	if err != nil {
 		return nil, dish, nil, err
 	}
+	if date > Today() {
+		return nil, dish, nil, ErrFutureMealUsePlan
+	}
 	if in.DishID == 0 {
 		return nil, dish, nil, ErrDishNotFound
 	}
@@ -108,6 +112,9 @@ func createMealRecordTx(tx *gorm.DB, uid uint, in MealInput) (*models.MealRecord
 		return nil, dish, nil, err
 	}
 	entries, err := addShoppingItems(tx, uid, dish, in.MealType, date)
+	if err == nil {
+		err = tx.Where("user_id = ? AND `key` = ?", uid, "week_plan_cache").Delete(&models.UserSetting{}).Error
+	}
 	return record, dish, entries, err
 }
 
@@ -137,7 +144,12 @@ func UpdateMealRecord(uid uint, id any, patch MealPatch, dbs ...*gorm.DB) (*mode
 	if patch.Photo != nil {
 		record.Photo = strings.TrimSpace(*patch.Photo)
 	}
-	if err := requestDB.Save(&record).Error; err != nil {
+	if err := requestDB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&record).Error; err != nil {
+			return err
+		}
+		return tx.Where("user_id = ? AND `key` = ?", uid, "week_plan_cache").Delete(&models.UserSetting{}).Error
+	}); err != nil {
 		return nil, err
 	}
 	QueueAutoAchievementSync(uid)
@@ -156,6 +168,9 @@ func DeleteMealRecord(uid uint, id any, dbs ...*gorm.DB) (*models.MealRecord, er
 			return err
 		}
 		if err := tx.Delete(&record).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ? AND `key` = ?", uid, "week_plan_cache").Delete(&models.UserSetting{}).Error; err != nil {
 			return err
 		}
 		var plans int64
@@ -231,6 +246,8 @@ func SetFavorite(uid, dishID uint, favorite bool, dbs ...*gorm.DB) error {
 var validEventTypes = map[string]bool{
 	"view": true, "recommend": true, "accept": true, "reject": true,
 	"search": true, "chat": true, "feedback": true, "custom": true,
+	"impression": true, "skip": true, "not_today": true, "dislike": true,
+	"undo_dislike": true, "plan": true,
 }
 
 func IsValidEventType(t string) bool { return validEventTypes[strings.TrimSpace(t)] }

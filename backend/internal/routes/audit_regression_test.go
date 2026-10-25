@@ -174,7 +174,7 @@ func TestAuditMenuResolvesCurrentContentAndVisibility(t *testing.T) {
 		weekday = 7
 	}
 	monday := now.AddDate(0, 0, 1-weekday).Format("2006-01-02")
-	b, _ := json.Marshal(services.WeekPlan{Days: []services.WeekDayPlan{{Date: monday, Lunch: []models.Dish{d}}}})
+	b, _ := json.Marshal(services.WeekPlan{AlgorithmVersion: services.RecommendationAlgorithmVersion, Days: []services.WeekDayPlan{{Date: monday, Lunch: []models.Dish{d}}}})
 	if err := database.SetUserSetting(u.ID, "week_plan_cache", string(b)); err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestAuditSuggestionFailureDoesNotConsumePendingState(t *testing.T) {
 	if err := database.DB.Create(&s).Error; err != nil {
 		t.Fatal(err)
 	}
-	injectWriteFailure(t, "create", "meal_records")
+	injectWriteFailure(t, "create", "health_plan_items")
 	rows, err := services.ResolveSuggestion(u.ID, s.ID, services.ResolveInput{Accept: true})
 	if err == nil || len(rows) != 0 {
 		t.Fatal("failed acceptance reported success")
@@ -307,9 +307,13 @@ func TestAuditSuggestionRetryAndFamilyPlanRollback(t *testing.T) {
 		}
 	}
 	var count int64
-	database.DB.Model(&models.MealRecord{}).Where("user_id = ?", u.ID).Count(&count)
+	database.DB.Model(&models.HealthPlanItem{}).Where("user_id = ?", u.ID).Count(&count)
 	if count != 1 {
-		t.Fatalf("replayed meals=%d", count)
+		t.Fatalf("replayed plans=%d", count)
+	}
+	database.DB.Model(&models.MealRecord{}).Where("user_id = ?", u.ID).Count(&count)
+	if count != 0 {
+		t.Fatalf("accepted suggestion created actual meals=%d", count)
 	}
 	family, err := services.CreateFamily(u.ID, "plan rollback")
 	if err != nil {

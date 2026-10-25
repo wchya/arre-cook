@@ -34,6 +34,16 @@ func TestInputPolicyAndOrdinaryRecipeNames(t *testing.T) {
 }
 
 func TestWriteIntentRequiresAnAction(t *testing.T) {
+	for _, text := range []string{"明天吃什么", "今晚吃啥？", "不要安排菜单，只推荐几道", "别加入菜单，只看做法", "怎么把它加入菜单"} {
+		if chatWriteAllowed("plan_meal", text) {
+			t.Fatalf("recommendation question enabled planning: %s", text)
+		}
+	}
+	for _, text := range []string{"就吃这个，加入菜单", "帮我把番茄炒蛋安排菜单", "明天吃番茄炒蛋，帮我加入菜单"} {
+		if !chatWriteAllowed("plan_meal", text) {
+			t.Fatalf("explicit plan request blocked: %s", text)
+		}
+	}
 	for _, question := range []string{"看看我的收藏", "这道菜怎么收藏？", "不要帮我收藏这道菜", "请不要记录今天的晚餐"} {
 		for _, name := range []string{"set_favorite", "log_meal"} {
 			if chatWriteAllowed(name, question) {

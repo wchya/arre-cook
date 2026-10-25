@@ -119,7 +119,7 @@ func recordError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, services.ErrDishNotFound), errors.Is(err, services.ErrRecordNotFound):
 		utils.NotFound(c, err.Error())
-	case errors.Is(err, services.ErrDuplicateMeal), errors.Is(err, services.ErrInvalidMealType), errors.Is(err, services.ErrInvalidDate):
+	case errors.Is(err, services.ErrDuplicateMeal), errors.Is(err, services.ErrInvalidMealType), errors.Is(err, services.ErrInvalidDate), errors.Is(err, services.ErrFutureMealUsePlan):
 		utils.BadRequest(c, err.Error())
 	default:
 		utils.InternalError(c, "操作失败")
@@ -133,6 +133,16 @@ func CreateRecord(c *gin.Context) {
 		return
 	}
 	record, err := services.CreateMealRecord(uid(c), req.input(), "app", "", database.DB.WithContext(c.Request.Context()))
+	if errors.Is(err, services.ErrFutureMealUsePlan) {
+		date, _ := services.NormalizeMealPlanDate(req.MealDate)
+		plan, planErr := services.AcceptMealPlan(uid(c), services.MealPlanInput{DishID: req.DishID, MealDate: date, MealType: req.MealType, Source: "app"}, database.DB.WithContext(c.Request.Context()))
+		if planErr != nil {
+			mealPlanError(c, planErr)
+			return
+		}
+		utils.Success(c, gin.H{"planned": true, "plan_id": plan.ID, "plan": plan})
+		return
+	}
 	if err != nil {
 		recordError(c, err)
 		return
@@ -149,16 +159,27 @@ func BatchCreateRecords(c *gin.Context) {
 		return
 	}
 	created := make([]models.MealRecord, 0, len(req.Records))
+	planned := make([]models.HealthPlanItem, 0)
 	skipped := 0
 	for _, r := range req.Records {
 		record, err := services.CreateMealRecord(uid(c), r.input(), "app", "", database.DB.WithContext(c.Request.Context()))
+		if errors.Is(err, services.ErrFutureMealUsePlan) {
+			date, _ := services.NormalizeMealPlanDate(r.MealDate)
+			plan, planErr := services.AcceptMealPlan(uid(c), services.MealPlanInput{DishID: r.DishID, MealDate: date, MealType: r.MealType, Source: "app"}, database.DB.WithContext(c.Request.Context()))
+			if planErr != nil {
+				skipped++
+			} else {
+				planned = append(planned, *plan)
+			}
+			continue
+		}
 		if err != nil {
 			skipped++
 			continue
 		}
 		created = append(created, *record)
 	}
-	utils.Success(c, gin.H{"created": created, "skipped": skipped, "total": len(req.Records)})
+	utils.Success(c, gin.H{"created": created, "planned": planned, "skipped": skipped, "total": len(req.Records)})
 }
 
 func UpdateRecord(c *gin.Context) {
