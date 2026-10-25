@@ -1,0 +1,9 @@
+{
+  "version": "0.17.1",
+  "revision": "4511e04d02a6fdffa2d4b4adadf2612eb511490f",
+  "schema_changed": false,
+  "migration_required": false,
+  "existing_tables": 52,
+  "new_tables": [],
+  "reason": "Client feedback request-key and release-version patch only; reuse existing recommendation schema."
+}

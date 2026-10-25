@@ -1,0 +1,16 @@
+{
+  "version": "0.17.1",
+  "source_revision": "4511e04d02a6fdffa2d4b4adadf2612eb511490f",
+  "checks": {
+    "web_lint": "passed",
+    "web_build": "passed",
+    "client_tests": {
+      "passed": 109,
+      "failed": 0
+    },
+    "miniprogram_javascript_syntax": "passed",
+    "official_miniprogram_compilation": "passed",
+    "official_miniprogram_upload": "passed"
+  },
+  "schema_changes": false
+}

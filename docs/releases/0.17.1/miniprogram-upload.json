@@ -1,0 +1,16 @@
+{
+  "version": "0.17.1",
+  "revision": "4511e04d02a6fdffa2d4b4adadf2612eb511490f",
+  "appid": "wx1c4522af7a2e72d1",
+  "sdk_version": "2.1.31",
+  "uploaded_at": "2026-10-25T07:36:04.109Z",
+  "result": {
+    "subPackageInfo": [
+      {
+        "name": "__FULL__",
+        "size": 759867
+      }
+    ],
+    "pluginInfo": []
+  }
+}

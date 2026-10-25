@@ -1,0 +1,37 @@
+{
+  "version": "0.17.1",
+  "checks": [
+    "administrator_login",
+    "/api/meal-plans",
+    "/api/profile",
+    "/api/week-plan",
+    "/api/health/summary",
+    "/api/notifications",
+    "mcp_initialize",
+    "mcp_tools_list_readonly_permissions",
+    "mcp_recommendation_v2_metadata_and_bounded_scores",
+    "agent_rest_recommendation"
+  ],
+  "local": {
+    "busy_rejections": 0,
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-10-25T15:40:44+08:00",
+    "version": "0.17.1"
+  },
+  "public": {
+    "busy_rejections": 0,
+    "status": "UP",
+    "storage": "s3",
+    "time": "2026-10-25T15:40:44+08:00",
+    "version": "0.17.1"
+  },
+  "algorithm_version": "personal-meal-v2",
+  "runtime": {
+    "DB_AUTO_MIGRATE": "false",
+    "GOMEMLIMIT": "192MiB",
+    "GOMAXPROCS": "2"
+  },
+  "container_health": "healthy",
+  "restart_count": 0
+}
