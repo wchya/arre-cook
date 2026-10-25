@@ -1,0 +1,28 @@
+{
+  "source_revision": "ef8f8903798b83841137c6731ec570903a9456d8",
+  "version": "0.17.0",
+  "timezone": "Asia/Shanghai",
+  "checks": {
+    "go_test_all": "passed",
+    "go_vet_all": "passed",
+    "go_race_recommendation_and_plan_contracts": "passed",
+    "web_lint": "passed",
+    "web_build": "passed",
+    "client_tests": {
+      "passed": 107,
+      "failed": 0
+    },
+    "git_diff_check": "passed",
+    "browser": {
+      "daily_reload_stable": true,
+      "skip_changes_candidate": true,
+      "scores_hidden": true,
+      "plan_created_without_actual_meal": true,
+      "dislike_and_undo": true,
+      "recommendation_page_scrolls": true
+    }
+  },
+  "limits": [
+    "WeChat device acceptance and distribution are separate from server deployment."
+  ]
+}

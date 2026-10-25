@@ -1,0 +1,19 @@
+{
+  "startup_error_markers": 0,
+  "resource_limits": {
+    "memory_bytes": 1073741824,
+    "nano_cpus": 2000000000,
+    "stop_timeout": 110
+  },
+  "actual_record_counts_preserved": {
+    "meal_records": 6,
+    "food_journal_entries": 35
+  },
+  "image_read": {
+    "status": 200,
+    "content_type": "image/jpeg"
+  },
+  "git_revision": "ef8f8903798b83841137c6731ec570903a9456d8",
+  "backup_permissions": "0o700",
+  "backup_file_permissions": "0o600"
+}
