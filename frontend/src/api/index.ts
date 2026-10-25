@@ -239,7 +239,10 @@ export const recommendationFeedbackApi = {
   send: (recommendationId: string, dishId: number, eventType: RecommendationFeedbackType) =>
     api<null>("POST", "/recommendation-feedback", {
       recommendation_id: recommendationId, dish_id: dishId, event_type: eventType,
-      request_key: `${recommendationId}:${dishId}:${eventType}`,
+      // The server derives reversible preference receipts from the latest state.
+      ...(eventType === "dislike" || eventType === "undo_dislike" ? {} : {
+        request_key: `${recommendationId}:${dishId}:${eventType}`,
+      }),
     }),
 }
 

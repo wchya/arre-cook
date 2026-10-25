@@ -6,7 +6,10 @@ function feedback(recommendationId, dishId, eventType) {
     recommendation_id: recommendationId,
     dish_id: dishId,
     event_type: eventType,
-    request_key: `${recommendationId}:${dishId}:${eventType}`,
+    // Reversible preferences use the server's state-aware idempotency key.
+    ...(eventType === "dislike" || eventType === "undo_dislike" ? {} : {
+      request_key: `${recommendationId}:${dishId}:${eventType}`,
+    }),
   })
 }
 

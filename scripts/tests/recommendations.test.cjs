@@ -45,7 +45,7 @@ function mini(name) {
     _seen: [], _rejected: [], _recommendationId: '', _today: [],
   }
   for (const [key, value] of Object.entries(definition)) if (typeof value === 'function') page[key] = value.bind(page)
-  return { page, api, calls, toasts, observers }
+  return { page, api, calls, toasts, observers, recommendation: helper.exports }
 }
 
 test('mini home reports only a visible card and skips never become dislikes', async () => {
@@ -180,3 +180,36 @@ test('mini recommendation officer starts a new session when meal or filters chan
   page.setData({ includeText: '鸡蛋' })
   assert.equal(page.buildRequest().session_id, undefined)
 })
+
+function webFeedback() {
+  const ts = front('typescript')
+  const calls = []
+  const mod = { exports: {} }
+  const client = { api: async (method, url, body) => { calls.push([method, url, structuredClone(body)]); return null } }
+  const code = ts.transpileModule(fs.readFileSync(path.join(root, 'frontend/src/api/index.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
+  new Function('require', 'module', 'exports', code)(name => name === './client' ? client : front(name), mod, mod.exports)
+  return { send: mod.exports.recommendationFeedbackApi.send, calls }
+}
+
+for (const channel of ['Web', 'mini']) {
+  test(`${channel} reversible feedback uses server state while exposure retries keep a fixed receipt`, async () => {
+    const adapter = channel === 'Web' ? webFeedback() : (() => {
+      const { recommendation, calls } = mini('assistant')
+      return { send: recommendation.feedback, calls }
+    })()
+    for (const kind of ['dislike', 'undo_dislike', 'dislike', 'undo_dislike']) await adapter.send('same-snapshot', 9, kind)
+    assert.deepEqual(adapter.calls.map(call => call[2].event_type), ['dislike', 'undo_dislike', 'dislike', 'undo_dislike'])
+    for (const call of adapter.calls) {
+      assert.equal(call[1], '/recommendation-feedback')
+      assert.equal(call[2].recommendation_id, 'same-snapshot')
+      assert.equal(Object.hasOwn(call[2], 'request_key'), false)
+    }
+    for (const kind of ['impression', 'skip', 'not_today']) {
+      await adapter.send('same-snapshot', 9, kind)
+      await adapter.send('same-snapshot', 9, kind)
+      const pair = adapter.calls.slice(-2)
+      assert.equal(pair[0][2].request_key, `same-snapshot:9:${kind}`)
+      assert.equal(pair[0][2].request_key, pair[1][2].request_key)
+    }
+  })
+}
