@@ -1,0 +1,14 @@
+{
+  "ninimenu-final.sql": {
+    "bytes": 1133546,
+    "sha256": "ccca7789a84e60592f72793753b9c32b98a5451c53fbe1ca6a3c038bf3743ebf"
+  },
+  "cook-uploads-s3.tar.gz": {
+    "bytes": 1420921,
+    "sha256": "936d8385ca47c77dc85fce0af228957c308ecd45787bc985bb7b0a45e73d610b"
+  },
+  "local-uploads.tar.gz": {
+    "bytes": 61616273,
+    "sha256": "26a4fe6f71bb79c477eed3602b8de3120fb2758903841017bbbded657513c5e1"
+  }
+}

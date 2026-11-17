@@ -1,0 +1,39 @@
+{
+  "version": "0.18.0",
+  "source_revision": "1ef55882fecbefa1f4861cdbae81723de07cddf8",
+  "algorithm_version": "personal-meal-v3",
+  "checks": {
+    "backend_tests": {
+      "passed": 392,
+      "packages": 24,
+      "failed": 0
+    },
+    "backend_vet": "passed",
+    "web_lint": "passed",
+    "web_build": "passed",
+    "client_tests": {
+      "passed": 109,
+      "failed": 0
+    },
+    "recommendation_client_tests": {
+      "passed": 10,
+      "failed": 0
+    },
+    "release_worktree": "clean",
+    "scoped_diff_check": "passed"
+  },
+  "benchmark": {
+    "name": "BenchmarkRecommendationV3ReusedContext",
+    "platform": "Apple M1",
+    "fixture_recipes": 100,
+    "fixture_history_records": 20,
+    "requested_results": 3,
+    "iterations": 20,
+    "ns_per_op": 2710708,
+    "bytes_per_op": 1275615,
+    "allocations_per_op": 16352,
+    "scope": "Reused context; excludes model creation and database loading."
+  },
+  "schema_changes": false,
+  "new_runtime_dependencies": false
+}

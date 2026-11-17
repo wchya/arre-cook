@@ -1,0 +1,9 @@
+{
+  "version": "0.18.0",
+  "revision": "1ef55882fecbefa1f4861cdbae81723de07cddf8",
+  "schema_changed": false,
+  "migration_required": false,
+  "existing_tables": 52,
+  "new_tables": [],
+  "reason": "Historical recipe similarity, signed neighbor preference transfer and controlled exploration reuse the existing recommendation schema."
+}

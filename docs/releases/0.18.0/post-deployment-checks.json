@@ -1,0 +1,28 @@
+{
+  "source_revision": "1ef55882fecbefa1f4861cdbae81723de07cddf8",
+  "running_image": "sha256:db9afe6c508a5dc5c4a26cbc2ea24058f24a37556d2c63a0c54064e8d3e1aa72",
+  "image_revision_label": "1ef55882fecbefa1f4861cdbae81723de07cddf8",
+  "startup_error_markers": 0,
+  "resource_limits": {
+    "memory_bytes": 1073741824,
+    "nano_cpus": 2000000000,
+    "stop_timeout": 110
+  },
+  "actual_record_counts_preserved": {
+    "users": 4,
+    "dishes": 661,
+    "meal_records": 6,
+    "food_journal_entries": 51,
+    "user_favorites": 0
+  },
+  "schema_tables": 52,
+  "release_notices": 4,
+  "maintenance_removed": true,
+  "backup_permissions": "0o700",
+  "backup_file_permissions": "0o600",
+  "database_dump_tables": 52,
+  "local_upload_archive_entries": 652,
+  "backup_checksums_recorded": true,
+  "container_health": "healthy",
+  "restart_count": 0
+}
