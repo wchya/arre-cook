@@ -90,6 +90,8 @@ type TasteProfile struct {
 	ingredientNegative  map[string]float64
 	ingredientWeightMap map[string]float64
 	recentMainCounts    map[string]int
+	historyDishes       []models.Dish
+	historyModel        *recommendationHistoryModel
 }
 
 func normalizeProfileDays(days int) int {
@@ -151,7 +153,7 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 
 	var allDishes []models.Dish
 	if err := requestDB.Unscoped().Scopes(database.VisibleDishes(uid)).
-		Select("id", "name", "category", "taste", "ingredients", "seasonings", "cook_time", "difficulty", "owner_id", "deleted_at").
+		Select("id", "name", "category", "taste", "ingredients", "seasonings", "tags", "cook_time", "difficulty", "owner_id", "family_id", "deleted_at").
 		Find(&allDishes).Error; err != nil {
 		p.loadErr = err
 		return p
@@ -410,6 +412,12 @@ func BuildTasteProfile(uid uint, days int, dbs ...*gorm.DB) *TasteProfile {
 	sortBriefs(p.DislikedDishes)
 	p.MostViewedDishes = frequencyList(p.viewCount, dishByID, p.LastEaten, 8)
 	p.RejectedDishes = frequencyList(p.rejectCount, dishByID, p.LastEaten, 8)
+	for _, d := range allDishes {
+		if p.dishEvidence[d.ID] != nil || p.favoriteSet[d.ID] || p.LastEaten[d.ID] != "" {
+			p.historyDishes = append(p.historyDishes, d)
+		}
+	}
+	sort.Slice(p.historyDishes, func(i, j int) bool { return p.historyDishes[i].ID < p.historyDishes[j].ID })
 
 	p.Summary = buildProfileSummary(p)
 	return p

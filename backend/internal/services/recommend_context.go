@@ -43,6 +43,8 @@ func NewRecommendationContext(uid uint, profileDays int, dbs ...*gorm.DB) (*Reco
 	if ctx.profile.loadErr != nil {
 		return nil, ctx.profile.loadErr
 	}
+	catalog := append(append([]models.Dish{}, ctx.profile.historyDishes...), ctx.dishes...)
+	ctx.profile.historyModel = newRecommendationHistory(catalog, ctx.profile)
 	var inventory []models.HomeInventory
 	if err = db.Scopes(database.OwnedBy(uid)).Where("in_stock = ?", true).Find(&inventory).Error; err != nil {
 		return nil, err
@@ -294,6 +296,12 @@ func RecommendWithContext(ctx *RecommendationContext, req RecommendRequest) (*Re
 		n = n<<8 | int64(v)
 	}
 	rng := mathrand.New(mathrand.NewSource(n))
+	if diversity && ctx.profile.historyModel != nil {
+		req.recentContentSimilarity = make(map[uint]float64, len(candidates))
+		for _, d := range candidates {
+			req.recentContentSimilarity[d.ID] = ctx.profile.historyModel.recentSimilarity(d.ID, date, ctx.profile.LastEaten)
+		}
+	}
 	picked := []RecommendItem{}
 	pool := append([]models.Dish{}, candidates...)
 	for len(pool) > 0 && len(picked) < count {
@@ -314,15 +322,12 @@ func RecommendWithContext(ctx *RecommendationContext, req RecommendRequest) (*Re
 			return ties[scored[i].Dish.ID] > ties[scored[j].Dish.ID]
 		})
 		chosen := scored[0]
-		if diversity && ctx.profile.WindowRecords > 0 && rng.Float64() < .2 {
-			explorers := []RecommendItem{}
-			for _, it := range scored {
-				if ctx.profile.eatenCount[it.Dish.ID] == 0 && !ctx.profile.dislikedSet[it.Dish.ID] && it.Score >= scored[0].Score-12 {
-					explorers = append(explorers, it)
-				}
-			}
-			if len(explorers) > 0 {
-				chosen = explorers[rng.Intn(len(explorers))]
+		// Reserve at most one discovery in a meal; smaller requests explore
+		// occasionally. Exploration must still have positive historical support.
+		explore := count >= 3 && len(picked) == count-1 || count < 3 && len(picked) == 0 && rng.Float64() < .2
+		if diversity && explore {
+			if discovery, ok := historyDiscovery(scored, selected, ctx.profile); ok {
+				chosen = discovery
 			}
 		}
 		chosen.ItemID = fmt.Sprintf("%s:%d", id, chosen.Dish.ID)
@@ -432,7 +437,23 @@ func recommendationContextKey(ctx *RecommendationContext, req RecommendRequest, 
 		Candidates, Selected []models.Dish
 		Inventory            map[string]bool
 		Quality              map[uint]float64
-	}{RecommendationAlgorithmVersion + ":reasons-v2", req, ctx.profile.Preferences, ctx.blocked, ctx.profile.favoriteSet, ctx.profile.dishEvidence, ctx.profile.LastEaten, candidates, selected, ctx.inventory, ctx.quality}
+		History              string
+		HistoryDishes        []models.Dish
+		Liked, Disliked      map[uint]bool
+		RecentMainCounts     map[string]int
+		LearnedPreferences   [6]map[string]float64
+	}{
+		Version: RecommendationAlgorithmVersion, Request: req, Preferences: ctx.profile.Preferences,
+		Blocked: ctx.blocked, Favorites: ctx.profile.favoriteSet, Evidence: ctx.profile.dishEvidence,
+		LastEaten: ctx.profile.LastEaten, Candidates: candidates, Selected: selected,
+		Inventory: ctx.inventory, Quality: ctx.quality, History: ctx.profile.historyModel.fingerprint(),
+		HistoryDishes: ctx.profile.historyDishes, Liked: ctx.profile.likedSet, Disliked: ctx.profile.dislikedSet,
+		RecentMainCounts: ctx.profile.recentMainCounts,
+		LearnedPreferences: [6]map[string]float64{
+			ctx.profile.tasteWeightMap, ctx.profile.categoryWeightMap, ctx.profile.ingredientWeightMap,
+			ctx.profile.tasteNegative, ctx.profile.categoryNegative, ctx.profile.ingredientNegative,
+		},
+	}
 	raw, _ := json.Marshal(payload)
 	h := sha256.Sum256(raw)
 	return hex.EncodeToString(h[:])

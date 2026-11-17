@@ -10,7 +10,7 @@ import (
 	"ninimenu/internal/models"
 )
 
-const RecommendationAlgorithmVersion = "personal-meal-v2"
+const RecommendationAlgorithmVersion = "personal-meal-v3"
 
 var recommendationLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
 
@@ -71,6 +71,13 @@ func affinityForDish(d models.Dish, p *TasteProfile) (float64, float64, float64)
 		ingredientPenalty = math.Max(ingredientPenalty, 5*n/(n+3))
 	}
 	prior += 5*ingredientBest - ingredientPenalty
+	if p.historyModel != nil {
+		adjustment := p.historyModel.signals[d.ID].Adjustment
+		if p.dislikedSet[d.ID] {
+			adjustment = math.Min(0, adjustment)
+		}
+		prior += adjustment
+	}
 	prior = boundedScore(prior)
 	e := p.dishEvidence[d.ID]
 	if e == nil {
@@ -283,7 +290,7 @@ type scoreReason struct {
 }
 
 func scoreDishV2(d models.Dish, req RecommendRequest, p *TasteProfile, date time.Time, selected []models.Dish, inventory map[string]bool, quality float64, exposures map[uint]int) (float64, []string, recommendationScoreParts) {
-	f := dishFeatures(d)
+	f := p.historyModel.featuresFor(d)
 	personal, confidence, _ := affinityForDish(d, p)
 	reasons := []scoreReason{}
 	reason := func(points float64, text string) {
@@ -293,6 +300,12 @@ func scoreDishV2(d models.Dish, req RecommendRequest, p *TasteProfile, date time
 	}
 	if p.favoriteSet[d.ID] {
 		reason(5.25, "你收藏过的菜")
+	}
+	if p.historyModel != nil && !p.dislikedSet[d.ID] {
+		signal := p.historyModel.signals[d.ID]
+		if signal.Adjustment > 0 && signal.Reason != "" {
+			reason(signal.Adjustment*.35, signal.Reason)
+		}
 	}
 	if evidence := p.dishEvidence[d.ID]; personal >= 65 && evidence != nil && evidence.Weight >= 1 && evidence.Sum/evidence.Weight >= 75 && p.likedSet[d.ID] {
 		reason((personal-50)*.35, "之前吃过，评价不错")
@@ -368,6 +381,23 @@ func scoreDishV2(d models.Dish, req RecommendRequest, p *TasteProfile, date time
 	freshness -= math.Min(float64(exposures[d.ID])*4, 24)
 	freshness -= math.Min(float64(p.recentMainCounts[f.Main])*5, 15)
 	freshness -= math.Min(float64(p.rejectCount[d.ID])*2, 6)
+	if p.historyModel != nil && (req.Diversity == nil || *req.Diversity) {
+		signal := p.historyModel.signals[d.ID]
+		recentSimilarity, cached := req.recentContentSimilarity[d.ID]
+		if !cached {
+			recentSimilarity = p.historyModel.recentSimilarity(d.ID, date, p.LastEaten)
+		}
+		freshness -= 30 * math.Max(0, (recentSimilarity-.65)/.35)
+		if p.eatenCount[d.ID] == 0 {
+			// Different IDs with nearly identical recipes are not new experiences.
+			if p.WindowRecords > 0 {
+				freshness -= 20 * math.Max(0, (signal.Similarity-.85)/.15)
+			}
+			if signal.Positive > signal.Negative && !p.dislikedSet[d.ID] {
+				freshness += 10 * signal.Novelty * signal.Positive
+			}
+		}
+	}
 	if p.notToday[d.ID] && req.MealDate == recommendationNow().Format("2006-01-02") {
 		freshness = 0
 	}
@@ -405,7 +435,10 @@ func scoreDishV2(d models.Dish, req RecommendRequest, p *TasteProfile, date time
 	}
 	pairing := 50.0
 	if req.Diversity == nil || *req.Diversity {
-		pairing = pairingScore(d, selected)
+		pairing = pairingScore(d, selected, p.historyModel)
+		if p.historyModel != nil {
+			pairing -= 40 * math.Max(0, (nearestSelectedSimilarity(p.historyModel, d.ID, selected)-.5)/.5)
+		}
 	}
 	if len(selected) > 0 && pairing >= 70 {
 		text := "换一种主食材或做法"
@@ -422,7 +455,7 @@ func scoreDishV2(d models.Dish, req RecommendRequest, p *TasteProfile, date time
 				confirmed = append(confirmed, other)
 			}
 		}
-		if len(confirmed) > 0 && pairingScore(d, confirmed) >= 70 {
+		if len(confirmed) > 0 && pairingScore(d, confirmed, p.historyModel) >= 70 {
 			text = "和已经选好的菜搭配更丰富"
 		}
 		reason((pairing-50)*.1, text)
@@ -446,14 +479,18 @@ func scoreDishV2(d models.Dish, req RecommendRequest, p *TasteProfile, date time
 	}
 	return math.Round(boundedScore(score)*10) / 10, explanation, parts
 }
-func pairingScore(d models.Dish, selected []models.Dish) float64 {
+func pairingScore(d models.Dish, selected []models.Dish, history ...*recommendationHistoryModel) float64 {
 	if len(selected) == 0 {
 		return 50
 	}
-	f := dishFeatures(d)
+	var model *recommendationHistoryModel
+	if len(history) > 0 {
+		model = history[0]
+	}
+	f := model.featuresFor(d)
 	total := 0.0
 	for _, other := range selected {
-		o := dishFeatures(other)
+		o := model.featuresFor(other)
 		value := 60.0
 		if f.Role != "" && o.Role != "" {
 			if f.Role == o.Role {

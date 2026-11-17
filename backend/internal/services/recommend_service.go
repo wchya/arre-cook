@@ -35,6 +35,8 @@ type RecommendRequest struct {
 	Mode               string        `json:"mode"`
 	Source             string        `json:"source"`
 	Actor              string        `json:"actor"`
+
+	recentContentSimilarity map[uint]float64
 }
 
 type RecommendItem struct {
